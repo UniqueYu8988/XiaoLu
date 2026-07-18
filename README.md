@@ -6,6 +6,7 @@
     <img alt="Version" src="https://img.shields.io/badge/version-0.1.0-76558f" />
     <img alt="Platform" src="https://img.shields.io/badge/platform-Windows-4b315e" />
     <img alt="Data" src="https://img.shields.io/badge/data-local--only-a9c99e" />
+    <img alt="License" src="https://img.shields.io/badge/code%20license-MIT-f4d57b" />
   </p>
 </div>
 
@@ -173,6 +174,10 @@ tests/                  核心状态逻辑测试
 
 后续功能会在实际使用一段时间后集中整理，再提升次版本号发布，避免为了增加功能而让学习助理本身变成负担。
 
-## 素材与授权说明
+## 许可证与素材授权
 
-小鹿角色图像由项目所有者提供。除非得到明确许可，仓库中的角色素材不授权再分发、二次打包或商业使用。第三方项目与依赖的权利归各自作者所有。
+- 项目自行编写的源代码、测试、构建脚本和配置采用 [MIT License](LICENSE) 开源。
+- `assets/` 与 `docs/` 中的小鹿角色、动画图集、角色图标及带有人物的说明书素材不属于 MIT，仍由项目所有者保留全部权利。
+- 你可以自由使用和修改代码；如果没有获得额外素材授权，需要把小鹿角色素材替换成自己的内容。
+
+完整边界和中英文说明见 [ASSET_LICENSE.md](ASSET_LICENSE.md)，第三方项目声明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。

@@ -3,6 +3,7 @@
   "productName": "小鹿共学搭子",
   "version": "0.1.0",
   "author": "Xiaolu",
+  "license": "MIT",
   "private": true,
   "description": "A focused, local-first desktop companion for Xiaolu.",
   "type": "module",
