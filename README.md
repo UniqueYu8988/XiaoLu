@@ -3,7 +3,7 @@
   <h1>小鹿共学搭子</h1>
   <p>不是桌面宠物，而是住在桌面上的学习搭子。</p>
   <p>
-    <img alt="Version" src="https://img.shields.io/badge/version-0.1.0-76558f" />
+    <img alt="Version" src="https://img.shields.io/badge/version-0.2.0-76558f" />
     <img alt="Platform" src="https://img.shields.io/badge/platform-Windows-4b315e" />
     <img alt="Data" src="https://img.shields.io/badge/data-local--only-a9c99e" />
     <img alt="License" src="https://img.shields.io/badge/code%20license-MIT-f4d57b" />
@@ -180,7 +180,7 @@ tests/                  核心状态逻辑测试
 
 ## 版本计划
 
-当前为 `0.1.0`：完成独立运行、稳定拖动、学习计时、五次打卡、每日及固定任务、晚间结算、书签、统计、自启动和 MSI 安装。
+当前为 `0.2.0`：完成独立运行、稳定拖动、学习计时、五次打卡、每日及固定任务、晚间结算、书签、统计、自启动和 MSI 安装。
 
 后续功能会在实际使用一段时间后集中整理，再提升次版本号发布，避免为了增加功能而让学习助理本身变成负担。
 
