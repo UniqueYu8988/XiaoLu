@@ -10,18 +10,25 @@ import {
   type IpcMainEvent,
 } from "electron";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 
 import {
   CHECK_IN_SLOTS,
+  addDailyTask,
   calculateStats,
   checkIn,
   daySummaries,
+  deleteDailyTask,
+  editDailyTask,
   getDay,
   initialStudyState,
   localDateKey,
+  markTaskReminderShown,
   normalizeStudyState,
   reconcileStudyState,
+  setDailyTaskCompleted,
+  setDailyTaskRecurring,
   setLaunchAtLogin,
   studyMsForDay,
   submitDailyReport,
@@ -37,6 +44,7 @@ const PET_HITBOX = { width: 96, height: 104, bottom: 8 } as const;
 const BUBBLE_HITBOX = { left: 2, top: 4, width: 124, height: 76 } as const;
 const PANEL_WINDOW = { width: 420, height: 680 } as const;
 const checkInSlots = new Set<string>(CHECK_IN_SLOTS);
+const panelViews = new Set(["today", "tasks", "history", "stats", "bookmarks", "report"]);
 
 const lines = {
   checkIn: {
@@ -51,6 +59,11 @@ const lines = {
   studyStopped: ["这一段收好啦。", "辛苦了，先喘口气也没关系。", "我记下来啦，休息一下吧。"],
   dayClosed: ["今天已经收进日记啦，明天再继续。", "今天结算完成啦，剩下的时间好好休息。"],
   missed: ["这次没等到你，下个时间点见。", "这一格先空着，我们继续往后走。", "刚才的时间点错过啦，下一次记得回应我。"],
+  taskAdded: ["写下来啦，我们一件件完成。", "今天要做的事，我替你放好啦。", "好，这一件也加入今天。"],
+  taskCompleted: ["划掉一件，做得好。", "这一件完成啦，继续稳稳往前走。", "收到，又认真完成了一件。"],
+  allTasksCompleted: ["今天列下的事情都完成啦！", "一件也没有落下，真棒。", "今日任务全部点亮啦。"],
+  taskFixed: ["固定好啦，明天我会再放进任务栏。", "记住啦，这件事每天都会回来。", "以后每天，我都替你准备好这一项。"],
+  taskUnfixed: ["好，只留在今天，不再每天重复。", "已经取消固定，明天不会自动出现啦。"],
 } as const;
 
 let petWindow: BrowserWindow | null = null;
@@ -66,6 +79,8 @@ let dragging: { startX: number; startY: number; windowX: number; windowY: number
 let isPetIgnoringMouse = false;
 let bubblePromptActive = false;
 let activePromptKey: string | null = null;
+let activePromptType: "check-in" | "task-reminder" | null = null;
+let activePromptExpiresAt = 0;
 let lastDragDirection: "left" | "right" = "right";
 let isQuitting = false;
 let persistQueue = Promise.resolve();
@@ -265,13 +280,43 @@ function installIpc(): void {
     assertTrustedSender(event);
     return performReport(value);
   });
+  ipcMain.handle("xiaolu:add-task", async (event, title: unknown) => {
+    assertTrustedSender(event);
+    if (typeof title !== "string") throw new Error("任务内容格式不正确。");
+    return performAddTask(title);
+  });
+  ipcMain.handle("xiaolu:edit-task", async (event, id: unknown, title: unknown) => {
+    assertTrustedSender(event);
+    if (typeof id !== "string" || typeof title !== "string") throw new Error("任务内容格式不正确。");
+    return performEditTask(id, title);
+  });
+  ipcMain.handle("xiaolu:set-task-completed", async (event, id: unknown, completed: unknown) => {
+    assertTrustedSender(event);
+    if (typeof id !== "string" || typeof completed !== "boolean") throw new Error("任务状态格式不正确。");
+    return performSetTaskCompleted(id, completed);
+  });
+  ipcMain.handle("xiaolu:set-task-recurring", async (event, id: unknown, recurring: unknown) => {
+    assertTrustedSender(event);
+    if (typeof id !== "string" || typeof recurring !== "boolean") throw new Error("固定任务状态格式不正确。");
+    return performSetTaskRecurring(id, recurring);
+  });
+  ipcMain.handle("xiaolu:delete-task", async (event, id: unknown) => {
+    assertTrustedSender(event);
+    if (typeof id !== "string") throw new Error("任务编号格式不正确。");
+    return performDeleteTask(id);
+  });
   ipcMain.handle("xiaolu:set-launch-at-login", async (event, enabled: unknown) => {
     assertTrustedSender(event);
     if (typeof enabled !== "boolean") throw new Error("启动设置格式不正确。");
     await updateLaunchAtLogin(enabled);
     return publicState();
   });
-  ipcMain.on("xiaolu:open-panel", (event) => { assertTrustedSender(event); showPanel(); });
+  ipcMain.on("xiaolu:open-panel", (event, requestedView: unknown) => {
+    assertTrustedSender(event);
+    const view = typeof requestedView === "string" && panelViews.has(requestedView) ? requestedView : "today";
+    if (activePromptType === "task-reminder") clearActivePrompt();
+    showPanel(view);
+  });
   ipcMain.on("xiaolu:hide-panel", (event) => { assertTrustedSender(event); hidePanel(); });
   ipcMain.on("xiaolu:drag-start", (event, point: unknown) => {
     if (!petWindow || event.sender !== petWindow.webContents || !isPoint(point)) return;
@@ -340,9 +385,7 @@ async function performCheckIn(requested?: CheckInSlot): Promise<Record<string, u
   const result = checkIn(studyState, new Date(), requested);
   studyState = result.state;
   if (!result.accepted) return publicState(result.reason === "already-recorded" ? "这一格已经打过卡啦。" : "现在不在打卡时间内。");
-  activePromptKey = null;
-  bubblePromptActive = false;
-  petWindow?.webContents.send("xiaolu:clear-prompt");
+  clearActivePrompt();
   await persistState();
   sendState();
   emitAction("waving", chooseLine("checkInSuccess", lines.checkInSuccess), "✓", 1_500);
@@ -366,6 +409,58 @@ async function performReport(value: unknown): Promise<Record<string, unknown>> {
   if (report) playSettlementAction(report, true);
   scheduleNextSettlementAction();
   return publicState("今天已经好好收进日记啦。");
+}
+
+async function performAddTask(title: string): Promise<Record<string, unknown>> {
+  studyState = addDailyTask(studyState, randomUUID(), title, new Date());
+  await persistState();
+  sendState();
+  emitAction("review", chooseLine("taskAdded", lines.taskAdded), "＋", 1_450);
+  return publicState();
+}
+
+async function performEditTask(id: string, title: string): Promise<Record<string, unknown>> {
+  studyState = editDailyTask(studyState, id, title, new Date());
+  await persistState();
+  sendState();
+  return publicState("改好啦，今天就按这个来。");
+}
+
+async function performSetTaskCompleted(id: string, completed: boolean): Promise<Record<string, unknown>> {
+  studyState = setDailyTaskCompleted(studyState, id, completed, new Date());
+  await persistState();
+  sendState();
+  const tasks = getDay(studyState, localDateKey()).tasks;
+  if (completed && tasks.length > 0 && tasks.every((task) => task.completedAt)) {
+    if (activePromptType === "task-reminder") clearActivePrompt();
+    emitAction("jumping", chooseLine("allTasksCompleted", lines.allTasksCompleted), "✦", 1_800);
+  } else if (completed) {
+    emitAction("waving", chooseLine("taskCompleted", lines.taskCompleted), "✓", 1_350);
+  }
+  return publicState();
+}
+
+async function performSetTaskRecurring(id: string, recurring: boolean): Promise<Record<string, unknown>> {
+  studyState = setDailyTaskRecurring(studyState, id, recurring, randomUUID(), new Date());
+  await persistState();
+  sendState();
+  emitAction(
+    recurring ? "review" : "idle",
+    chooseLine(recurring ? "taskFixed" : "taskUnfixed", recurring ? lines.taskFixed : lines.taskUnfixed),
+    recurring ? "◆" : undefined,
+    1_450,
+  );
+  return publicState();
+}
+
+async function performDeleteTask(id: string): Promise<Record<string, unknown>> {
+  studyState = deleteDailyTask(studyState, id, new Date());
+  await persistState();
+  sendState();
+  if (getDay(studyState, localDateKey()).tasks.every((task) => task.completedAt) && activePromptType === "task-reminder") {
+    clearActivePrompt();
+  }
+  return publicState();
 }
 
 async function updateLaunchAtLogin(enabled: boolean): Promise<void> {
@@ -418,8 +513,10 @@ async function evaluateSchedule(announceMissed: boolean): Promise<void> {
 
   if (result.pendingCheckIn) {
     const key = `${localDateKey(now)}:${result.pendingCheckIn.slot}`;
-    if (activePromptKey !== key) {
+    if (activePromptKey !== key || activePromptType !== "check-in") {
       activePromptKey = key;
+      activePromptType = "check-in";
+      activePromptExpiresAt = new Date(result.pendingCheckIn.windowEnd).getTime();
       bubblePromptActive = true;
       const slot = result.pendingCheckIn.slot;
       const pool = lines.checkIn[slot];
@@ -432,17 +529,59 @@ async function evaluateSchedule(announceMissed: boolean): Promise<void> {
         expiresAt: result.pendingCheckIn.windowEnd,
       });
     }
-  } else if (activePromptKey) {
-    activePromptKey = null;
-    bubblePromptActive = false;
-    petWindow?.webContents.send("xiaolu:clear-prompt");
+  } else if (activePromptType === "check-in") {
+    clearActivePrompt();
   }
 
   if (announceMissed && result.newlyMissed.length > 0) {
     emitAction("failed", chooseLine("missed", lines.missed), undefined, 1_850);
   }
+  if (!result.pendingCheckIn) maybePromptIncompleteTasks(now);
   maybePlaySettlementAction(now);
   sendState();
+}
+
+function maybePromptIncompleteTasks(now: Date): void {
+  const tasks = getDay(studyState, localDateKey(now)).tasks;
+  const incompleteCount = tasks.filter((task) => !task.completedAt).length;
+  if (incompleteCount === 0) {
+    if (activePromptType === "task-reminder") clearActivePrompt();
+    return;
+  }
+  if (activePromptType === "task-reminder") {
+    if (now.getTime() < activePromptExpiresAt) return;
+    clearActivePrompt();
+  }
+  const minutes = now.getHours() * 60 + now.getMinutes();
+  const reminderSlot = minutes >= 22 * 60 ? "22:00" : minutes >= 21 * 60 + 6 ? "21:00" : undefined;
+  if (!reminderSlot) return;
+  const day = getDay(studyState, localDateKey(now));
+  if (day.taskReminders.includes(reminderSlot)) return;
+  const key = `${localDateKey(now)}:tasks:${reminderSlot}`;
+  studyState = markTaskReminderShown(studyState, reminderSlot, now);
+  void persistState();
+  const pool = reminderSlot === "21:00"
+    ? [`今天还有 ${incompleteCount} 件事没划掉，要一起看一眼吗？`, `还有 ${incompleteCount} 件小事留在今天，我们去看看吧。`, `收尾前，还有 ${incompleteCount} 项任务在等你。`]
+    : [`还有 ${incompleteCount} 件事没有完成，需要再确认一下吗？`, `睡前再看一眼吧，今天还留着 ${incompleteCount} 项任务。`, `我再轻轻提醒一次，还有 ${incompleteCount} 件事没划掉。`];
+  activePromptKey = key;
+  activePromptType = "task-reminder";
+  activePromptExpiresAt = now.getTime() + 25 * 60_000;
+  bubblePromptActive = true;
+  petWindow?.webContents.send("xiaolu:prompt", {
+    id: key,
+    type: "task-reminder",
+    label: "看任务",
+    message: chooseLine(`taskReminder-${reminderSlot}`, pool),
+    expiresAt: new Date(activePromptExpiresAt).toISOString(),
+  });
+}
+
+function clearActivePrompt(): void {
+  activePromptKey = null;
+  activePromptType = null;
+  activePromptExpiresAt = 0;
+  bubblePromptActive = false;
+  petWindow?.webContents.send("xiaolu:clear-prompt");
 }
 
 function maybePlaySettlementAction(now: Date): void {
@@ -505,6 +644,7 @@ function publicState(message?: string): Record<string, unknown> {
       date,
       studyMs: studyMsForDay(studyState, date, now),
       checkIns,
+      tasks: today.tasks,
       report: today.report ?? null,
     },
     history: daySummaries(studyState, now),

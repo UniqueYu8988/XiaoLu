@@ -4,7 +4,7 @@ contextBridge.exposeInMainWorld("xiaoluPet", {
   getState: () => ipcRenderer.invoke("xiaolu:get-state"),
   toggleStudy: () => ipcRenderer.invoke("xiaolu:toggle-study"),
   checkIn: (slot) => ipcRenderer.invoke("xiaolu:check-in", slot),
-  openPanel: () => ipcRenderer.send("xiaolu:open-panel"),
+  openPanel: (view) => ipcRenderer.send("xiaolu:open-panel", view),
   dragStart: (point) => ipcRenderer.send("xiaolu:drag-start", point),
   dragEnd: () => ipcRenderer.send("xiaolu:drag-end"),
   onCursor: (callback) => ipcRenderer.on("xiaolu:cursor", (_event, point) => callback(point)),

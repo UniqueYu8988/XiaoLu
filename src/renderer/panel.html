@@ -2,7 +2,7 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; connect-src 'none'; font-src 'none'; base-uri 'none'; form-action 'none'" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; connect-src 'none'; font-src 'self'; base-uri 'none'; form-action 'none'" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>小鹿共学日记</title>
     <link rel="stylesheet" href="panel.css" />
@@ -13,7 +13,10 @@
         <div class="brand">
           <div><span class="eyebrow">XIAOLU STUDY MATE</span><h1>共学日记</h1></div>
         </div>
-        <button id="close" class="icon-button" type="button" aria-label="关闭">×</button>
+        <div class="title-actions">
+          <button id="open-bookmarks" class="icon-button bookmark-button" type="button" aria-label="打开书签收藏" title="书签收藏"><span class="bookmark-symbol" aria-hidden="true"></span></button>
+          <button id="close" class="icon-button" type="button" aria-label="关闭">×</button>
+        </div>
       </header>
 
       <section class="today-head">
@@ -31,8 +34,8 @@
 
       <nav class="tabs" aria-label="共学日记页面">
         <button class="tab active" data-tab="today" type="button">今日</button>
+        <button class="tab" data-tab="tasks" type="button">任务</button>
         <button class="tab" data-tab="history" type="button">记录</button>
-        <button class="tab" data-tab="bookmarks" type="button">书签</button>
         <button class="tab" data-tab="stats" type="button">统计</button>
       </nav>
 
@@ -74,6 +77,18 @@
           </div>
         </section>
 
+        <section id="view-tasks" class="view">
+          <div class="section-title"><span>DO</span><h2>今日任务</h2></div>
+          <p class="helper">今天想完成的事，写清楚一件就够了。</p>
+          <form id="task-form" class="task-form">
+            <input id="task-title" type="text" maxlength="60" autocomplete="off" placeholder="写下一件今天要做的事" aria-label="新任务" />
+            <button class="pixel-button primary" type="submit">加入</button>
+          </form>
+          <div class="task-progress"><span>今天的进度</span><strong id="task-progress">0 / 0</strong></div>
+          <div id="task-list" class="task-list"></div>
+          <div id="task-pager" class="pager" hidden><button id="task-prev" type="button">‹</button><span id="task-page">1 / 1</span><button id="task-next" type="button">›</button></div>
+        </section>
+
         <section id="view-history" class="view">
           <div class="section-title"><span>LOG</span><h2>学习记录</h2></div>
           <div id="history-list" class="history-list"></div>
@@ -82,9 +97,22 @@
 
         <section id="view-bookmarks" class="view">
           <div class="section-title"><span>COL</span><h2>我们的书签</h2></div>
-          <p class="helper">每一枚，都替我们记住一个认真相伴的日子。</p>
-          <div id="bookmark-list" class="bookmark-list"></div>
-          <div id="bookmark-pager" class="pager" hidden><button id="bookmark-prev" type="button">‹</button><span id="bookmark-page">1 / 1</span><button id="bookmark-next" type="button">›</button></div>
+          <p class="helper">认真走过的日子，都被这三枚书签好好收着。</p>
+          <div class="bookmark-showcase">
+            <figure class="showcase-item self">
+              <div class="showcase-art"><img src="../assets/bookmarks/bookmark-self.png" alt="我的单人书签" /><span class="bookmark-count">× <strong id="bookmark-self-count">0</strong></span></div>
+              <figcaption>我的单人书签</figcaption>
+            </figure>
+            <figure class="showcase-item together">
+              <div class="showcase-art"><img src="../assets/bookmarks/bookmark-together.png" alt="双人书签" /><span class="bookmark-count">× <strong id="bookmark-together-count">0</strong></span></div>
+              <figcaption>双人书签</figcaption>
+            </figure>
+            <figure class="showcase-item friend">
+              <div class="showcase-art"><img src="../assets/bookmarks/bookmark-friend.png" alt="她的单人书签" /><span class="bookmark-count">× <strong id="bookmark-friend-count">0</strong></span></div>
+              <figcaption>她的单人书签</figcaption>
+            </figure>
+          </div>
+          <p id="bookmark-summary" class="bookmark-summary">我们的第一枚书签，还在等一个认真完成的日子。</p>
         </section>
 
         <section id="view-stats" class="view">

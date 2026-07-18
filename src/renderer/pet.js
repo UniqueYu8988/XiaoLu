@@ -202,7 +202,12 @@ card.addEventListener("keydown", (event) => {
 });
 
 message.addEventListener("click", async () => {
-  if (!currentPrompt || currentPrompt.type !== "check-in") return;
+  if (!currentPrompt) return;
+  if (currentPrompt.type === "task-reminder") {
+    api.openPanel("tasks");
+    return;
+  }
+  if (currentPrompt.type !== "check-in") return;
   message.disabled = true;
   try {
     await api.checkIn(currentPrompt.slot);

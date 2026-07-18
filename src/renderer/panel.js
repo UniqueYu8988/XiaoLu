@@ -7,9 +7,10 @@ let portraitLocked = false;
 let portraitTimer = null;
 let portraitPersistent = "idle";
 let historyPage = 0;
-let bookmarkPage = 0;
+let taskPage = 0;
+let taskRenderKey = null;
 const HISTORY_PAGE_SIZE = 4;
-const BOOKMARK_PAGE_SIZE = 4;
+const TASK_PAGE_SIZE = 7;
 
 const portraitAnimations = {
   idle: { row: 0, frames: 6, duration: 5500, iterations: 1 },
@@ -119,8 +120,9 @@ function render(state) {
   byId("check-in-now").textContent = state.pendingCheckIn ? `${state.pendingCheckIn.slot} · 我在` : "我在";
 
   renderReport(state.today.report);
+  renderTasks(state.today.tasks ?? []);
   renderHistory(state.history);
-  renderBookmarks(state.history);
+  renderBookmarkCollection(state.stats);
   renderStats(state.stats);
   byId("launch-at-login").checked = state.settings.launchAtLogin;
   if (state.message) showFeedback(state.message);
@@ -166,7 +168,7 @@ function renderHistory(history) {
     time.textContent = compactDuration(day.studyMs);
     top.append(date, time);
     const meta = document.createElement("p");
-    meta.textContent = `打卡 ${day.checkedCount}/5 · 做题 ${day.report?.problemCount ?? 0}`;
+    meta.textContent = `打卡 ${day.checkedCount}/5 · 任务 ${day.completedTaskCount ?? 0}/${day.taskCount ?? 0} · 做题 ${day.report?.problemCount ?? 0}`;
     item.append(top, meta);
     if (day.report?.note) {
       const note = document.createElement("blockquote");
@@ -178,38 +180,90 @@ function renderHistory(history) {
   renderPager("history", historyPage, pageCount);
 }
 
-function renderBookmarks(history) {
-  const bookmarks = history.filter((day) => day.report?.bookmark);
-  const list = byId("bookmark-list");
-  if (bookmarks.length === 0) {
-    list.replaceChildren(emptyMessage("等我们一起完成约定，就把第一枚书签收好。"));
-    byId("bookmark-pager").hidden = true;
+function renderTasks(tasks) {
+  const ordered = [...tasks].sort((a, b) => Number(Boolean(a.completedAt)) - Number(Boolean(b.completedAt)) || a.createdAt.localeCompare(b.createdAt));
+  const pageCount = Math.max(1, Math.ceil(ordered.length / TASK_PAGE_SIZE));
+  taskPage = Math.min(taskPage, pageCount - 1);
+  const renderKey = JSON.stringify([ordered, taskPage]);
+  if (taskRenderKey === renderKey) return;
+  taskRenderKey = renderKey;
+  const completed = ordered.filter((task) => task.completedAt).length;
+  byId("task-progress").textContent = `${completed} / ${ordered.length}`;
+  const list = byId("task-list");
+  if (ordered.length === 0) {
+    list.replaceChildren(emptyMessage("今天还没有任务。想做什么，就从一件开始吧。"));
+    byId("task-pager").hidden = true;
     return;
   }
-  const pageCount = Math.ceil(bookmarks.length / BOOKMARK_PAGE_SIZE);
-  bookmarkPage = Math.min(bookmarkPage, pageCount - 1);
-  const visible = bookmarks.slice(bookmarkPage * BOOKMARK_PAGE_SIZE, (bookmarkPage + 1) * BOOKMARK_PAGE_SIZE);
-  list.replaceChildren(...visible.map((day, index) => {
-    const card = document.createElement("article");
-    card.className = `bookmark ${day.report.bookmark} palette-${index % 4}`;
-    const pin = document.createElement("span");
-    pin.className = "bookmark-pin";
-    pin.textContent = day.report.bookmark === "together" ? "WE" : day.report.bookmark === "self" ? "ME" : "HER";
-    const title = document.createElement("strong");
-    title.textContent = bookmarkName(day.report.bookmark);
-    const date = document.createElement("time");
-    date.textContent = displayDate(day.date);
-    const meta = document.createElement("p");
-    meta.textContent = `${compactDuration(day.studyMs)} · ${day.report.problemCount} 题`;
-    card.append(pin, title, date, meta);
-    if (day.report.note) {
-      const note = document.createElement("small");
-      note.textContent = day.report.note;
-      card.append(note);
+  const visible = ordered.slice(taskPage * TASK_PAGE_SIZE, (taskPage + 1) * TASK_PAGE_SIZE);
+  list.replaceChildren(...visible.map(taskRow));
+  renderPager("task", taskPage, pageCount);
+}
+
+function taskRow(task) {
+  const row = document.createElement("article");
+  row.className = `task-row${task.completedAt ? " completed" : ""}`;
+  const check = document.createElement("button");
+  check.className = "task-check";
+  check.type = "button";
+  check.setAttribute("aria-label", task.completedAt ? "恢复未完成" : "标记完成");
+  check.addEventListener("click", () => void runTaskAction(() => api.setTaskCompleted(task.id, !task.completedAt)));
+  const title = document.createElement("input");
+  title.className = "task-inline-input";
+  title.type = "text";
+  title.maxLength = 60;
+  title.value = task.title;
+  title.setAttribute("aria-label", "任务名称");
+  title.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") { event.preventDefault(); title.blur(); }
+    if (event.key === "Escape") { title.value = task.title; title.blur(); }
+  });
+  title.addEventListener("change", () => {
+    const value = title.value.trim();
+    if (!value) {
+      title.value = task.title;
+      showFeedback("任务名称不能留空哦。");
+      return;
     }
-    return card;
-  }));
-  renderPager("bookmark", bookmarkPage, pageCount);
+    if (value !== task.title) void runTaskAction(() => api.editTask(task.id, value));
+  });
+  const recurring = document.createElement("button");
+  recurring.className = `task-action task-recurring${task.recurringTaskId ? " active" : ""}`;
+  recurring.type = "button";
+  recurring.textContent = "固";
+  recurring.setAttribute("aria-label", task.recurringTaskId ? "取消每日固定" : "设为每日固定");
+  recurring.title = task.recurringTaskId ? "取消每日固定" : "每天重复";
+  recurring.addEventListener("click", () => void runTaskAction(() => api.setTaskRecurring(task.id, !task.recurringTaskId)));
+  const remove = document.createElement("button");
+  remove.className = "task-action";
+  remove.type = "button";
+  remove.textContent = "×";
+  remove.setAttribute("aria-label", "删除任务");
+  remove.addEventListener("click", () => void runTaskAction(() => api.deleteTask(task.id)));
+  row.append(check, title, recurring, remove);
+  return row;
+}
+
+async function runTaskAction(action) {
+  try {
+    const state = await action();
+    taskRenderKey = null;
+    render(state);
+  } catch (error) {
+    showFeedback(String(error?.message || error));
+  }
+}
+
+function renderBookmarkCollection(stats) {
+  byId("bookmark-self-count").textContent = stats.selfBookmarks;
+  byId("bookmark-friend-count").textContent = stats.friendBookmarks;
+  byId("bookmark-together-count").textContent = stats.togetherBookmarks;
+  const total = stats.selfBookmarks + stats.friendBookmarks + stats.togetherBookmarks;
+  byId("bookmark-summary").textContent = total === 0
+    ? "我们的第一枚书签，还在等一个认真完成的日子。"
+    : stats.togetherBookmarks > 0
+      ? `我们已经一起完成 ${stats.togetherBookmarks} 天，也收好了 ${total} 枚认真生活的证明。`
+      : `这里已经收好了 ${total} 枚认真完成的书签。`;
 }
 
 function renderPager(name, page, pageCount) {
@@ -226,7 +280,7 @@ function renderStats(stats) {
     ["累计做题", `${stats.totalProblems} 题`],
     ["按时打卡", `${stats.checkedCount} 次`],
     ["双人书签", `${stats.togetherBookmarks} 枚`],
-    ["当前共同连续", `${stats.currentTogetherStreak} 天`],
+    ["累计完成任务", `${stats.completedTasks} 项`],
     ["最长共同连续", `${stats.longestTogetherStreak} 天`],
   ];
   byId("stats-grid").replaceChildren(...entries.map(([label, value]) => {
@@ -250,6 +304,7 @@ function emptyMessage(text) {
 function switchTab(name) {
   document.querySelectorAll(".tab").forEach((tab) => tab.classList.toggle("active", tab.dataset.tab === name));
   document.querySelectorAll(".view").forEach((view) => view.classList.toggle("active", view.id === `view-${name}`));
+  byId("open-bookmarks").classList.toggle("active", name === "bookmarks");
   if (name === "report") {
     switchTab("today");
     setTimeout(() => byId("report-section").scrollIntoView({ behavior: "smooth", block: "start" }), 50);
@@ -266,8 +321,9 @@ document.querySelectorAll(".choice-grid .choice").forEach((choice) => {
 });
 byId("history-prev").addEventListener("click", () => { historyPage = Math.max(0, historyPage - 1); renderHistory(latestState?.history ?? []); });
 byId("history-next").addEventListener("click", () => { historyPage += 1; renderHistory(latestState?.history ?? []); });
-byId("bookmark-prev").addEventListener("click", () => { bookmarkPage = Math.max(0, bookmarkPage - 1); renderBookmarks(latestState?.history ?? []); });
-byId("bookmark-next").addEventListener("click", () => { bookmarkPage += 1; renderBookmarks(latestState?.history ?? []); });
+byId("task-prev").addEventListener("click", () => { taskPage = Math.max(0, taskPage - 1); taskRenderKey = null; renderTasks(latestState?.today.tasks ?? []); });
+byId("task-next").addEventListener("click", () => { taskPage += 1; taskRenderKey = null; renderTasks(latestState?.today.tasks ?? []); });
+byId("open-bookmarks").addEventListener("click", () => switchTab("bookmarks"));
 byId("close").addEventListener("click", () => api.hide());
 byId("toggle-study").addEventListener("click", async () => {
   byId("toggle-study").disabled = true;
@@ -277,6 +333,30 @@ byId("toggle-study").addEventListener("click", async () => {
 byId("check-in-now").addEventListener("click", async () => {
   if (!latestState?.pendingCheckIn) return;
   render(await api.checkIn(latestState.pendingCheckIn.slot));
+});
+byId("task-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const input = byId("task-title");
+  const title = input.value.trim();
+  if (!title) {
+    showFeedback("先写下一件想完成的事吧。");
+    input.focus();
+    return;
+  }
+  const button = event.currentTarget.querySelector("button[type=submit]");
+  button.disabled = true;
+  try {
+    taskPage = 0;
+    const state = await api.addTask(title);
+    input.value = "";
+    taskRenderKey = null;
+    render(state);
+    input.focus();
+  } catch (error) {
+    showFeedback(String(error?.message || error));
+  } finally {
+    button.disabled = false;
+  }
 });
 byId("report-form").addEventListener("submit", async (event) => {
   event.preventDefault();

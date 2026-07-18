@@ -3,6 +3,7 @@ export const CHECK_IN_SLOTS = ["09:00", "12:00", "15:00", "18:00", "21:00"] as c
 export type CheckInSlot = typeof CHECK_IN_SLOTS[number];
 export type CheckInStatus = "checked" | "missed";
 export type BookmarkType = "self" | "friend" | "together";
+export type TaskReminderSlot = "21:00" | "22:00";
 
 export interface StudySession {
   readonly startedAt: string;
@@ -23,10 +24,26 @@ export interface DailyReport {
   readonly bookmark?: BookmarkType;
 }
 
+export interface DailyTask {
+  readonly id: string;
+  readonly title: string;
+  readonly createdAt: string;
+  readonly completedAt?: string;
+  readonly recurringTaskId?: string;
+}
+
+export interface RecurringTask {
+  readonly id: string;
+  readonly title: string;
+  readonly createdAt: string;
+}
+
 export interface DayRecord {
   readonly date: string;
   readonly sessions: readonly StudySession[];
   readonly checkIns: Readonly<Partial<Record<CheckInSlot, CheckInRecord>>>;
+  readonly tasks: readonly DailyTask[];
+  readonly taskReminders: readonly TaskReminderSlot[];
   readonly report?: DailyReport;
 }
 
@@ -38,6 +55,7 @@ export interface StudyState {
   readonly version: 2;
   readonly activeSessionStartedAt?: string;
   readonly days: Readonly<Record<string, DayRecord>>;
+  readonly recurringTasks: readonly RecurringTask[];
   readonly settings: StudySettings;
   readonly lastEvaluatedAt: string;
 }
@@ -81,12 +99,15 @@ export interface PublicDaySummary {
   readonly studyMs: number;
   readonly checkedCount: number;
   readonly missedCount: number;
+  readonly taskCount: number;
+  readonly completedTaskCount: number;
   readonly report?: DailyReport;
 }
 
 export interface StudyStats {
   readonly totalStudyMs: number;
   readonly totalProblems: number;
+  readonly completedTasks: number;
   readonly checkedCount: number;
   readonly missedCount: number;
   readonly togetherBookmarks: number;
@@ -108,6 +129,7 @@ export function initialStudyState(now = new Date()): StudyState {
   return {
     version: 2,
     days: {},
+    recurringTasks: [],
     settings: { launchAtLogin: true },
     lastEvaluatedAt: now.toISOString(),
   };
@@ -123,11 +145,23 @@ export function normalizeStudyState(value: unknown, now = new Date()): StudyStat
     }
   }
   const activeSessionStartedAt = isDateString(value.activeSessionStartedAt) ? value.activeSessionStartedAt : undefined;
+  const recurringTasks: RecurringTask[] = [];
+  if (Array.isArray(value.recurringTasks)) {
+    for (const raw of value.recurringTasks) {
+      if (!isRecord(raw)) continue;
+      const id = normalizeTaskId(raw.id);
+      const title = normalizeTaskTitle(raw.title);
+      const createdAt = isDateString(raw.createdAt) ? raw.createdAt : undefined;
+      if (!id || !title || !createdAt || recurringTasks.some((task) => task.id === id)) continue;
+      recurringTasks.push({ id, title, createdAt });
+    }
+  }
   const settingsValue = isRecord(value.settings) ? value.settings : {};
   return {
     version: 2,
     ...(activeSessionStartedAt ? { activeSessionStartedAt } : {}),
     days,
+    recurringTasks,
     settings: { launchAtLogin: settingsValue.launchAtLogin !== false },
     lastEvaluatedAt: isDateString(value.lastEvaluatedAt) ? value.lastEvaluatedAt : now.toISOString(),
   };
@@ -138,6 +172,18 @@ export function reconcileStudyState(current: StudyState, now = new Date()): Reco
   state = splitActiveSessionAtMidnights(state, now);
   const days = cloneDays(state.days);
   const today = localDateKey(now);
+  const todayRecord = days[today] ?? emptyDay(today);
+  const todayTasks = [...todayRecord.tasks];
+  for (const recurring of state.recurringTasks) {
+    if (todayTasks.some((task) => task.recurringTaskId === recurring.id)) continue;
+    todayTasks.push({
+      id: `repeat:${recurring.id}:${today}`,
+      title: recurring.title,
+      createdAt: now.toISOString(),
+      recurringTaskId: recurring.id,
+    });
+  }
+  if (todayTasks.length !== todayRecord.tasks.length || !days[today]) days[today] = { ...todayRecord, tasks: todayTasks };
   const existingKeys = new Set(Object.keys(days));
   existingKeys.add(today);
   const lastDate = localDateKey(new Date(state.lastEvaluatedAt));
@@ -238,6 +284,106 @@ export function submitDailyReport(current: StudyState, input: ReportInput, now =
   return { ...state, days, lastEvaluatedAt: now.toISOString() };
 }
 
+export function addDailyTask(current: StudyState, id: string, title: string, now = new Date()): StudyState {
+  const state = reconcileStudyState(current, now).state;
+  const normalizedId = normalizeTaskId(id);
+  const normalizedTitle = normalizeTaskTitle(title);
+  if (!normalizedId || !normalizedTitle) throw new Error("任务内容不能为空。");
+  const date = localDateKey(now);
+  const day = getDay(state, date);
+  if (day.tasks.some((task) => task.id === normalizedId)) throw new Error("任务编号重复。");
+  const days = cloneDays(state.days);
+  days[date] = {
+    ...day,
+    tasks: [...day.tasks, { id: normalizedId, title: normalizedTitle, createdAt: now.toISOString() }],
+  };
+  return { ...state, days, lastEvaluatedAt: now.toISOString() };
+}
+
+export function editDailyTask(current: StudyState, id: string, title: string, now = new Date()): StudyState {
+  const state = reconcileStudyState(current, now).state;
+  const normalizedTitle = normalizeTaskTitle(title);
+  if (!normalizedTitle) throw new Error("任务内容不能为空。");
+  const task = getDay(state, localDateKey(now)).tasks.find((item) => item.id === id);
+  const updated = updateTodayTasks(state, id, now, (item) => ({ ...item, title: normalizedTitle }));
+  if (!task?.recurringTaskId) return updated;
+  return {
+    ...updated,
+    recurringTasks: updated.recurringTasks.map((item) => item.id === task.recurringTaskId ? { ...item, title: normalizedTitle } : item),
+  };
+}
+
+export function setDailyTaskCompleted(current: StudyState, id: string, completed: boolean, now = new Date()): StudyState {
+  const state = reconcileStudyState(current, now).state;
+  return updateTodayTasks(state, id, now, (task) => {
+    if (completed) return task.completedAt ? task : { ...task, completedAt: now.toISOString() };
+    const { completedAt: _completedAt, ...rest } = task;
+    return rest;
+  });
+}
+
+export function deleteDailyTask(current: StudyState, id: string, now = new Date()): StudyState {
+  const state = reconcileStudyState(current, now).state;
+  const date = localDateKey(now);
+  const day = getDay(state, date);
+  const removed = day.tasks.find((task) => task.id === id);
+  const tasks = day.tasks.filter((task) => task.id !== id);
+  if (tasks.length === day.tasks.length) return state;
+  const days = cloneDays(state.days);
+  days[date] = { ...day, tasks };
+  return {
+    ...state,
+    days,
+    recurringTasks: removed?.recurringTaskId
+      ? state.recurringTasks.filter((task) => task.id !== removed.recurringTaskId)
+      : state.recurringTasks,
+    lastEvaluatedAt: now.toISOString(),
+  };
+}
+
+export function setDailyTaskRecurring(
+  current: StudyState,
+  id: string,
+  recurring: boolean,
+  newRecurringTaskId: string,
+  now = new Date(),
+): StudyState {
+  const state = reconcileStudyState(current, now).state;
+  const date = localDateKey(now);
+  const day = getDay(state, date);
+  const task = day.tasks.find((item) => item.id === id);
+  if (!task) return state;
+  const recurringTaskId = task.recurringTaskId ?? normalizeTaskId(newRecurringTaskId);
+  if (recurring && !recurringTaskId) throw new Error("固定任务编号不正确。");
+  const tasks = day.tasks.map((item) => {
+    if (item.id !== id) return item;
+    if (recurring) return { ...item, recurringTaskId: recurringTaskId as string };
+    const { recurringTaskId: _recurringTaskId, ...rest } = item;
+    return rest;
+  });
+  let recurringTasks = state.recurringTasks;
+  if (recurring && recurringTaskId) {
+    recurringTasks = state.recurringTasks.some((item) => item.id === recurringTaskId)
+      ? state.recurringTasks.map((item) => item.id === recurringTaskId ? { ...item, title: task.title } : item)
+      : [...state.recurringTasks, { id: recurringTaskId, title: task.title, createdAt: now.toISOString() }];
+  } else if (task.recurringTaskId) {
+    recurringTasks = state.recurringTasks.filter((item) => item.id !== task.recurringTaskId);
+  }
+  const days = cloneDays(state.days);
+  days[date] = { ...day, tasks };
+  return { ...state, days, recurringTasks, lastEvaluatedAt: now.toISOString() };
+}
+
+export function markTaskReminderShown(current: StudyState, slot: TaskReminderSlot, now = new Date()): StudyState {
+  const state = reconcileStudyState(current, now).state;
+  const date = localDateKey(now);
+  const day = getDay(state, date);
+  if (day.taskReminders.includes(slot)) return state;
+  const days = cloneDays(state.days);
+  days[date] = { ...day, taskReminders: [...day.taskReminders, slot] };
+  return { ...state, days, lastEvaluatedAt: now.toISOString() };
+}
+
 export function setLaunchAtLogin(current: StudyState, enabled: boolean, now = new Date()): StudyState {
   return {
     ...normalizeStudyState(current, now),
@@ -280,6 +426,8 @@ export function daySummaries(state: StudyState, now = new Date(), limit = 120): 
         studyMs: studyMsForDay(state, date, now),
         checkedCount: records.filter((item) => item?.status === "checked").length,
         missedCount: records.filter((item) => item?.status === "missed").length,
+        taskCount: day.tasks.length,
+        completedTaskCount: day.tasks.filter((task) => task.completedAt).length,
         ...(day.report ? { report: day.report } : {}),
       };
     });
@@ -288,6 +436,7 @@ export function daySummaries(state: StudyState, now = new Date(), limit = 120): 
 export function calculateStats(state: StudyState, now = new Date()): StudyStats {
   const summaries = daySummaries(state, now, Number.MAX_SAFE_INTEGER);
   let totalProblems = 0;
+  let completedTasks = 0;
   let checkedCount = 0;
   let missedCount = 0;
   let togetherBookmarks = 0;
@@ -295,6 +444,7 @@ export function calculateStats(state: StudyState, now = new Date()): StudyStats 
   let friendBookmarks = 0;
   for (const summary of summaries) {
     totalProblems += summary.report?.problemCount ?? 0;
+    completedTasks += summary.completedTaskCount;
     checkedCount += summary.checkedCount;
     missedCount += summary.missedCount;
     if (summary.report?.bookmark === "together") togetherBookmarks += 1;
@@ -323,6 +473,7 @@ export function calculateStats(state: StudyState, now = new Date()): StudyStats 
   return {
     totalStudyMs: summaries.reduce((sum, item) => sum + item.studyMs, 0),
     totalProblems,
+    completedTasks,
     checkedCount,
     missedCount,
     togetherBookmarks,
@@ -405,7 +556,23 @@ function normalizeDay(value: Record<string, unknown>, date: string): DayRecord {
     }
   }
   const report = normalizeReport(value.report);
-  return { date, sessions, checkIns, ...(report ? { report } : {}) };
+  const tasks: DailyTask[] = [];
+  if (Array.isArray(value.tasks)) {
+    for (const raw of value.tasks) {
+      if (!isRecord(raw)) continue;
+      const id = normalizeTaskId(raw.id);
+      const title = normalizeTaskTitle(raw.title);
+      const createdAt = isDateString(raw.createdAt) ? raw.createdAt : undefined;
+      const completedAt = isDateString(raw.completedAt) ? raw.completedAt : undefined;
+      const recurringTaskId = normalizeTaskId(raw.recurringTaskId);
+      if (!id || !title || !createdAt || tasks.some((task) => task.id === id)) continue;
+      tasks.push({ id, title, createdAt, ...(completedAt ? { completedAt } : {}), ...(recurringTaskId ? { recurringTaskId } : {}) });
+    }
+  }
+  const taskReminders = Array.isArray(value.taskReminders)
+    ? value.taskReminders.filter((slot): slot is TaskReminderSlot => slot === "21:00" || slot === "22:00")
+    : [];
+  return { date, sessions, checkIns, tasks, taskReminders: [...new Set(taskReminders)], ...(report ? { report } : {}) };
 }
 
 function normalizeReport(value: unknown): DailyReport | undefined {
@@ -424,7 +591,7 @@ function normalizeReport(value: unknown): DailyReport | undefined {
 }
 
 function emptyDay(date: string): DayRecord {
-  return { date, sessions: [], checkIns: {} };
+  return { date, sessions: [], checkIns: {}, tasks: [], taskReminders: [] };
 }
 
 function cloneDays(days: Readonly<Record<string, DayRecord>>): Record<string, DayRecord> {
@@ -436,6 +603,38 @@ function bookmarkFor(selfCompleted: boolean, friendCompleted: boolean): Bookmark
   if (selfCompleted) return "self";
   if (friendCompleted) return "friend";
   return undefined;
+}
+
+function updateTodayTasks(
+  state: StudyState,
+  id: string,
+  now: Date,
+  update: (task: DailyTask) => DailyTask,
+): StudyState {
+  const date = localDateKey(now);
+  const day = getDay(state, date);
+  let changed = false;
+  const tasks = day.tasks.map((task) => {
+    if (task.id !== id) return task;
+    changed = true;
+    return update(task);
+  });
+  if (!changed) return state;
+  const days = cloneDays(state.days);
+  days[date] = { ...day, tasks };
+  return { ...state, days, lastEvaluatedAt: now.toISOString() };
+}
+
+function normalizeTaskId(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const id = value.trim();
+  return id.length > 0 && id.length <= 120 ? id : undefined;
+}
+
+function normalizeTaskTitle(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const title = value.trim().replace(/\s+/g, " ").slice(0, 60);
+  return title || undefined;
 }
 
 function dateAtLocalMidnight(date: string): Date {
