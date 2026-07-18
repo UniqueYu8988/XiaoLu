@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; connect-src 'none'; font-src 'none'; base-uri 'none'; form-action 'none'" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>小鹿共学日记</title>
+    <link rel="stylesheet" href="panel.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <header class="titlebar">
+        <div class="brand">
+          <div><span class="eyebrow">XIAOLU STUDY MATE</span><h1>共学日记</h1></div>
+        </div>
+        <button id="close" class="icon-button" type="button" aria-label="关闭">×</button>
+      </header>
+
+      <section class="today-head">
+        <div class="portrait-stage" aria-label="正在陪伴学习的小鹿">
+          <div class="portrait-frame" aria-hidden="true"></div>
+          <div id="portrait-sprite" class="portrait-sprite"></div>
+        </div>
+        <div class="today-copy">
+          <span id="today-date" class="date-label">----.--.--</span>
+          <strong id="timer">00:00:00</strong>
+          <span id="timer-status">等你准备好，我们就开始。</span>
+        </div>
+        <button id="toggle-study" class="pixel-button primary" type="button">开始学习</button>
+      </section>
+
+      <nav class="tabs" aria-label="共学日记页面">
+        <button class="tab active" data-tab="today" type="button">今日</button>
+        <button class="tab" data-tab="history" type="button">记录</button>
+        <button class="tab" data-tab="bookmarks" type="button">书签</button>
+        <button class="tab" data-tab="stats" type="button">统计</button>
+      </nav>
+
+      <main class="content">
+        <section id="view-today" class="view active">
+          <div class="section-title"><span>01</span><h2>今日在场</h2></div>
+          <div id="checkins" class="checkins"></div>
+          <button id="check-in-now" class="pixel-button check-in-button" type="button" hidden>我在</button>
+
+          <div id="report-section" class="report-section">
+            <div class="section-title"><span>02</span><h2>今日结算</h2></div>
+            <p class="helper">今天认真做过的事，挑几件告诉我就好。</p>
+            <form id="report-form">
+              <label class="field">
+                <span>今日做题数量</span>
+                <input id="problem-count" type="number" min="0" max="1000000" step="1" value="0" />
+              </label>
+              <label class="field">
+                <span>一句成果</span>
+                <input id="note" type="text" maxlength="120" placeholder="今天最想记住的一件事" />
+              </label>
+              <div class="agreement-group" role="group" aria-labelledby="self-agreement-title">
+                <span id="self-agreement-title" class="agreement-title">我今天完成约定了吗？</span>
+                <div class="choice-grid" data-choice-group="self-completed">
+                  <button class="choice" type="button" data-value="yes" aria-label="完成" title="完成"><span class="choice-icon choice-icon-check" aria-hidden="true"></span></button>
+                  <button class="choice" type="button" data-value="no" aria-label="未完成" title="未完成"><span class="choice-icon choice-icon-cross" aria-hidden="true"></span></button>
+                </div>
+              </div>
+              <div class="agreement-group" role="group" aria-labelledby="friend-agreement-title">
+                <span id="friend-agreement-title" class="agreement-title">现实里的她完成约定了吗？</span>
+                <div class="choice-grid" data-choice-group="friend-completed">
+                  <button class="choice" type="button" data-value="yes" aria-label="完成" title="完成"><span class="choice-icon choice-icon-check" aria-hidden="true"></span></button>
+                  <button class="choice" type="button" data-value="no" aria-label="未完成" title="未完成"><span class="choice-icon choice-icon-cross" aria-hidden="true"></span></button>
+                </div>
+              </div>
+              <button id="submit-report" class="pixel-button primary wide" type="submit">收进今天的日记</button>
+            </form>
+            <p id="report-result" class="report-result" hidden></p>
+          </div>
+        </section>
+
+        <section id="view-history" class="view">
+          <div class="section-title"><span>LOG</span><h2>学习记录</h2></div>
+          <div id="history-list" class="history-list"></div>
+          <div id="history-pager" class="pager" hidden><button id="history-prev" type="button">‹</button><span id="history-page">1 / 1</span><button id="history-next" type="button">›</button></div>
+        </section>
+
+        <section id="view-bookmarks" class="view">
+          <div class="section-title"><span>COL</span><h2>我们的书签</h2></div>
+          <p class="helper">每一枚，都替我们记住一个认真相伴的日子。</p>
+          <div id="bookmark-list" class="bookmark-list"></div>
+          <div id="bookmark-pager" class="pager" hidden><button id="bookmark-prev" type="button">‹</button><span id="bookmark-page">1 / 1</span><button id="bookmark-next" type="button">›</button></div>
+        </section>
+
+        <section id="view-stats" class="view">
+          <div class="section-title"><span>SUM</span><h2>累计统计</h2></div>
+          <div id="stats-grid" class="stats-grid"></div>
+          <label class="setting-row">
+            <span><strong>开机自动启动</strong><small>让我准时来提醒你</small></span>
+            <input id="launch-at-login" type="checkbox" />
+          </label>
+          <div class="privacy-note">这些学习记忆，只安静地留在你的电脑里。</div>
+        </section>
+      </main>
+
+      <p id="feedback" class="feedback" aria-live="polite" hidden></p>
+    </div>
+    <script src="panel.js"></script>
+  </body>
+</html>

@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; connect-src 'none'; font-src 'none'; base-uri 'none'; form-action 'none'" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>小鹿共学搭子</title>
+    <link rel="stylesheet" href="pet.css" />
+  </head>
+  <body>
+    <main class="stage">
+      <button id="message" class="message" type="button" aria-live="polite">
+        <span id="message-copy"></span>
+        <span id="message-action" class="message-action"></span>
+      </button>
+      <div id="effect" class="effect" aria-hidden="true"></div>
+      <div id="pet-card" class="pet-card" aria-label="小鹿，双击开始或结束学习，右键打开共学日记" role="button" tabindex="0">
+        <div id="sprite" class="sprite"></div>
+      </div>
+    </main>
+    <script src="pet.js"></script>
+  </body>
+</html>
