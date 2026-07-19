@@ -39,9 +39,8 @@ import {
   type StudyState,
 } from "./game.js";
 
-const PET_WINDOW = { width: 128, height: 176 } as const;
-const PET_HITBOX = { width: 96, height: 104, bottom: 8 } as const;
-const BUBBLE_HITBOX = { left: 2, top: 4, width: 124, height: 76 } as const;
+const PET_WINDOW = { width: 128, height: 208 } as const;
+const PET_HITBOX = { width: 68, height: 102, bottom: 9 } as const;
 const PANEL_WINDOW = { width: 420, height: 680 } as const;
 const checkInSlots = new Set<string>(CHECK_IN_SLOTS);
 const panelViews = new Set(["today", "tasks", "history", "stats", "bookmarks", "report"]);
@@ -78,6 +77,7 @@ let dragTimer: NodeJS.Timeout | null = null;
 let dragging: { startX: number; startY: number; windowX: number; windowY: number; lastCursorX: number } | null = null;
 let isPetIgnoringMouse = false;
 let bubblePromptActive = false;
+let bubbleHitbox: { left: number; top: number; width: number; height: number } | null = null;
 let activePromptKey: string | null = null;
 let activePromptType: "check-in" | "task-reminder" | null = null;
 let activePromptExpiresAt = 0;
@@ -316,6 +316,11 @@ function installIpc(): void {
     const view = typeof requestedView === "string" && panelViews.has(requestedView) ? requestedView : "today";
     if (activePromptType === "task-reminder") clearActivePrompt();
     showPanel(view);
+  });
+  ipcMain.on("xiaolu:bubble-bounds", (event, value: unknown) => {
+    if (!petWindow || event.sender !== petWindow.webContents) return;
+    bubbleHitbox = normalizeWindowBounds(value);
+    syncPetMousePassthrough();
   });
   ipcMain.on("xiaolu:hide-panel", (event) => { assertTrustedSender(event); hidePanel(); });
   ipcMain.on("xiaolu:drag-start", (event, point: unknown) => {
@@ -725,11 +730,11 @@ function syncPetMousePassthrough(cursor = screen.getCursorScreenPoint()): void {
     && cursor.x < petLeft + PET_HITBOX.width
     && cursor.y >= petTop
     && cursor.y < petTop + PET_HITBOX.height;
-  const overBubble = bubblePromptActive
-    && cursor.x >= bounds.x + BUBBLE_HITBOX.left
-    && cursor.x < bounds.x + BUBBLE_HITBOX.left + BUBBLE_HITBOX.width
-    && cursor.y >= bounds.y + BUBBLE_HITBOX.top
-    && cursor.y < bounds.y + BUBBLE_HITBOX.top + BUBBLE_HITBOX.height;
+  const overBubble = bubblePromptActive && bubbleHitbox
+    && cursor.x >= bounds.x + bubbleHitbox.left
+    && cursor.x < bounds.x + bubbleHitbox.left + bubbleHitbox.width
+    && cursor.y >= bounds.y + bubbleHitbox.top
+    && cursor.y < bounds.y + bubbleHitbox.top + bubbleHitbox.height;
   setPetMousePassthrough(!(overPet || overBubble));
 }
 
@@ -777,6 +782,17 @@ function isPoint(value: unknown): value is { screenX: number; screenY: number } 
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function normalizeWindowBounds(value: unknown): { left: number; top: number; width: number; height: number } | null {
+  if (!isRecord(value)) return null;
+  const numbers = [value.left, value.top, value.width, value.height];
+  if (!numbers.every((item) => typeof item === "number" && Number.isFinite(item))) return null;
+  const left = Math.max(0, Math.min(PET_WINDOW.width, Math.floor(value.left as number)));
+  const top = Math.max(0, Math.min(PET_WINDOW.height, Math.floor(value.top as number)));
+  const width = Math.max(0, Math.min(PET_WINDOW.width - left, Math.ceil(value.width as number)));
+  const height = Math.max(0, Math.min(PET_WINDOW.height - top, Math.ceil(value.height as number)));
+  return width > 0 && height > 0 ? { left, top, width, height } : null;
 }
 
 function isNodeError(error: unknown): error is NodeJS.ErrnoException {

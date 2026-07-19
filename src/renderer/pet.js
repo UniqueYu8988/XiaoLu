@@ -85,11 +85,22 @@ function renderPrompt() {
   if (!currentPrompt) {
     message.classList.remove("visible", "actionable");
     messageAction.textContent = "";
+    api.setBubbleBounds(null);
     return;
   }
   messageCopy.textContent = currentPrompt.message;
   messageAction.textContent = currentPrompt.label || "我在";
   message.classList.add("visible", "actionable");
+  requestAnimationFrame(reportBubbleBounds);
+}
+
+function reportBubbleBounds() {
+  if (!currentPrompt || !message.classList.contains("visible")) {
+    api.setBubbleBounds(null);
+    return;
+  }
+  const bounds = message.getBoundingClientRect();
+  api.setBubbleBounds({ left: bounds.left, top: bounds.top, width: bounds.width, height: bounds.height });
 }
 
 function showTransientMessage(text, duration = 2800) {
@@ -215,6 +226,7 @@ message.addEventListener("click", async () => {
     message.disabled = false;
   }
 });
+message.addEventListener("transitionend", reportBubbleBounds);
 
 api.onCursor((point) => { latestCursorPoint = point; });
 api.onDragDirection((direction) => {
@@ -229,6 +241,7 @@ api.onPrompt((prompt) => {
 api.onClearPrompt(() => {
   currentPrompt = null;
   message.classList.remove("visible", "actionable");
+  api.setBubbleBounds(null);
 });
 api.onAction((action) => {
   if (dragging) {

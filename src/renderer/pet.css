@@ -56,6 +56,29 @@ button { font: inherit; }
   transform: translate(-50%, 6px) scale(.96);
   transition: opacity .18s ease, transform .18s ease;
   pointer-events: none;
+  z-index: 2;
+}
+.message::before,
+.message::after {
+  content: "";
+  position: absolute;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+.message::before {
+  right: 20px;
+  bottom: -9px;
+  border-top: 9px solid #513b60;
+  border-right: 7px solid transparent;
+  border-left: 7px solid transparent;
+}
+.message::after {
+  right: 22px;
+  bottom: -5px;
+  border-top: 6px solid rgba(255, 248, 233, .98);
+  border-right: 5px solid transparent;
+  border-left: 5px solid transparent;
 }
 .message.visible { opacity: 1; transform: translate(-50%, 0) scale(1); }
 .message.actionable { pointer-events: auto; cursor: pointer; }
