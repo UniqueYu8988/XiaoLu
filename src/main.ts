@@ -27,6 +27,7 @@ import {
   markTaskReminderShown,
   normalizeStudyState,
   reconcileStudyState,
+  setBountyDefinition,
   setDailyTaskCompleted,
   setDailyTaskRecurring,
   setLaunchAtLogin,
@@ -34,6 +35,7 @@ import {
   submitDailyReport,
   toggleStudy,
   type CheckInSlot,
+  type BountySlot,
   type DailyReport,
   type ReportInput,
   type StudyState,
@@ -63,6 +65,8 @@ const lines = {
   allTasksCompleted: ["今天列下的事情都完成啦！", "一件也没有落下，真棒。", "今日任务全部点亮啦。"],
   taskFixed: ["固定好啦，明天我会再放进任务栏。", "记住啦，这件事每天都会回来。", "以后每天，我都替你准备好这一项。"],
   taskUnfixed: ["好，只留在今天，不再每天重复。", "已经取消固定，明天不会自动出现啦。"],
+  bountySelf: ["这枚是你替自己赢下的，收好啦。", "今天守住了这份坚持，书签归你。", "第一份悬赏完成，认真有了新的证明。"],
+  bountyGift: ["这枚书签替她收好啦。", "你愿意多走的这一步，我替她记住了。", "第二份悬赏完成，这是今天送给她的努力。"],
 } as const;
 
 let petWindow: BrowserWindow | null = null;
@@ -136,7 +140,7 @@ function createPetWindow(): void {
   const x = display.workArea.x + display.workArea.width - PET_WINDOW.width - 36;
   const y = display.workArea.y + display.workArea.height - PET_WINDOW.height - 20;
   petWindow = new BrowserWindow({
-    title: "小鹿共学搭子",
+    title: "共学日记",
     width: PET_WINDOW.width,
     height: PET_WINDOW.height,
     x,
@@ -183,7 +187,7 @@ function createPetWindow(): void {
 function createPanelWindow(): BrowserWindow {
   if (panelWindow && !panelWindow.isDestroyed()) return panelWindow;
   panelWindow = new BrowserWindow({
-    title: "小鹿共学日记",
+    title: "共学日记",
     width: PANEL_WINDOW.width,
     height: PANEL_WINDOW.height,
     frame: false,
@@ -238,7 +242,7 @@ function hidePanel(): void {
 function createTray(): void {
   const icon = nativeImage.createFromPath(join(app.getAppPath(), "dist", "assets", "icons", "tray-icon-32.png"));
   tray = new Tray(icon);
-  tray.setToolTip("小鹿共学搭子");
+  tray.setToolTip("共学日记");
   refreshTrayMenu();
   tray.on("double-click", () => showPanel());
 }
@@ -284,6 +288,11 @@ function installIpc(): void {
     assertTrustedSender(event);
     if (typeof title !== "string") throw new Error("任务内容格式不正确。");
     return performAddTask(title);
+  });
+  ipcMain.handle("xiaolu:set-bounty", async (event, slot: unknown, title: unknown) => {
+    assertTrustedSender(event);
+    if ((slot !== "self" && slot !== "gift") || typeof title !== "string") throw new Error("悬赏内容格式不正确。");
+    return performSetBounty(slot, title);
   });
   ipcMain.handle("xiaolu:edit-task", async (event, id: unknown, title: unknown) => {
     assertTrustedSender(event);
@@ -424,6 +433,17 @@ async function performAddTask(title: string): Promise<Record<string, unknown>> {
   return publicState();
 }
 
+async function performSetBounty(slot: BountySlot, title: string): Promise<Record<string, unknown>> {
+  studyState = setBountyDefinition(studyState, slot, title, new Date());
+  await persistState();
+  sendState();
+  const message = title.trim()
+    ? slot === "self" ? "第一份悬赏写好啦，明天也会在这里。" : "第二份悬赏也收好啦，每天都等你来赢。"
+    : slot === "self" ? "今天的坚持先留白，想好了再写。" : "今天的挑战先留白，想好了再写。";
+  emitAction("review", message, title.trim() ? "◆" : "·", 1_550);
+  return publicState();
+}
+
 async function performEditTask(id: string, title: string): Promise<Record<string, unknown>> {
   studyState = editDailyTask(studyState, id, title, new Date());
   await persistState();
@@ -432,11 +452,15 @@ async function performEditTask(id: string, title: string): Promise<Record<string
 }
 
 async function performSetTaskCompleted(id: string, completed: boolean): Promise<Record<string, unknown>> {
+  const taskBeforeUpdate = getDay(studyState, localDateKey()).tasks.find((task) => task.id === id);
   studyState = setDailyTaskCompleted(studyState, id, completed, new Date());
   await persistState();
   sendState();
   const tasks = getDay(studyState, localDateKey()).tasks;
-  if (completed && tasks.length > 0 && tasks.every((task) => task.completedAt)) {
+  if (completed && taskBeforeUpdate?.bountySlot) {
+    const pool = taskBeforeUpdate.bountySlot === "self" ? lines.bountySelf : lines.bountyGift;
+    emitAction("jumping", chooseLine(`bounty-${taskBeforeUpdate.bountySlot}`, pool), "✦", 1_900);
+  } else if (completed && tasks.length > 0 && tasks.every((task) => task.completedAt)) {
     if (activePromptType === "task-reminder") clearActivePrompt();
     emitAction("jumping", chooseLine("allTasksCompleted", lines.allTasksCompleted), "✦", 1_800);
   } else if (completed) {
@@ -613,11 +637,11 @@ function playSettlementAction(report: DailyReport, announce: boolean): void {
   if (report.selfCompleted && report.friendCompleted) {
     emitAction("jumping", announce ? "我们都完成啦，这枚双人书签要好好收着。" : undefined, announce ? "✦" : undefined, 1_900);
   } else if (report.selfCompleted && !report.friendCompleted) {
-    emitAction("failed", announce ? "你的这份完成了，我会把今天如实记下来。" : undefined, undefined, 1_850);
+    emitAction("review", announce ? "你的这份完成了，双人书签留给下一次一起赢。" : undefined, undefined, 1_750);
   } else if (!report.selfCompleted && report.friendCompleted) {
     emitAction("waiting", announce ? "她完成了今天的约定，明天继续一起走吧。" : undefined, undefined, 1_750);
   } else {
-    emitAction("failed", announce ? "今天先留档，明天我们重新开始。" : undefined, undefined, 1_850);
+    emitAction("idle", announce ? "今天先好好留档，双人书签明天再一起争取。" : undefined, undefined, 1_750);
   }
 }
 
@@ -652,6 +676,7 @@ function publicState(message?: string): Record<string, unknown> {
       tasks: today.tasks,
       report: today.report ?? null,
     },
+    bounties: studyState.bounties,
     history: daySummaries(studyState, now),
     stats: calculateStats(studyState, now),
     settings: studyState.settings,

@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld("xiaoluHome", {
   checkIn: (slot) => ipcRenderer.invoke("xiaolu:check-in", slot),
   submitReport: (report) => ipcRenderer.invoke("xiaolu:submit-report", report),
   addTask: (title) => ipcRenderer.invoke("xiaolu:add-task", title),
+  setBounty: (slot, title) => ipcRenderer.invoke("xiaolu:set-bounty", slot, title),
   editTask: (id, title) => ipcRenderer.invoke("xiaolu:edit-task", id, title),
   setTaskCompleted: (id, completed) => ipcRenderer.invoke("xiaolu:set-task-completed", id, completed),
   setTaskRecurring: (id, recurring) => ipcRenderer.invoke("xiaolu:set-task-recurring", id, recurring),

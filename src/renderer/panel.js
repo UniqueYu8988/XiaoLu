@@ -10,7 +10,7 @@ let historyPage = 0;
 let taskPage = 0;
 let taskRenderKey = null;
 const HISTORY_PAGE_SIZE = 4;
-const TASK_PAGE_SIZE = 7;
+const TASK_PAGE_SIZE = 3;
 
 const portraitAnimations = {
   idle: { row: 0, frames: 6, duration: 5500, iterations: 1 },
@@ -89,10 +89,8 @@ function statusLabel(status) {
 }
 
 function bookmarkName(type) {
-  if (type === "together") return "双人书签";
-  if (type === "self") return "我的单人书签";
-  if (type === "friend") return "她的单人书签";
-  return "未生成书签";
+  if (type === "together") return "双人书签已收好";
+  return "双人书签留待下一次";
 }
 
 function render(state) {
@@ -120,7 +118,7 @@ function render(state) {
   byId("check-in-now").textContent = state.pendingCheckIn ? `${state.pendingCheckIn.slot} · 我在` : "我在";
 
   renderReport(state.today.report);
-  renderTasks(state.today.tasks ?? []);
+  renderTasks(state.today.tasks ?? [], state.bounties ?? {});
   renderHistory(state.history);
   renderBookmarkCollection(state.stats);
   renderStats(state.stats);
@@ -168,11 +166,22 @@ function renderHistory(history) {
     time.textContent = compactDuration(day.studyMs);
     top.append(date, time);
     const meta = document.createElement("p");
-    meta.textContent = `打卡 ${day.checkedCount}/5 · 任务 ${day.completedTaskCount ?? 0}/${day.taskCount ?? 0} · 做题 ${day.report?.problemCount ?? 0}`;
+    const bountyMeta = day.bountyCount ? ` · 悬赏 ${day.completedBountyCount ?? 0}/${day.bountyCount}` : "";
+    meta.textContent = `打卡 ${day.checkedCount}/5${bountyMeta} · 任务 ${day.completedTaskCount ?? 0}/${day.taskCount ?? 0} · 做题 ${day.report?.problemCount ?? 0}`;
     item.append(top, meta);
     if (day.report?.note) {
       const note = document.createElement("blockquote");
       note.textContent = day.report.note;
+      note.tabIndex = 0;
+      note.title = "点击查看完整记录";
+      note.setAttribute("aria-label", `学习成果：${day.report.note}。点击查看完整内容`);
+      note.addEventListener("click", () => showFeedback(day.report.note));
+      note.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          showFeedback(day.report.note);
+        }
+      });
       item.append(note);
     }
     return item;
@@ -180,13 +189,14 @@ function renderHistory(history) {
   renderPager("history", historyPage, pageCount);
 }
 
-function renderTasks(tasks) {
-  const ordered = [...tasks].sort((a, b) => Number(Boolean(a.completedAt)) - Number(Boolean(b.completedAt)) || a.createdAt.localeCompare(b.createdAt));
+function renderTasks(tasks, bounties) {
+  const ordered = tasks.filter((task) => !task.bountySlot).sort((a, b) => Number(Boolean(a.completedAt)) - Number(Boolean(b.completedAt)) || Number(Boolean(b.recurringTaskId)) - Number(Boolean(a.recurringTaskId)) || a.createdAt.localeCompare(b.createdAt));
   const pageCount = Math.max(1, Math.ceil(ordered.length / TASK_PAGE_SIZE));
   taskPage = Math.min(taskPage, pageCount - 1);
-  const renderKey = JSON.stringify([ordered, taskPage]);
+  const renderKey = JSON.stringify([tasks, bounties, taskPage]);
   if (taskRenderKey === renderKey) return;
   taskRenderKey = renderKey;
+  renderBountyBoard(tasks, bounties);
   const completed = ordered.filter((task) => task.completedAt).length;
   byId("task-progress").textContent = `${completed} / ${ordered.length}`;
   const list = byId("task-list");
@@ -200,9 +210,97 @@ function renderTasks(tasks) {
   renderPager("task", taskPage, pageCount);
 }
 
+function renderBountyBoard(tasks, bounties) {
+  const slots = [
+    { slot: "gift", ariaLabel: "给她的悬赏", hint: "今日挑战", success: "今天，你成功为她赢下了一份努力。", image: "../assets/bookmarks/bookmark-friend-bounty.png" },
+    { slot: "self", ariaLabel: "给自己的悬赏", hint: "今日坚持", success: "今天，你成功为自己赢下了一次坚持。", image: "../assets/bookmarks/bookmark-self-bounty.png" },
+  ];
+  byId("bounty-board").replaceChildren(...slots.map((config) => bountyCard(config, tasks.find((task) => task.bountySlot === config.slot), bounties[config.slot])));
+}
+
+function bountyCard(config, task, definition) {
+  const completed = Boolean(task?.completedAt);
+  if (completed) {
+    const result = document.createElement("article");
+    result.className = `bounty-result bounty-${config.slot}`;
+    const message = document.createElement("span");
+    message.textContent = config.success;
+    const undo = document.createElement("button");
+    undo.className = "bounty-undo";
+    undo.type = "button";
+    undo.textContent = "↩";
+    undo.setAttribute("aria-label", `撤回${config.ariaLabel}`);
+    undo.addEventListener("click", () => void runTaskAction(() => api.setTaskCompleted(task.id, false)));
+    result.append(message, undo);
+    return result;
+  }
+  const card = document.createElement("article");
+  card.className = `bounty-card bounty-${config.slot}${task ? " configured" : " empty"}`;
+  const art = document.createElement("div");
+  art.className = "bounty-mini-art";
+  const image = document.createElement("img");
+  image.src = config.image;
+  image.alt = "";
+  art.append(image);
+
+  const copy = document.createElement("div");
+  copy.className = "bounty-copy";
+  const input = document.createElement("input");
+  input.className = "bounty-title-input";
+  input.type = "text";
+  input.maxLength = 60;
+  input.value = task?.title ?? definition?.title ?? "";
+  input.placeholder = config.hint;
+  input.setAttribute("aria-label", `${config.ariaLabel}内容`);
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") { event.preventDefault(); input.blur(); }
+    if (event.key === "Escape") { input.value = task?.title ?? definition?.title ?? ""; input.blur(); }
+  });
+  input.addEventListener("change", () => {
+    const value = input.value.trim();
+    const previous = task?.title ?? definition?.title ?? "";
+    if (!value) {
+      if (previous) void runTaskAction(() => api.setBounty(config.slot, ""));
+      return;
+    }
+    if (value === previous) return;
+    void runTaskAction(() => api.setBounty(config.slot, value));
+  });
+  copy.append(input);
+
+  card.setAttribute("aria-label", task ? "双击书签赢得书签" : "先单击书签写下悬赏");
+  card.addEventListener("mousedown", (event) => {
+    if (event.detail > 1) event.preventDefault();
+  });
+  card.addEventListener("dblclick", (event) => {
+    event.preventDefault();
+    const previous = task?.title ?? definition?.title ?? "";
+    if (input.value.trim() !== previous) {
+      input.blur();
+      window.getSelection()?.removeAllRanges();
+      return;
+    }
+    input.blur();
+    window.getSelection()?.removeAllRanges();
+    if (!task) {
+      input.focus();
+      showFeedback("先把今天想赢下的目标写进书签吧。");
+      return;
+    }
+    if (card.classList.contains("claiming")) return;
+    card.classList.add("claiming");
+    window.setTimeout(async () => {
+      const earned = await runTaskAction(() => api.setTaskCompleted(task.id, true));
+      if (earned) playBookmarkGain();
+    }, 520);
+  });
+  card.append(art, copy);
+  return card;
+}
+
 function taskRow(task) {
   const row = document.createElement("article");
-  row.className = `task-row${task.completedAt ? " completed" : ""}`;
+  row.className = `task-row${task.completedAt ? " completed" : ""}${task.recurringTaskId ? " recurring" : ""}`;
   const check = document.createElement("button");
   check.className = "task-check";
   check.type = "button";
@@ -230,7 +328,7 @@ function taskRow(task) {
   const recurring = document.createElement("button");
   recurring.className = `task-action task-recurring${task.recurringTaskId ? " active" : ""}`;
   recurring.type = "button";
-  recurring.textContent = "固";
+  recurring.textContent = "日";
   recurring.setAttribute("aria-label", task.recurringTaskId ? "取消每日固定" : "设为每日固定");
   recurring.title = task.recurringTaskId ? "取消每日固定" : "每天重复";
   recurring.addEventListener("click", () => void runTaskAction(() => api.setTaskRecurring(task.id, !task.recurringTaskId)));
@@ -249,21 +347,30 @@ async function runTaskAction(action) {
     const state = await action();
     taskRenderKey = null;
     render(state);
+    return true;
   } catch (error) {
     showFeedback(String(error?.message || error));
+    return false;
   }
 }
 
+function playBookmarkGain() {
+  const gain = byId("bookmark-gain");
+  gain.classList.remove("playing");
+  void gain.offsetWidth;
+  gain.classList.add("playing");
+}
+
 function renderBookmarkCollection(stats) {
-  byId("bookmark-self-count").textContent = stats.selfBookmarks;
-  byId("bookmark-friend-count").textContent = stats.friendBookmarks;
+  byId("bookmark-self-count").textContent = stats.selfBountyBookmarks;
+  byId("bookmark-friend-count").textContent = stats.giftBountyBookmarks;
   byId("bookmark-together-count").textContent = stats.togetherBookmarks;
-  const total = stats.selfBookmarks + stats.friendBookmarks + stats.togetherBookmarks;
+  const total = stats.selfBountyBookmarks + stats.giftBountyBookmarks + stats.togetherBookmarks;
   byId("bookmark-summary").textContent = total === 0
-    ? "我们的第一枚书签，还在等一个认真完成的日子。"
+    ? "第一份悬赏和下一枚双人书签，都在等认真完成的一天。"
     : stats.togetherBookmarks > 0
-      ? `我们已经一起完成 ${stats.togetherBookmarks} 天，也收好了 ${total} 枚认真生活的证明。`
-      : `这里已经收好了 ${total} 枚认真完成的书签。`;
+      ? `已经为自己赢得 ${stats.selfBountyBookmarks} 枚、为她赢得 ${stats.giftBountyBookmarks} 枚，也一起完成了 ${stats.togetherBookmarks} 天。`
+      : `两份悬赏已经赢下 ${stats.selfBountyBookmarks + stats.giftBountyBookmarks} 枚书签，双人书签还在等你们一起完成。`;
 }
 
 function renderPager(name, page, pageCount) {
@@ -281,7 +388,7 @@ function renderStats(stats) {
     ["按时打卡", `${stats.checkedCount} 次`],
     ["双人书签", `${stats.togetherBookmarks} 枚`],
     ["累计完成任务", `${stats.completedTasks} 项`],
-    ["最长共同连续", `${stats.longestTogetherStreak} 天`],
+    ["累计完成悬赏", `${stats.completedBounties} 项`],
   ];
   byId("stats-grid").replaceChildren(...entries.map(([label, value]) => {
     const card = document.createElement("article");
@@ -321,8 +428,8 @@ document.querySelectorAll(".choice-grid .choice").forEach((choice) => {
 });
 byId("history-prev").addEventListener("click", () => { historyPage = Math.max(0, historyPage - 1); renderHistory(latestState?.history ?? []); });
 byId("history-next").addEventListener("click", () => { historyPage += 1; renderHistory(latestState?.history ?? []); });
-byId("task-prev").addEventListener("click", () => { taskPage = Math.max(0, taskPage - 1); taskRenderKey = null; renderTasks(latestState?.today.tasks ?? []); });
-byId("task-next").addEventListener("click", () => { taskPage += 1; taskRenderKey = null; renderTasks(latestState?.today.tasks ?? []); });
+byId("task-prev").addEventListener("click", () => { taskPage = Math.max(0, taskPage - 1); taskRenderKey = null; renderTasks(latestState?.today.tasks ?? [], latestState?.bounties ?? {}); });
+byId("task-next").addEventListener("click", () => { taskPage += 1; taskRenderKey = null; renderTasks(latestState?.today.tasks ?? [], latestState?.bounties ?? {}); });
 byId("open-bookmarks").addEventListener("click", () => switchTab("bookmarks"));
 byId("close").addEventListener("click", () => api.hide());
 byId("toggle-study").addEventListener("click", async () => {

@@ -1,7 +1,7 @@
 {
   "name": "xiaolu-desktop-pet",
-  "productName": "小鹿共学搭子",
-  "version": "0.2.1",
+  "productName": "共学日记",
+  "version": "0.3.0",
   "author": "Xiaolu",
   "license": "MIT",
   "private": true,
@@ -28,7 +28,7 @@
   },
   "build": {
     "appId": "dev.xiaolu.study-mate",
-    "productName": "小鹿共学搭子",
+    "productName": "共学日记",
     "electronDist": "node_modules/electron/dist",
     "asar": true,
     "files": [

@@ -11,6 +11,7 @@ import {
   initialStudyState,
   localDateKey,
   reconcileStudyState,
+  setBountyDefinition,
   setDailyTaskCompleted,
   setDailyTaskRecurring,
   studyMsForDay,
@@ -64,7 +65,6 @@ assert.equal(summaries[0]?.report?.problemCount, 42);
 const stats = calculateStats(state, at(21, 20));
 assert.equal(stats.totalProblems, 42);
 assert.equal(stats.togetherBookmarks, 1);
-assert.equal(stats.currentTogetherStreak, 1);
 
 let taskState = initialStudyState(at(8, 0, 19));
 taskState = addDailyTask(taskState, "task-1", " 完成 第一章  ", at(8, 1, 19));
@@ -104,6 +104,44 @@ recurringState = setDailyTaskRecurring(recurringState, repeatedDay21.id, false, 
 assert.equal(recurringState.recurringTasks.length, 0);
 recurringState = reconcileStudyState(recurringState, at(8, 0, 22)).state;
 assert.equal(recurringState.days[localDateKey(at(8, 0, 22))]?.tasks.length, 0);
+
+let bountyState = initialStudyState(at(8, 0, 19));
+bountyState = setBountyDefinition(bountyState, "self", "晨读二十分钟", at(8, 1, 19));
+const bountyDay19 = bountyState.days[localDateKey(at(8, 1, 19))]?.tasks.find((task) => task.bountySlot === "self");
+assert.equal(bountyDay19?.title, "晨读二十分钟");
+bountyState = setDailyTaskCompleted(bountyState, bountyDay19.id, true, at(8, 30, 19));
+bountyState = submitDailyReport(bountyState, {
+  problemCount: 0,
+  note: "",
+  selfCompleted: true,
+  friendCompleted: false,
+}, at(21, 0, 19));
+assert.equal(bountyState.days[localDateKey(at(21, 0, 19))]?.report?.bookmark, undefined);
+bountyState = reconcileStudyState(bountyState, at(8, 0, 20)).state;
+const bountyDay20 = bountyState.days[localDateKey(at(8, 0, 20))]?.tasks.find((task) => task.bountySlot === "self");
+assert.equal(bountyDay20?.title, "晨读二十分钟");
+assert.equal(bountyDay20?.completedAt, undefined);
+bountyState = editDailyTask(bountyState, bountyDay20.id, "晨读三十分钟", at(8, 1, 20));
+assert.equal(bountyState.bounties.self?.title, "晨读三十分钟");
+bountyState = setBountyDefinition(bountyState, "gift", "完成一篇阅读训练", at(8, 2, 20));
+const giftDay20 = bountyState.days[localDateKey(at(8, 2, 20))]?.tasks.find((task) => task.bountySlot === "gift");
+bountyState = setDailyTaskCompleted(bountyState, giftDay20.id, true, at(18, 0, 20));
+let bountyStats = calculateStats(bountyState, at(18, 1, 20));
+assert.equal(bountyStats.selfBountyBookmarks, 1);
+assert.equal(bountyStats.giftBountyBookmarks, 1);
+assert.equal(bountyStats.completedBounties, 2);
+bountyState = reconcileStudyState(bountyState, at(8, 0, 21)).state;
+const bountyDay21 = bountyState.days[localDateKey(at(8, 0, 21))]?.tasks.find((task) => task.bountySlot === "self");
+assert.equal(bountyDay21?.title, "晨读三十分钟");
+assert.equal(bountyState.days[localDateKey(at(8, 0, 21))]?.tasks.filter((task) => task.bountySlot).length, 2);
+
+let clearedBountyState = initialStudyState(at(9, 0, 19));
+clearedBountyState = setBountyDefinition(clearedBountyState, "gift", "今日挑战", at(9, 1, 19));
+clearedBountyState = setBountyDefinition(clearedBountyState, "gift", "", at(9, 2, 19));
+assert.equal(clearedBountyState.bounties.gift, undefined);
+assert.equal(clearedBountyState.days[localDateKey(at(9, 2, 19))]?.tasks.some((task) => task.bountySlot === "gift"), false);
+clearedBountyState = reconcileStudyState(clearedBountyState, at(9, 0, 20)).state;
+assert.equal(clearedBountyState.days[localDateKey(at(9, 0, 20))]?.tasks.some((task) => task.bountySlot === "gift"), false);
 
 let overnight = initialStudyState(at(23, 50));
 overnight = toggleStudy(overnight, at(23, 50)).state;

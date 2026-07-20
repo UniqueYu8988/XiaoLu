@@ -5,6 +5,8 @@ output/
 qa/
 tmp/
 *.log
+__pycache__/
+*.pyc
 .DS_Store
 Thumbs.db
 .env

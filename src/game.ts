@@ -2,7 +2,8 @@ export const CHECK_IN_SLOTS = ["09:00", "12:00", "15:00", "18:00", "21:00"] as c
 
 export type CheckInSlot = typeof CHECK_IN_SLOTS[number];
 export type CheckInStatus = "checked" | "missed";
-export type BookmarkType = "self" | "friend" | "together";
+export type BookmarkType = "together";
+export type BountySlot = "self" | "gift";
 export type TaskReminderSlot = "21:00" | "22:00";
 
 export interface StudySession {
@@ -30,12 +31,19 @@ export interface DailyTask {
   readonly createdAt: string;
   readonly completedAt?: string;
   readonly recurringTaskId?: string;
+  readonly bountySlot?: BountySlot;
 }
 
 export interface RecurringTask {
   readonly id: string;
   readonly title: string;
   readonly createdAt: string;
+}
+
+export interface BountyDefinition {
+  readonly slot: BountySlot;
+  readonly title: string;
+  readonly updatedAt: string;
 }
 
 export interface DayRecord {
@@ -56,6 +64,7 @@ export interface StudyState {
   readonly activeSessionStartedAt?: string;
   readonly days: Readonly<Record<string, DayRecord>>;
   readonly recurringTasks: readonly RecurringTask[];
+  readonly bounties: Readonly<Partial<Record<BountySlot, BountyDefinition>>>;
   readonly settings: StudySettings;
   readonly lastEvaluatedAt: string;
 }
@@ -101,6 +110,8 @@ export interface PublicDaySummary {
   readonly missedCount: number;
   readonly taskCount: number;
   readonly completedTaskCount: number;
+  readonly bountyCount: number;
+  readonly completedBountyCount: number;
   readonly report?: DailyReport;
 }
 
@@ -108,13 +119,12 @@ export interface StudyStats {
   readonly totalStudyMs: number;
   readonly totalProblems: number;
   readonly completedTasks: number;
+  readonly completedBounties: number;
   readonly checkedCount: number;
   readonly missedCount: number;
   readonly togetherBookmarks: number;
-  readonly selfBookmarks: number;
-  readonly friendBookmarks: number;
-  readonly currentTogetherStreak: number;
-  readonly longestTogetherStreak: number;
+  readonly selfBountyBookmarks: number;
+  readonly giftBountyBookmarks: number;
 }
 
 const SLOT_MINUTES: Record<CheckInSlot, number> = {
@@ -130,6 +140,7 @@ export function initialStudyState(now = new Date()): StudyState {
     version: 2,
     days: {},
     recurringTasks: [],
+    bounties: {},
     settings: { launchAtLogin: true },
     lastEvaluatedAt: now.toISOString(),
   };
@@ -156,12 +167,23 @@ export function normalizeStudyState(value: unknown, now = new Date()): StudyStat
       recurringTasks.push({ id, title, createdAt });
     }
   }
+  const bounties: Partial<Record<BountySlot, BountyDefinition>> = {};
+  if (isRecord(value.bounties)) {
+    for (const slot of ["self", "gift"] as const) {
+      const raw = value.bounties[slot];
+      if (!isRecord(raw)) continue;
+      const title = normalizeTaskTitle(raw.title);
+      const updatedAt = isDateString(raw.updatedAt) ? raw.updatedAt : undefined;
+      if (title && updatedAt) bounties[slot] = { slot, title, updatedAt };
+    }
+  }
   const settingsValue = isRecord(value.settings) ? value.settings : {};
   return {
     version: 2,
     ...(activeSessionStartedAt ? { activeSessionStartedAt } : {}),
     days,
     recurringTasks,
+    bounties,
     settings: { launchAtLogin: settingsValue.launchAtLogin !== false },
     lastEvaluatedAt: isDateString(value.lastEvaluatedAt) ? value.lastEvaluatedAt : now.toISOString(),
   };
@@ -174,6 +196,16 @@ export function reconcileStudyState(current: StudyState, now = new Date()): Reco
   const today = localDateKey(now);
   const todayRecord = days[today] ?? emptyDay(today);
   const todayTasks = [...todayRecord.tasks];
+  for (const slot of ["self", "gift"] as const) {
+    const bounty = state.bounties[slot];
+    if (!bounty || todayTasks.some((task) => task.bountySlot === slot)) continue;
+    todayTasks.push({
+      id: `bounty:${slot}:${today}`,
+      title: bounty.title,
+      createdAt: now.toISOString(),
+      bountySlot: slot,
+    });
+  }
   for (const recurring of state.recurringTasks) {
     if (todayTasks.some((task) => task.recurringTaskId === recurring.id)) continue;
     todayTasks.push({
@@ -306,6 +338,15 @@ export function editDailyTask(current: StudyState, id: string, title: string, no
   if (!normalizedTitle) throw new Error("任务内容不能为空。");
   const task = getDay(state, localDateKey(now)).tasks.find((item) => item.id === id);
   const updated = updateTodayTasks(state, id, now, (item) => ({ ...item, title: normalizedTitle }));
+  if (task?.bountySlot) {
+    return {
+      ...updated,
+      bounties: {
+        ...updated.bounties,
+        [task.bountySlot]: { slot: task.bountySlot, title: normalizedTitle, updatedAt: now.toISOString() },
+      },
+    };
+  }
   if (!task?.recurringTaskId) return updated;
   return {
     ...updated,
@@ -327,6 +368,7 @@ export function deleteDailyTask(current: StudyState, id: string, now = new Date(
   const date = localDateKey(now);
   const day = getDay(state, date);
   const removed = day.tasks.find((task) => task.id === id);
+  if (removed?.bountySlot) throw new Error("悬赏会每天守在这里，可以直接修改内容。");
   const tasks = day.tasks.filter((task) => task.id !== id);
   if (tasks.length === day.tasks.length) return state;
   const days = cloneDays(state.days);
@@ -353,6 +395,7 @@ export function setDailyTaskRecurring(
   const day = getDay(state, date);
   const task = day.tasks.find((item) => item.id === id);
   if (!task) return state;
+  if (task.bountySlot) throw new Error("悬赏本身就是每日任务，不需要再次固定。");
   const recurringTaskId = task.recurringTaskId ?? normalizeTaskId(newRecurringTaskId);
   if (recurring && !recurringTaskId) throw new Error("固定任务编号不正确。");
   const tasks = day.tasks.map((item) => {
@@ -372,6 +415,38 @@ export function setDailyTaskRecurring(
   const days = cloneDays(state.days);
   days[date] = { ...day, tasks };
   return { ...state, days, recurringTasks, lastEvaluatedAt: now.toISOString() };
+}
+
+export function setBountyDefinition(
+  current: StudyState,
+  slot: BountySlot,
+  title: string,
+  now = new Date(),
+): StudyState {
+  const state = reconcileStudyState(current, now).state;
+  const normalizedTitle = normalizeTaskTitle(title);
+  const date = localDateKey(now);
+  const day = getDay(state, date);
+  if (!normalizedTitle) {
+    const days = cloneDays(state.days);
+    days[date] = { ...day, tasks: day.tasks.filter((task) => task.bountySlot !== slot) };
+    const bounties: Partial<Record<BountySlot, BountyDefinition>> = { ...state.bounties };
+    delete bounties[slot];
+    return { ...state, days, bounties, lastEvaluatedAt: now.toISOString() };
+  }
+  const existing = day.tasks.find((task) => task.bountySlot === slot);
+  const task: DailyTask = existing
+    ? { ...existing, title: normalizedTitle }
+    : { id: `bounty:${slot}:${date}`, title: normalizedTitle, createdAt: now.toISOString(), bountySlot: slot };
+  const tasks = existing ? day.tasks.map((item) => item.id === existing.id ? task : item) : [...day.tasks, task];
+  const days = cloneDays(state.days);
+  days[date] = { ...day, tasks };
+  return {
+    ...state,
+    days,
+    bounties: { ...state.bounties, [slot]: { slot, title: normalizedTitle, updatedAt: now.toISOString() } },
+    lastEvaluatedAt: now.toISOString(),
+  };
 }
 
 export function markTaskReminderShown(current: StudyState, slot: TaskReminderSlot, now = new Date()): StudyState {
@@ -426,8 +501,10 @@ export function daySummaries(state: StudyState, now = new Date(), limit = 120): 
         studyMs: studyMsForDay(state, date, now),
         checkedCount: records.filter((item) => item?.status === "checked").length,
         missedCount: records.filter((item) => item?.status === "missed").length,
-        taskCount: day.tasks.length,
-        completedTaskCount: day.tasks.filter((task) => task.completedAt).length,
+        taskCount: day.tasks.filter((task) => !task.bountySlot).length,
+        completedTaskCount: day.tasks.filter((task) => !task.bountySlot && task.completedAt).length,
+        bountyCount: day.tasks.filter((task) => task.bountySlot).length,
+        completedBountyCount: day.tasks.filter((task) => task.bountySlot && task.completedAt).length,
         ...(day.report ? { report: day.report } : {}),
       };
     });
@@ -440,47 +517,28 @@ export function calculateStats(state: StudyState, now = new Date()): StudyStats 
   let checkedCount = 0;
   let missedCount = 0;
   let togetherBookmarks = 0;
-  let selfBookmarks = 0;
-  let friendBookmarks = 0;
+  let selfBountyBookmarks = 0;
+  let giftBountyBookmarks = 0;
   for (const summary of summaries) {
     totalProblems += summary.report?.problemCount ?? 0;
     completedTasks += summary.completedTaskCount;
     checkedCount += summary.checkedCount;
     missedCount += summary.missedCount;
     if (summary.report?.bookmark === "together") togetherBookmarks += 1;
-    if (summary.report?.bookmark === "self") selfBookmarks += 1;
-    if (summary.report?.bookmark === "friend") friendBookmarks += 1;
-  }
-  const togetherDates = new Set(summaries.filter((item) => item.report?.bookmark === "together").map((item) => item.date));
-  const sortedDates = summaries.map((item) => item.date).sort();
-  let longestTogetherStreak = 0;
-  let run = 0;
-  let previous: string | undefined;
-  for (const date of sortedDates) {
-    if (!togetherDates.has(date)) { run = 0; previous = date; continue; }
-    run = previous && daysBetween(previous, date) === 1 ? run + 1 : 1;
-    longestTogetherStreak = Math.max(longestTogetherStreak, run);
-    previous = date;
-  }
-  let currentTogetherStreak = 0;
-  const descendingTogether = [...togetherDates].sort((a, b) => b.localeCompare(a));
-  for (let index = 0; index < descendingTogether.length; index += 1) {
-    const date = descendingTogether[index];
-    if (!date) continue;
-    if (index === 0 || daysBetween(descendingTogether[index]!, descendingTogether[index - 1]!) === 1) currentTogetherStreak += 1;
-    else break;
+    const tasks = getDay(state, summary.date).tasks;
+    selfBountyBookmarks += tasks.filter((task) => task.bountySlot === "self" && task.completedAt).length;
+    giftBountyBookmarks += tasks.filter((task) => task.bountySlot === "gift" && task.completedAt).length;
   }
   return {
     totalStudyMs: summaries.reduce((sum, item) => sum + item.studyMs, 0),
     totalProblems,
     completedTasks,
+    completedBounties: selfBountyBookmarks + giftBountyBookmarks,
     checkedCount,
     missedCount,
     togetherBookmarks,
-    selfBookmarks,
-    friendBookmarks,
-    currentTogetherStreak,
-    longestTogetherStreak,
+    selfBountyBookmarks,
+    giftBountyBookmarks,
   };
 }
 
@@ -565,8 +623,9 @@ function normalizeDay(value: Record<string, unknown>, date: string): DayRecord {
       const createdAt = isDateString(raw.createdAt) ? raw.createdAt : undefined;
       const completedAt = isDateString(raw.completedAt) ? raw.completedAt : undefined;
       const recurringTaskId = normalizeTaskId(raw.recurringTaskId);
+      const bountySlot = raw.bountySlot === "self" || raw.bountySlot === "gift" ? raw.bountySlot : undefined;
       if (!id || !title || !createdAt || tasks.some((task) => task.id === id)) continue;
-      tasks.push({ id, title, createdAt, ...(completedAt ? { completedAt } : {}), ...(recurringTaskId ? { recurringTaskId } : {}) });
+      tasks.push({ id, title, createdAt, ...(completedAt ? { completedAt } : {}), ...(recurringTaskId ? { recurringTaskId } : {}), ...(bountySlot ? { bountySlot } : {}) });
     }
   }
   const taskReminders = Array.isArray(value.taskReminders)
@@ -600,8 +659,6 @@ function cloneDays(days: Readonly<Record<string, DayRecord>>): Record<string, Da
 
 function bookmarkFor(selfCompleted: boolean, friendCompleted: boolean): BookmarkType | undefined {
   if (selfCompleted && friendCompleted) return "together";
-  if (selfCompleted) return "self";
-  if (friendCompleted) return "friend";
   return undefined;
 }
 
@@ -640,12 +697,6 @@ function normalizeTaskTitle(value: unknown): string | undefined {
 function dateAtLocalMidnight(date: string): Date {
   const [year = 1970, month = 1, day = 1] = date.split("-").map(Number);
   return new Date(year, month - 1, day);
-}
-
-function daysBetween(earlier: string, later: string): number {
-  const start = dateAtLocalMidnight(earlier);
-  const end = dateAtLocalMidnight(later);
-  return Math.round((end.getTime() - start.getTime()) / 86_400_000);
 }
 
 function durationMs(start: string, end: string): number {
