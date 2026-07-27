@@ -5,6 +5,8 @@ export type CheckInStatus = "checked" | "missed";
 export type BookmarkType = "together";
 export type BountySlot = "self" | "gift";
 export type TaskReminderSlot = "21:00" | "22:00";
+export type StudyLaunchPeriod = "morning" | "afternoon" | "evening";
+export type StudyLaunchSource = "prompt" | "double-click" | "manual" | "organic";
 
 export interface StudySession {
   readonly startedAt: string;
@@ -46,17 +48,53 @@ export interface BountyDefinition {
   readonly updatedAt: string;
 }
 
+export interface YuQuizSnapshot {
+  readonly date: string;
+  readonly todayQuestions: number;
+  readonly todayCorrect: number;
+  readonly todayAccuracy: number | null;
+  readonly todayLearningSeconds: number;
+  readonly currentView: string;
+  readonly isLearning: boolean;
+  readonly activeSession: boolean;
+  readonly pageOpen?: boolean;
+  readonly pageSuspectedOpen?: boolean;
+  readonly pageVisible?: boolean;
+  readonly studyState?: "closed" | "ready" | "learning" | "paused" | "consulting";
+  readonly pauseReason?: "idle" | "hidden" | "manual" | "none";
+  readonly aiConsulting?: boolean;
+  readonly lastActivityAt?: string;
+  readonly syncedAt: string;
+}
+
+export interface StudyLaunchRecord {
+  readonly availableAt?: string;
+  readonly promptedAt?: string;
+  readonly snoozedUntil?: string;
+  readonly ritualStartedAt?: string;
+  readonly finalPromptedAt?: string;
+  readonly completedAt?: string;
+  readonly skippedAt?: string;
+  readonly source?: StudyLaunchSource;
+}
+
 export interface DayRecord {
   readonly date: string;
   readonly sessions: readonly StudySession[];
   readonly checkIns: Readonly<Partial<Record<CheckInSlot, CheckInRecord>>>;
   readonly tasks: readonly DailyTask[];
   readonly taskReminders: readonly TaskReminderSlot[];
+  readonly studyLaunches: Readonly<Partial<Record<StudyLaunchPeriod, StudyLaunchRecord>>>;
+  readonly yuQuiz?: YuQuizSnapshot;
   readonly report?: DailyReport;
 }
 
 export interface StudySettings {
   readonly launchAtLogin: boolean;
+  readonly yuQuizIntegration: boolean;
+  readonly voiceEnabled: boolean;
+  readonly voiceVolume: number;
+  readonly yuQuizEventCursor?: number;
 }
 
 export interface StudyState {
@@ -112,6 +150,8 @@ export interface PublicDaySummary {
   readonly completedTaskCount: number;
   readonly bountyCount: number;
   readonly completedBountyCount: number;
+  readonly problemCount: number;
+  readonly yuQuiz?: YuQuizSnapshot;
   readonly report?: DailyReport;
 }
 
@@ -135,13 +175,15 @@ const SLOT_MINUTES: Record<CheckInSlot, number> = {
   "21:00": 21 * 60,
 };
 
+const STUDY_LAUNCH_SOURCES = new Set<StudyLaunchSource>(["prompt", "double-click", "manual", "organic"]);
+
 export function initialStudyState(now = new Date()): StudyState {
   return {
     version: 2,
     days: {},
     recurringTasks: [],
     bounties: {},
-    settings: { launchAtLogin: true },
+    settings: { launchAtLogin: true, yuQuizIntegration: false, voiceEnabled: true, voiceVolume: 0.82 },
     lastEvaluatedAt: now.toISOString(),
   };
 }
@@ -178,13 +220,22 @@ export function normalizeStudyState(value: unknown, now = new Date()): StudyStat
     }
   }
   const settingsValue = isRecord(value.settings) ? value.settings : {};
+  const yuQuizEventCursor = finiteNumber(settingsValue.yuQuizEventCursor);
   return {
     version: 2,
     ...(activeSessionStartedAt ? { activeSessionStartedAt } : {}),
     days,
     recurringTasks,
     bounties,
-    settings: { launchAtLogin: settingsValue.launchAtLogin !== false },
+    settings: {
+      launchAtLogin: settingsValue.launchAtLogin !== false,
+      yuQuizIntegration: settingsValue.yuQuizIntegration === true,
+      voiceEnabled: settingsValue.voiceEnabled !== false,
+      voiceVolume: Math.max(0, Math.min(1, finiteNumber(settingsValue.voiceVolume) ?? 0.82)),
+      ...(yuQuizEventCursor !== undefined && yuQuizEventCursor >= 0
+        ? { yuQuizEventCursor: Math.trunc(yuQuizEventCursor) }
+        : {}),
+    },
     lastEvaluatedAt: isDateString(value.lastEvaluatedAt) ? value.lastEvaluatedAt : now.toISOString(),
   };
 }
@@ -459,12 +510,117 @@ export function markTaskReminderShown(current: StudyState, slot: TaskReminderSlo
   return { ...state, days, lastEvaluatedAt: now.toISOString() };
 }
 
+export function studyLaunchPeriodAt(now = new Date()): StudyLaunchPeriod | undefined {
+  const minutes = now.getHours() * 60 + now.getMinutes();
+  if (minutes >= 7 * 60 && minutes < 12 * 60) return "morning";
+  if (minutes >= 13 * 60 && minutes < 18 * 60) return "afternoon";
+  if (minutes >= 19 * 60 && minutes < 23 * 60 + 30) return "evening";
+  return undefined;
+}
+
+export function updateStudyLaunch(
+  current: StudyState,
+  period: StudyLaunchPeriod,
+  update: (record: StudyLaunchRecord) => StudyLaunchRecord,
+  now = new Date(),
+): StudyState {
+  const state = normalizeStudyState(current, now);
+  const date = localDateKey(now);
+  const day = getDay(state, date);
+  const previous = day.studyLaunches[period] ?? {};
+  const next = normalizeStudyLaunchRecord(update(previous));
+  const days = cloneDays(state.days);
+  days[date] = {
+    ...day,
+    studyLaunches: { ...day.studyLaunches, [period]: next },
+  };
+  return { ...state, days, lastEvaluatedAt: now.toISOString() };
+}
+
+export function markStudyLaunchAvailable(current: StudyState, period: StudyLaunchPeriod, now = new Date()): StudyState {
+  return updateStudyLaunch(current, period, (record) => record.availableAt ? record : { ...record, availableAt: now.toISOString() }, now);
+}
+
+export function markStudyLaunchPrompted(current: StudyState, period: StudyLaunchPeriod, final: boolean, now = new Date()): StudyState {
+  return updateStudyLaunch(current, period, (record) => final
+    ? { ...record, finalPromptedAt: record.finalPromptedAt ?? now.toISOString() }
+    : { ...record, promptedAt: record.promptedAt ?? now.toISOString() }, now);
+}
+
+export function snoozeStudyLaunch(current: StudyState, period: StudyLaunchPeriod, until: Date, now = new Date()): StudyState {
+  return updateStudyLaunch(current, period, (record) => ({ ...record, snoozedUntil: until.toISOString() }), now);
+}
+
+export function beginStudyLaunchRitual(current: StudyState, period: StudyLaunchPeriod, source: StudyLaunchSource, now = new Date()): StudyState {
+  return updateStudyLaunch(current, period, (record) => ({ ...record, ritualStartedAt: now.toISOString(), source }), now);
+}
+
+export function completeStudyLaunch(current: StudyState, period: StudyLaunchPeriod, source: StudyLaunchSource, now = new Date()): StudyState {
+  return updateStudyLaunch(current, period, (record) => record.completedAt
+    ? record
+    : { ...record, completedAt: now.toISOString(), source }, now);
+}
+
+export function skipStudyLaunch(current: StudyState, period: StudyLaunchPeriod, now = new Date()): StudyState {
+  return updateStudyLaunch(current, period, (record) => ({ ...record, skippedAt: now.toISOString() }), now);
+}
+
 export function setLaunchAtLogin(current: StudyState, enabled: boolean, now = new Date()): StudyState {
+  const state = normalizeStudyState(current, now);
   return {
-    ...normalizeStudyState(current, now),
-    settings: { launchAtLogin: enabled },
+    ...state,
+    settings: { ...state.settings, launchAtLogin: enabled },
     lastEvaluatedAt: now.toISOString(),
   };
+}
+
+export function setYuQuizIntegration(current: StudyState, enabled: boolean, now = new Date()): StudyState {
+  const state = normalizeStudyState(current, now);
+  return {
+    ...state,
+    settings: {
+      ...state.settings,
+      yuQuizIntegration: enabled,
+    },
+    lastEvaluatedAt: now.toISOString(),
+  };
+}
+
+export function setVoiceEnabled(current: StudyState, enabled: boolean, now = new Date()): StudyState {
+  const state = normalizeStudyState(current, now);
+  return {
+    ...state,
+    settings: { ...state.settings, voiceEnabled: enabled },
+    lastEvaluatedAt: now.toISOString(),
+  };
+}
+
+export function setVoiceVolume(current: StudyState, volume: number, now = new Date()): StudyState {
+  const state = normalizeStudyState(current, now);
+  return {
+    ...state,
+    settings: { ...state.settings, voiceVolume: Math.max(0, Math.min(1, volume)) },
+    lastEvaluatedAt: now.toISOString(),
+  };
+}
+
+export function setYuQuizEventCursor(current: StudyState, cursor: number, now = new Date()): StudyState {
+  const state = normalizeStudyState(current, now);
+  return {
+    ...state,
+    settings: { ...state.settings, yuQuizEventCursor: Math.max(0, Math.trunc(cursor)) },
+    lastEvaluatedAt: now.toISOString(),
+  };
+}
+
+export function saveYuQuizSnapshot(current: StudyState, snapshot: YuQuizSnapshot, now = new Date()): StudyState {
+  const state = normalizeStudyState(current, now);
+  if (!state.settings.yuQuizIntegration || snapshot.date !== localDateKey(now)) return state;
+  const date = localDateKey(now);
+  const days = cloneDays(state.days);
+  const day = getDay(state, date);
+  days[date] = { ...day, yuQuiz: snapshot };
+  return { ...state, days, lastEvaluatedAt: now.toISOString() };
 }
 
 export function findPendingCheckIn(state: StudyState, now = new Date()): PendingCheckIn | undefined {
@@ -486,6 +642,7 @@ export function studyMsForDay(state: StudyState, date: string, now = new Date())
   if (state.activeSessionStartedAt && localDateKey(new Date(state.activeSessionStartedAt)) === date) {
     total += Math.max(0, now.getTime() - new Date(state.activeSessionStartedAt).getTime());
   }
+  if (day.yuQuiz) total += Math.max(0, day.yuQuiz.todayLearningSeconds * 1_000);
   return total;
 }
 
@@ -505,6 +662,8 @@ export function daySummaries(state: StudyState, now = new Date(), limit = 120): 
         completedTaskCount: day.tasks.filter((task) => !task.bountySlot && task.completedAt).length,
         bountyCount: day.tasks.filter((task) => task.bountySlot).length,
         completedBountyCount: day.tasks.filter((task) => task.bountySlot && task.completedAt).length,
+        problemCount: day.yuQuiz?.todayQuestions ?? day.report?.problemCount ?? 0,
+        ...(day.yuQuiz ? { yuQuiz: day.yuQuiz } : {}),
         ...(day.report ? { report: day.report } : {}),
       };
     });
@@ -520,7 +679,7 @@ export function calculateStats(state: StudyState, now = new Date()): StudyStats 
   let selfBountyBookmarks = 0;
   let giftBountyBookmarks = 0;
   for (const summary of summaries) {
-    totalProblems += summary.report?.problemCount ?? 0;
+    totalProblems += summary.problemCount;
     completedTasks += summary.completedTaskCount;
     checkedCount += summary.checkedCount;
     missedCount += summary.missedCount;
@@ -631,7 +790,45 @@ function normalizeDay(value: Record<string, unknown>, date: string): DayRecord {
   const taskReminders = Array.isArray(value.taskReminders)
     ? value.taskReminders.filter((slot): slot is TaskReminderSlot => slot === "21:00" || slot === "22:00")
     : [];
-  return { date, sessions, checkIns, tasks, taskReminders: [...new Set(taskReminders)], ...(report ? { report } : {}) };
+  const studyLaunches: Partial<Record<StudyLaunchPeriod, StudyLaunchRecord>> = {};
+  if (isRecord(value.studyLaunches)) {
+    for (const period of ["morning", "afternoon", "evening"] as const) {
+      const raw = value.studyLaunches[period];
+      if (isRecord(raw)) studyLaunches[period] = normalizeStudyLaunchRecord(raw);
+    }
+  }
+  const yuQuiz = normalizeYuQuizSnapshot(value.yuQuiz, date);
+  const authoritativeReport = report && yuQuiz && report.problemCount !== yuQuiz.todayQuestions
+    ? { ...report, problemCount: yuQuiz.todayQuestions }
+    : report;
+  return { date, sessions, checkIns, tasks, taskReminders: [...new Set(taskReminders)], studyLaunches, ...(yuQuiz ? { yuQuiz } : {}), ...(authoritativeReport ? { report: authoritativeReport } : {}) };
+}
+
+function normalizeYuQuizSnapshot(value: unknown, date: string): YuQuizSnapshot | undefined {
+  if (!isRecord(value) || value.date !== date || !isDateString(value.syncedAt)) return undefined;
+  const todayAccuracy = value.todayAccuracy === null ? null : finiteNumber(value.todayAccuracy);
+  return {
+    date,
+    todayQuestions: clampInteger(value.todayQuestions, 0, 1_000_000),
+    todayCorrect: clampInteger(value.todayCorrect, 0, 1_000_000),
+    todayAccuracy: todayAccuracy === undefined ? null : todayAccuracy,
+    todayLearningSeconds: clampInteger(value.todayLearningSeconds, 0, 86_400 * 366),
+    currentView: typeof value.currentView === "string" ? value.currentView.slice(0, 32) : "home",
+    isLearning: value.isLearning === true,
+    activeSession: value.activeSession === true,
+    ...(typeof value.pageOpen === "boolean" ? { pageOpen: value.pageOpen } : {}),
+    ...(typeof value.pageSuspectedOpen === "boolean" ? { pageSuspectedOpen: value.pageSuspectedOpen } : {}),
+    ...(typeof value.pageVisible === "boolean" ? { pageVisible: value.pageVisible } : {}),
+    ...(value.studyState === "closed" || value.studyState === "ready" || value.studyState === "learning" || value.studyState === "paused" || value.studyState === "consulting"
+      ? { studyState: value.studyState }
+      : {}),
+    ...(value.pauseReason === "idle" || value.pauseReason === "hidden" || value.pauseReason === "manual" || value.pauseReason === "none"
+      ? { pauseReason: value.pauseReason }
+      : {}),
+    ...(typeof value.aiConsulting === "boolean" ? { aiConsulting: value.aiConsulting } : {}),
+    ...(isDateString(value.lastActivityAt) ? { lastActivityAt: value.lastActivityAt } : {}),
+    syncedAt: value.syncedAt,
+  };
 }
 
 function normalizeReport(value: unknown): DailyReport | undefined {
@@ -650,7 +847,24 @@ function normalizeReport(value: unknown): DailyReport | undefined {
 }
 
 function emptyDay(date: string): DayRecord {
-  return { date, sessions: [], checkIns: {}, tasks: [], taskReminders: [] };
+  return { date, sessions: [], checkIns: {}, tasks: [], taskReminders: [], studyLaunches: {} };
+}
+
+function normalizeStudyLaunchRecord(value: unknown): StudyLaunchRecord {
+  if (!isRecord(value)) return {};
+  const source = typeof value.source === "string" && STUDY_LAUNCH_SOURCES.has(value.source as StudyLaunchSource)
+    ? value.source as StudyLaunchSource
+    : undefined;
+  return {
+    ...(isDateString(value.availableAt) ? { availableAt: value.availableAt } : {}),
+    ...(isDateString(value.promptedAt) ? { promptedAt: value.promptedAt } : {}),
+    ...(isDateString(value.snoozedUntil) ? { snoozedUntil: value.snoozedUntil } : {}),
+    ...(isDateString(value.ritualStartedAt) ? { ritualStartedAt: value.ritualStartedAt } : {}),
+    ...(isDateString(value.finalPromptedAt) ? { finalPromptedAt: value.finalPromptedAt } : {}),
+    ...(isDateString(value.completedAt) ? { completedAt: value.completedAt } : {}),
+    ...(isDateString(value.skippedAt) ? { skippedAt: value.skippedAt } : {}),
+    ...(source ? { source } : {}),
+  };
 }
 
 function cloneDays(days: Readonly<Record<string, DayRecord>>): Record<string, DayRecord> {
@@ -707,6 +921,10 @@ function clampInteger(value: unknown, min: number, max: number): number {
   return typeof value === "number" && Number.isFinite(value)
     ? Math.min(max, Math.max(min, Math.round(value)))
     : min;
+}
+
+function finiteNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

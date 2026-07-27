@@ -97,9 +97,18 @@ function render(state) {
   latestState = state;
   byId("today-date").textContent = displayDate(state.date);
   byId("timer").textContent = formatDuration(state.today.studyMs);
-  byId("timer-status").textContent = state.isStudying ? "这一段，我陪你一起认真。" : state.today.report ? "今天的认真，已经收进日记了。" : "准备好时，叫我一起开始吧。";
-  byId("toggle-study").textContent = state.isStudying ? "学习中" : state.today.report ? "今日已收好" : "开始学习";
-  byId("toggle-study").disabled = Boolean(state.today.report && !state.isStudying);
+  const yuQuiz = state.yuQuiz ?? { enabled: false };
+  if (yuQuiz.enabled) {
+    byId("timer-status").textContent = "小鹿在 YuQuiz 旁边坐好啦，安心做题吧。";
+    byId("toggle-study").textContent = "YuQuiz 自动记录";
+    byId("toggle-study").disabled = true;
+  } else {
+    byId("timer-status").textContent = yuQuiz.connected
+      ? "小鹿找到 YuQuiz 啦，等你翻开下一道题。"
+      : state.isStudying ? "这一段，我陪你一起认真。" : state.today.report ? "今天的认真，已经收进日记了。" : "准备好时，叫我一起开始吧。";
+    byId("toggle-study").textContent = state.isStudying ? "学习中" : state.today.report ? "今日已收好" : "开始学习";
+    byId("toggle-study").disabled = Boolean(state.today.report && !state.isStudying);
+  }
   portraitPersistent = portraitAnimations[state.persistentAnimation] ? state.persistentAnimation : "idle";
   if (!portraitLocked) setPortraitAnimation(portraitPersistent, true);
 
@@ -117,16 +126,20 @@ function render(state) {
   byId("check-in-now").hidden = !state.pendingCheckIn;
   byId("check-in-now").textContent = state.pendingCheckIn ? `${state.pendingCheckIn.slot} · 我在` : "我在";
 
-  renderReport(state.today.report);
+  renderReport(state.today.report, yuQuiz);
   renderTasks(state.today.tasks ?? [], state.bounties ?? {});
   renderHistory(state.history);
   renderBookmarkCollection(state.stats);
   renderStats(state.stats);
   byId("launch-at-login").checked = state.settings.launchAtLogin;
+  byId("yuquiz-integration").checked = Boolean(yuQuiz.enabled);
+  byId("voice-enabled").checked = state.settings.voiceEnabled !== false;
+  byId("voice-volume").value = Number.isFinite(state.settings.voiceVolume) ? state.settings.voiceVolume : 0.82;
+  byId("voice-volume").disabled = state.settings.voiceEnabled === false;
   if (state.message) showFeedback(state.message);
 }
 
-function renderReport(report) {
+function renderReport(report, yuQuiz = { enabled: false }) {
   const key = report ? report.submittedAt : "empty";
   if (loadedReportKey !== key) {
     loadedReportKey = key;
@@ -139,6 +152,11 @@ function renderReport(report) {
       choice.classList.toggle("active", report ? choice.dataset.value === (report.friendCompleted ? "yes" : "no") : false);
     });
   }
+  const input = byId("problem-count");
+  const snapshot = yuQuiz.snapshot;
+  input.readOnly = Boolean(snapshot);
+  input.title = snapshot ? "由 YuQuiz 今日统计自动读取" : "可以手动填写";
+  if (snapshot) input.value = snapshot.todayQuestions;
   const result = byId("report-result");
   result.hidden = !report;
   if (report) result.textContent = `已结算 · ${bookmarkName(report.bookmark)}`;
@@ -147,6 +165,7 @@ function renderReport(report) {
 
 function renderHistory(history) {
   const list = byId("history-list");
+  byId("history-total").textContent = `累计 ${history.length} 条`;
   if (history.length === 0) {
     list.replaceChildren(emptyMessage("这里还空着，今天会成为第一页。"));
     byId("history-pager").hidden = true;
@@ -167,7 +186,7 @@ function renderHistory(history) {
     top.append(date, time);
     const meta = document.createElement("p");
     const bountyMeta = day.bountyCount ? ` · 悬赏 ${day.completedBountyCount ?? 0}/${day.bountyCount}` : "";
-    meta.textContent = `打卡 ${day.checkedCount}/5${bountyMeta} · 任务 ${day.completedTaskCount ?? 0}/${day.taskCount ?? 0} · 做题 ${day.report?.problemCount ?? 0}`;
+    meta.textContent = `打卡 ${day.checkedCount}/5${bountyMeta} · 任务 ${day.completedTaskCount ?? 0}/${day.taskCount ?? 0} · 做题 ${day.problemCount ?? 0}`;
     item.append(top, meta);
     if (day.report?.note) {
       const note = document.createElement("blockquote");
@@ -186,7 +205,7 @@ function renderHistory(history) {
     }
     return item;
   }));
-  renderPager("history", historyPage, pageCount);
+  renderPager("history", historyPage, pageCount, true);
 }
 
 function renderTasks(tasks, bounties) {
@@ -373,9 +392,9 @@ function renderBookmarkCollection(stats) {
       : `两份悬赏已经赢下 ${stats.selfBountyBookmarks + stats.giftBountyBookmarks} 枚书签，双人书签还在等你们一起完成。`;
 }
 
-function renderPager(name, page, pageCount) {
+function renderPager(name, page, pageCount, alwaysVisible = false) {
   const pager = byId(`${name}-pager`);
-  pager.hidden = pageCount <= 1;
+  pager.hidden = !alwaysVisible && pageCount <= 1;
   byId(`${name}-page`).textContent = `${page + 1} / ${pageCount}`;
   byId(`${name}-prev`).disabled = page === 0;
   byId(`${name}-next`).disabled = page >= pageCount - 1;
@@ -492,6 +511,22 @@ byId("report-form").addEventListener("submit", async (event) => {
 byId("launch-at-login").addEventListener("change", async (event) => {
   render(await api.setLaunchAtLogin(event.target.checked));
 });
+byId("yuquiz-integration").addEventListener("change", async (event) => {
+  const input = event.target;
+  input.disabled = true;
+  try { render(await api.setYuQuizIntegration(input.checked)); }
+  finally { input.disabled = false; }
+});
+byId("voice-enabled").addEventListener("change", async (event) => {
+  const input = event.target;
+  input.disabled = true;
+  try { render(await api.setVoiceEnabled(input.checked)); }
+  finally { input.disabled = false; }
+});
+byId("voice-volume").addEventListener("change", async (event) => {
+  render(await api.setVoiceVolume(Number(event.target.value)));
+});
+byId("portrait-preview").addEventListener("click", async () => render(await api.previewVoice()));
 
 api.onView(switchTab);
 api.onAction((action) => {

@@ -3,7 +3,7 @@ const sprite = document.getElementById("sprite");
 const card = document.getElementById("pet-card");
 const message = document.getElementById("message");
 const messageCopy = document.getElementById("message-copy");
-const messageAction = document.getElementById("message-action");
+const messageActions = document.getElementById("message-actions");
 const effect = document.getElementById("effect");
 
 const animations = {
@@ -21,6 +21,12 @@ const animations = {
 let actionLocked = false;
 let actionTimer = null;
 let messageTimer = null;
+let typingTimer = null;
+let typingGeneration = 0;
+let activeMessageKey = "";
+let transientSequence = 0;
+let transientActive = false;
+const completedMessageKeys = new Set();
 let dragging = false;
 let dragMoved = false;
 let dragStart = null;
@@ -28,6 +34,10 @@ let dragDirection = "right";
 let queuedAction = null;
 let persistentAnimation = "idle";
 let currentPrompt = null;
+let statusBubbleMessage = "";
+let voiceEnabled = true;
+let voiceVolume = 0.82;
+let currentVoice = null;
 let latestCursorPoint = null;
 let lookActive = false;
 let displayedLookIndex = null;
@@ -81,17 +91,98 @@ function ensureKeyframes(name, animation) {
   document.head.appendChild(style);
 }
 
-function renderPrompt() {
+function renderPrompt(voiceDuration) {
+  if (transientActive) return;
+  messageActions.replaceChildren();
   if (!currentPrompt) {
-    message.classList.remove("visible", "actionable");
-    messageAction.textContent = "";
-    api.setBubbleBounds(null);
+    if (statusBubbleMessage) {
+      message.classList.add("visible");
+      message.classList.remove("actionable");
+      typeMessage(statusBubbleMessage, `status:${statusBubbleMessage}`);
+    } else {
+      clearTimeout(typingTimer);
+      activeMessageKey = "";
+      message.classList.remove("visible", "actionable", "typing");
+      message.style.width = "";
+      message.style.minHeight = "";
+      api.setBubbleBounds(null);
+    }
     return;
   }
-  messageCopy.textContent = currentPrompt.message;
-  messageAction.textContent = currentPrompt.label || "我在";
+  const actions = Array.isArray(currentPrompt.actions) && currentPrompt.actions.length
+    ? currentPrompt.actions
+    : [{ id: "primary", label: currentPrompt.label || "我在" }];
+  actions.forEach((action) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    const fallbackIcon = currentPrompt.type === "check-in" ? "check" : currentPrompt.type === "task-reminder" ? "list" : "check";
+    const icon = action.id === "start" ? "start" : action.id === "snooze" ? "snooze" : action.id === "skip" ? "skip" : fallbackIcon;
+    button.className = `message-action icon-${icon}`;
+    button.title = action.label;
+    button.setAttribute("aria-label", action.label);
+    button.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      messageActions.querySelectorAll("button").forEach((item) => { item.disabled = true; });
+      try { await api.respondPrompt(currentPrompt.id, action.id); }
+      finally { messageActions.querySelectorAll("button").forEach((item) => { item.disabled = false; }); }
+    });
+    messageActions.append(button);
+  });
   message.classList.add("visible", "actionable");
-  requestAnimationFrame(reportBubbleBounds);
+  typeMessage(currentPrompt.message, `prompt:${currentPrompt.id}`, undefined, voiceDuration);
+}
+
+function typeMessage(text, key, onComplete, voiceDuration) {
+  if (activeMessageKey === key) return;
+  clearTimeout(typingTimer);
+  const generation = typingGeneration += 1;
+  activeMessageKey = key;
+  message.classList.remove("typing");
+  message.style.width = "";
+  message.style.minHeight = "";
+  messageCopy.textContent = text;
+  const finalBounds = message.getBoundingClientRect();
+  message.style.width = `${Math.ceil(finalBounds.width)}px`;
+  message.style.minHeight = `${Math.ceil(finalBounds.height)}px`;
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (reducedMotion || completedMessageKeys.has(key)) {
+    requestAnimationFrame(reportBubbleBounds);
+    onComplete?.();
+    return;
+  }
+  const characters = Array.from(text);
+  messageCopy.textContent = "";
+  message.classList.add("typing");
+  const begin = (voiceDurationMs) => {
+    if (generation !== typingGeneration || activeMessageKey !== key) return;
+    let index = 0;
+    const weightFor = (character) => /[。！？!?]/.test(character) ? 3.2 : /[，、；：,]/.test(character) ? 2 : 1;
+    const totalWeight = Math.max(1, characters.reduce((sum, character) => sum + weightFor(character), 0));
+    const targetDuration = Number.isFinite(voiceDurationMs)
+      ? Math.max(650, voiceDurationMs - 420)
+      : totalWeight * 72;
+    const unitDelay = Math.max(48, Math.min(180, targetDuration / totalWeight));
+    const next = () => {
+      const character = characters[index] ?? "";
+      messageCopy.textContent += character;
+      index += 1;
+      requestAnimationFrame(reportBubbleBounds);
+      if (index >= characters.length) {
+        message.classList.remove("typing");
+        completedMessageKeys.add(key);
+        requestAnimationFrame(reportBubbleBounds);
+        onComplete?.();
+        return;
+      }
+      typingTimer = setTimeout(next, unitDelay * weightFor(character));
+    };
+    next();
+  };
+  if (voiceDuration && typeof voiceDuration.then === "function") {
+    void voiceDuration.then(begin, () => begin(undefined));
+  } else {
+    begin(undefined);
+  }
 }
 
 function reportBubbleBounds() {
@@ -103,17 +194,20 @@ function reportBubbleBounds() {
   api.setBubbleBounds({ left: bounds.left, top: bounds.top, width: bounds.width, height: bounds.height });
 }
 
-function showTransientMessage(text, duration = 2800) {
+function showTransientMessage(text, duration = 2800, voiceDuration) {
   if (!text) return;
-  messageCopy.textContent = text;
-  messageAction.textContent = "";
+  transientActive = true;
+  messageActions.replaceChildren();
   message.classList.remove("actionable");
   message.classList.add("visible");
   clearTimeout(messageTimer);
-  messageTimer = setTimeout(() => {
-    if (currentPrompt) renderPrompt();
-    else message.classList.remove("visible");
-  }, duration);
+  const key = `transient:${transientSequence += 1}`;
+  typeMessage(text, key, () => {
+    messageTimer = setTimeout(() => {
+      transientActive = false;
+      renderPrompt();
+    }, duration);
+  }, voiceDuration);
 }
 
 function showEffect(value) {
@@ -122,6 +216,33 @@ function showEffect(value) {
   effect.classList.remove("visible");
   void effect.offsetWidth;
   effect.classList.add("visible");
+}
+
+function playVoice(voice) {
+  if (!voiceEnabled || typeof voice !== "string" || !/^[a-z0-9-]+$/.test(voice)) return undefined;
+  if (currentVoice) {
+    currentVoice.pause();
+    currentVoice.currentTime = 0;
+  }
+  const audio = new Audio(`../assets/voice/${voice}.mp3`);
+  audio.preload = "metadata";
+  audio.volume = Math.max(0, Math.min(1, voiceVolume));
+  currentVoice = audio;
+  const duration = new Promise((resolve) => {
+    if (Number.isFinite(audio.duration)) {
+      resolve(audio.duration * 1000);
+      return;
+    }
+    const fallback = setTimeout(() => resolve(undefined), 600);
+    audio.addEventListener("loadedmetadata", () => {
+      clearTimeout(fallback);
+      resolve(Number.isFinite(audio.duration) ? audio.duration * 1000 : undefined);
+    }, { once: true });
+  });
+  audio.addEventListener("ended", () => { if (currentVoice === audio) currentVoice = null; }, { once: true });
+  audio.addEventListener("error", () => { if (currentVoice === audio) currentVoice = null; }, { once: true });
+  void audio.play().catch(() => { if (currentVoice === audio) currentVoice = null; });
+  return duration;
 }
 
 function shortestAngleDelta(from, to) {
@@ -195,7 +316,8 @@ function finishDrag(event) {
   if (queuedAction) {
     const action = queuedAction;
     queuedAction = null;
-    if (action.message) showTransientMessage(action.message);
+    const voiceDuration = playVoice(action.voice);
+    if (action.message) showTransientMessage(action.message, 2800, voiceDuration);
     showEffect(action.effect);
     playAction(action.animation, action.lockMs || 1700);
   } else if (!actionLocked) {
@@ -205,27 +327,13 @@ function finishDrag(event) {
 
 card.addEventListener("pointerup", finishDrag);
 card.addEventListener("pointercancel", finishDrag);
-card.addEventListener("dblclick", () => void api.toggleStudy());
+card.addEventListener("dblclick", () => void api.petDoubleClick());
 card.addEventListener("contextmenu", (event) => { event.preventDefault(); api.openPanel(); });
 card.addEventListener("keydown", (event) => {
-  if (event.key === "Enter" || event.key === " ") void api.toggleStudy();
+  if (event.key === "Enter" || event.key === " ") void api.petDoubleClick();
   if (event.key === "ContextMenu") api.openPanel();
 });
 
-message.addEventListener("click", async () => {
-  if (!currentPrompt) return;
-  if (currentPrompt.type === "task-reminder") {
-    api.openPanel("tasks");
-    return;
-  }
-  if (currentPrompt.type !== "check-in") return;
-  message.disabled = true;
-  try {
-    await api.checkIn(currentPrompt.slot);
-  } finally {
-    message.disabled = false;
-  }
-});
 message.addEventListener("transitionend", reportBubbleBounds);
 
 api.onCursor((point) => { latestCursorPoint = point; });
@@ -235,31 +343,56 @@ api.onDragDirection((direction) => {
   if (dragging) applyAnimation(`running-${dragDirection}`, true);
 });
 api.onPrompt((prompt) => {
+  transientActive = false;
+  clearTimeout(messageTimer);
   currentPrompt = prompt;
-  renderPrompt();
+  const voiceDuration = playVoice(prompt.voice);
+  renderPrompt(voiceDuration);
 });
 api.onClearPrompt(() => {
   currentPrompt = null;
-  message.classList.remove("visible", "actionable");
-  api.setBubbleBounds(null);
+  renderPrompt();
+});
+api.onStatusBubble((messageText) => {
+  statusBubbleMessage = typeof messageText === "string" ? messageText : "";
+  renderPrompt();
+});
+api.onClearStatusBubble(() => {
+  statusBubbleMessage = "";
+  renderPrompt();
 });
 api.onAction((action) => {
   if (dragging) {
     queuedAction = action;
     return;
   }
-  if (action.message) showTransientMessage(action.message);
+  const voiceDuration = playVoice(action.voice);
+  if (action.message) showTransientMessage(action.message, 2800, voiceDuration);
   showEffect(action.effect);
   playAction(action.animation, action.lockMs || 1700);
 });
+api.onVoice(playVoice);
 api.onState((state) => {
+  if (typeof state.statusBubble === "string") statusBubbleMessage = state.statusBubble;
+  voiceEnabled = state.settings?.voiceEnabled !== false;
+  voiceVolume = Number.isFinite(state.settings?.voiceVolume) ? state.settings.voiceVolume : 0.82;
+  if (currentVoice) currentVoice.volume = Math.max(0, Math.min(1, voiceVolume));
+  if (!voiceEnabled && currentVoice) {
+    currentVoice.pause();
+    currentVoice = null;
+  }
   persistentAnimation = animations[state.persistentAnimation] ? state.persistentAnimation : "idle";
+  renderPrompt();
   if (!actionLocked && !dragging) restorePersistentAnimation();
 });
 
 restorePersistentAnimation();
 requestAnimationFrame(updateLookDirection);
 void api.getState().then((state) => {
+  statusBubbleMessage = typeof state.statusBubble === "string" ? state.statusBubble : "";
   persistentAnimation = state.persistentAnimation || "idle";
+  voiceEnabled = state.settings?.voiceEnabled !== false;
+  voiceVolume = Number.isFinite(state.settings?.voiceVolume) ? state.settings.voiceVolume : 0.82;
+  renderPrompt();
   restorePersistentAnimation();
 });

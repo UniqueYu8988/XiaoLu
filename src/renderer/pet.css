@@ -1,3 +1,5 @@
+@font-face { font-family: "Xiaolu Pixel 10"; src: url("../assets/fonts/fusion-pixel-10px-zh-hans.woff2") format("woff2"); font-style: normal; font-weight: 400; font-display: block; }
+
 :root {
   color-scheme: dark;
   --frame-width: 192px;
@@ -7,7 +9,7 @@
 
 * { box-sizing: border-box; }
 html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: transparent; user-select: none; }
-body { font-family: "Microsoft YaHei UI", "PingFang SC", system-ui, sans-serif; }
+body { font-family: "Xiaolu Pixel 10", "Microsoft YaHei UI", "PingFang SC", system-ui, sans-serif; }
 button { font: inherit; }
 .stage { position: relative; width: 100%; height: 100%; pointer-events: none; }
 .pet-card {
@@ -42,15 +44,15 @@ button { font: inherit; }
   left: 50%;
   bottom: 112px;
   width: max-content;
-  max-width: 120px;
-  padding: 7px 8px;
+  max-width: 122px;
+  padding: 6px 7px;
   border: 2px solid #513b60;
   border-radius: 3px;
   color: #382949;
   background: rgba(255, 248, 233, .98);
   box-shadow: 3px 3px 0 rgba(81, 59, 96, .24);
-  font-size: 10px;
-  line-height: 1.35;
+  font-size: 11px;
+  line-height: 1.4;
   text-align: left;
   opacity: 0;
   transform: translate(-50%, 6px) scale(.96);
@@ -81,21 +83,46 @@ button { font: inherit; }
   border-left: 5px solid transparent;
 }
 .message.visible { opacity: 1; transform: translate(-50%, 0) scale(1); }
-.message.actionable { pointer-events: auto; cursor: pointer; }
-.message.actionable:hover { background: #fffdf7; }
-.message.actionable:active { transform: translate(-50%, 1px) scale(.98); }
-.message-action {
+.message.actionable { pointer-events: auto; }
+.message-actions {
   display: none;
-  margin-top: 5px;
-  padding: 2px 5px;
-  border: 1px solid #76558f;
-  color: #fff;
-  background: #76558f;
-  font-size: 9px;
-  font-weight: 700;
-  text-align: center;
+  grid-auto-flow: column;
+  grid-auto-columns: 20px;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 3px;
 }
-.message.actionable .message-action { display: block; }
+.message.actionable .message-actions { display: grid; }
+.message.typing .message-actions { visibility: hidden; pointer-events: none; }
+#message-copy::after { content: ""; }
+.message.typing #message-copy::after { display: inline-block; width: 2px; height: 10px; margin-left: 2px; background: #76558f; animation: type-caret .7s steps(1) infinite; vertical-align: -1px; }
+.message-action {
+  position: relative;
+  display: grid;
+  width: 20px;
+  height: 16px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  color: #76558f;
+  background: transparent;
+  cursor: pointer;
+}
+.message-action:hover { color: #382949; background: transparent; }
+.message-action:focus-visible { outline: 1px dashed #76558f; outline-offset: -2px; }
+.message-action:active { color: #382949; transform: translateY(1px) scale(.92); }
+.message-action:disabled { opacity: .55; cursor: default; }
+.message-action::before,
+.message-action::after { content: ""; position: absolute; display: block; }
+.icon-start::before { left: 7px; top: 4px; width: 0; height: 0; border-top: 4px solid transparent; border-bottom: 4px solid transparent; border-left: 7px solid currentColor; }
+.icon-snooze::before { left: 5px; top: 2px; width: 8px; height: 8px; border: 2px solid currentColor; }
+.icon-snooze::after { left: 9px; top: 5px; width: 3px; height: 3px; border-bottom: 2px solid currentColor; border-left: 2px solid currentColor; }
+.icon-skip::before,
+.icon-skip::after { left: 4px; top: 7px; width: 12px; height: 2px; background: currentColor; }
+.icon-skip::before { transform: rotate(45deg); }
+.icon-skip::after { transform: rotate(-45deg); }
+.icon-check::before { left: 6px; top: 1px; width: 6px; height: 9px; border-right: 3px solid currentColor; border-bottom: 3px solid currentColor; transform: rotate(45deg); }
+.icon-list::before { left: 4px; top: 3px; width: 12px; height: 2px; background: currentColor; box-shadow: 0 4px 0 currentColor, 0 8px 0 currentColor; }
 .effect {
   position: absolute;
   left: calc(50% + 32px);
@@ -117,6 +144,7 @@ button { font: inherit; }
   20% { opacity: 1; }
   100% { opacity: 0; transform: translateY(-48px) scale(1.15) rotate(8deg); }
 }
+@keyframes type-caret { 50% { opacity: 0; } }
 
 @media (prefers-reduced-motion: reduce) {
   .sprite { animation: none !important; }

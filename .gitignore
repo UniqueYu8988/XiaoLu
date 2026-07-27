@@ -4,6 +4,7 @@ release/
 output/
 qa/
 tmp/
+voice-source/
 *.log
 __pycache__/
 *.pyc

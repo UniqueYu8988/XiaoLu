@@ -12,6 +12,7 @@
 
 - `assets/xiaolu/` 中的角色图像、动画图集和角色配置；
 - `assets/icons/` 中由角色形象制作的应用图标与托盘图标；
+- `assets/voice/` 中为角色制作的离线语音；
 - `docs/` 中包含角色形象的 PDF 说明书和展示图片；
 - README 及其他文档中展示的小鹿角色图像。
 
@@ -27,8 +28,8 @@
 
 The MIT License in the repository root applies to the original source code,
 tests, build scripts, and project configuration. It does not apply to the
-character artwork, spritesheets, character-derived icons, or illustrated
-documentation under `assets/` and `docs/`.
+character artwork, spritesheets, character-derived icons, offline character
+voice clips, or illustrated documentation under `assets/` and `docs/`.
 
 Those character assets are all rights reserved. Separate permission is
 required to extract, redistribute, repackage, use for model training, or use

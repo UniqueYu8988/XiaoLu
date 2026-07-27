@@ -21,10 +21,10 @@
       </header>
 
       <section class="today-head">
-        <div class="portrait-stage" aria-label="正在陪伴学习的小鹿">
+        <button id="portrait-preview" class="portrait-stage" type="button" aria-label="让小鹿随机说一句话" title="点一下，听她说句话">
           <div class="portrait-frame" aria-hidden="true"></div>
           <div id="portrait-sprite" class="portrait-sprite"></div>
-        </div>
+        </button>
         <div class="today-copy">
           <span id="today-date" class="date-label">----.--.--</span>
           <strong id="timer">00:00:00</strong>
@@ -97,8 +97,9 @@
         </section>
 
         <section id="view-history" class="view">
-          <div class="section-title"><span>LOG</span><h2>学习记录</h2><div id="history-pager" class="pager pager-inline section-pager" aria-label="学习记录翻页" hidden><button id="history-prev" type="button" aria-label="上一页">‹</button><span id="history-page">1 / 1</span><button id="history-next" type="button" aria-label="下一页">›</button></div></div>
+          <div class="section-title"><span>LOG</span><h2>学习记录</h2></div>
           <div id="history-list" class="history-list"></div>
+          <div class="history-footer"><div id="history-pager" class="pager pager-inline" aria-label="学习记录翻页" hidden><button id="history-prev" type="button" aria-label="上一页">‹</button><span id="history-page">1 / 1</span><button id="history-next" type="button" aria-label="下一页">›</button></div><span id="history-total">累计 0 条</span></div>
         </section>
 
         <section id="view-bookmarks" class="view">
@@ -128,6 +129,17 @@
             <span><strong>开机自动启动</strong><small>让我准时来提醒你</small></span>
             <input id="launch-at-login" type="checkbox" />
           </label>
+          <label class="setting-row">
+            <span><strong>YuQuiz 自动联动</strong><small>使用网页时自行接管，离开后安静退出</small></span>
+            <input id="yuquiz-integration" type="checkbox" />
+          </label>
+          <div class="setting-row voice-setting">
+            <span><strong>小鹿语音</strong><small>只在重要时刻开口</small></span>
+            <div class="voice-controls">
+              <input id="voice-volume" type="range" min="0" max="1" step="0.05" aria-label="小鹿语音音量" />
+              <input id="voice-enabled" type="checkbox" aria-label="启用小鹿语音" />
+            </div>
+          </div>
           <div class="privacy-note">这些学习记忆，只安静地留在你的电脑里。</div>
         </section>
       </main>

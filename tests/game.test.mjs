@@ -10,10 +10,22 @@ import {
   findPendingCheckIn,
   initialStudyState,
   localDateKey,
+  markStudyLaunchAvailable,
+  markStudyLaunchPrompted,
+  normalizeStudyState,
   reconcileStudyState,
   setBountyDefinition,
   setDailyTaskCompleted,
   setDailyTaskRecurring,
+  setYuQuizIntegration,
+  setVoiceEnabled,
+  setVoiceVolume,
+  saveYuQuizSnapshot,
+  snoozeStudyLaunch,
+  beginStudyLaunchRitual,
+  completeStudyLaunch,
+  skipStudyLaunch,
+  studyLaunchPeriodAt,
   studyMsForDay,
   submitDailyReport,
   toggleStudy,
@@ -22,7 +34,35 @@ import {
 const at = (hour, minute, day = 18) => new Date(2026, 6, day, hour, minute, 0, 0);
 const date = localDateKey(at(9, 0));
 
+assert.equal(studyLaunchPeriodAt(at(6, 59)), undefined);
+assert.equal(studyLaunchPeriodAt(at(7, 0)), "morning");
+assert.equal(studyLaunchPeriodAt(at(11, 59)), "morning");
+assert.equal(studyLaunchPeriodAt(at(12, 0)), undefined);
+assert.equal(studyLaunchPeriodAt(at(13, 0)), "afternoon");
+assert.equal(studyLaunchPeriodAt(at(19, 0)), "evening");
+assert.equal(studyLaunchPeriodAt(at(23, 30)), undefined);
+
+let launchState = initialStudyState(at(8, 0));
+launchState = markStudyLaunchAvailable(launchState, "morning", at(8, 0));
+launchState = markStudyLaunchPrompted(launchState, "morning", false, at(8, 5));
+launchState = snoozeStudyLaunch(launchState, "morning", at(8, 15), at(8, 5));
+launchState = beginStudyLaunchRitual(launchState, "morning", "prompt", at(8, 15));
+launchState = completeStudyLaunch(launchState, "morning", "prompt", at(8, 17));
+launchState = normalizeStudyState(JSON.parse(JSON.stringify(launchState)), at(8, 17));
+const morningLaunch = launchState.days[date]?.studyLaunches.morning;
+assert.equal(morningLaunch?.source, "prompt");
+assert.equal(morningLaunch?.completedAt, at(8, 17).toISOString());
+launchState = skipStudyLaunch(launchState, "afternoon", at(14, 0));
+assert.equal(launchState.days[date]?.studyLaunches.afternoon?.skippedAt, at(14, 0).toISOString());
+
 let state = initialStudyState(at(8, 50));
+assert.equal(state.settings.voiceEnabled, true);
+assert.equal(state.settings.voiceVolume, 0.82);
+state = setVoiceEnabled(state, false, at(8, 51));
+state = setVoiceVolume(state, 0.35, at(8, 52));
+assert.equal(state.settings.voiceEnabled, false);
+assert.equal(state.settings.voiceVolume, 0.35);
+state = setVoiceEnabled(state, true, at(8, 53));
 assert.equal(findPendingCheckIn(state, at(8, 54)), undefined);
 state = reconcileStudyState(state, at(8, 55)).state;
 assert.equal(findPendingCheckIn(state, at(8, 55))?.slot, "09:00");
@@ -50,6 +90,24 @@ state = toggleStudy(state, at(13, 0)).state;
 state = toggleStudy(state, at(13, 30)).state;
 assert.equal(studyMsForDay(state, date, at(13, 30)), 120 * 60_000);
 
+let integratedState = setYuQuizIntegration(state, true, at(14, 0));
+integratedState = saveYuQuizSnapshot(integratedState, {
+  date,
+  todayQuestions: 12,
+  todayCorrect: 0,
+  todayAccuracy: null,
+  todayLearningSeconds: 30 * 60,
+  currentView: "quiz",
+  isLearning: false,
+  activeSession: false,
+  syncedAt: at(14, 30).toISOString(),
+}, at(14, 30));
+assert.equal(studyMsForDay(integratedState, date, at(14, 30)), 150 * 60_000);
+integratedState = setYuQuizIntegration(integratedState, false, at(15, 0));
+integratedState = toggleStudy(integratedState, at(15, 0)).state;
+integratedState = toggleStudy(integratedState, at(15, 30)).state;
+assert.equal(studyMsForDay(integratedState, date, at(15, 30)), 180 * 60_000);
+
 state = submitDailyReport(state, {
   problemCount: 42,
   note: "完成了一套练习",
@@ -65,6 +123,52 @@ assert.equal(summaries[0]?.report?.problemCount, 42);
 const stats = calculateStats(state, at(21, 20));
 assert.equal(stats.totalProblems, 42);
 assert.equal(stats.togetherBookmarks, 1);
+
+const authoritativeYuQuizState = normalizeStudyState({
+  version: 2,
+  days: {
+    [date]: {
+      date,
+      sessions: [],
+      checkIns: {},
+      tasks: [],
+      taskReminders: [],
+      yuQuiz: {
+        date,
+        todayQuestions: 84,
+        todayCorrect: 53,
+        todayAccuracy: 63.1,
+        todayLearningSeconds: 5596,
+        currentView: "home",
+        isLearning: false,
+        activeSession: false,
+        pageOpen: true,
+        pageVisible: true,
+        studyState: "ready",
+        pauseReason: "none",
+        aiConsulting: false,
+        syncedAt: at(23, 40).toISOString(),
+      },
+      report: {
+        submittedAt: at(22, 4).toISOString(),
+        problemCount: 47,
+        note: "旧日报值",
+        selfCompleted: true,
+        friendCompleted: true,
+      },
+    },
+  },
+  recurringTasks: [],
+  bounties: {},
+  settings: { launchAtLogin: true, yuQuizIntegration: false, yuQuizEventCursor: 47 },
+  lastEvaluatedAt: at(23, 50).toISOString(),
+}, at(23, 50));
+assert.equal(authoritativeYuQuizState.settings.yuQuizEventCursor, 47);
+assert.equal(authoritativeYuQuizState.days[date]?.yuQuiz?.todayQuestions, 84);
+assert.equal(authoritativeYuQuizState.days[date]?.yuQuiz?.studyState, "ready");
+assert.equal(authoritativeYuQuizState.days[date]?.report?.problemCount, 84);
+assert.equal(daySummaries(authoritativeYuQuizState, at(23, 50))[0]?.problemCount, 84);
+assert.equal(calculateStats(authoritativeYuQuizState, at(23, 50)).totalProblems, 84);
 
 let taskState = initialStudyState(at(8, 0, 19));
 taskState = addDailyTask(taskState, "task-1", " 完成 第一章  ", at(8, 1, 19));
