@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld("xiaoluHome", {
   deleteTask: (id) => ipcRenderer.invoke("xiaolu:delete-task", id),
   setLaunchAtLogin: (enabled) => ipcRenderer.invoke("xiaolu:set-launch-at-login", enabled),
   setYuQuizIntegration: (enabled) => ipcRenderer.invoke("xiaolu:set-yuquiz-integration", enabled),
+  setStudyAnchor: () => ipcRenderer.invoke("xiaolu:set-study-anchor"),
   setVoiceEnabled: (enabled) => ipcRenderer.invoke("xiaolu:set-voice-enabled", enabled),
   setVoiceVolume: (volume) => ipcRenderer.invoke("xiaolu:set-voice-volume", volume),
   previewVoice: () => ipcRenderer.invoke("xiaolu:preview-voice"),

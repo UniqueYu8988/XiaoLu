@@ -98,6 +98,7 @@ export interface StudySettings {
   readonly voiceEnabled: boolean;
   readonly voiceVolume: number;
   readonly petPosition?: RelativePetPosition;
+  readonly studyAnchor?: RelativePetPosition;
   readonly yuQuizEventCursor?: number;
 }
 
@@ -231,6 +232,7 @@ export function normalizeStudyState(value: unknown, now = new Date()): StudyStat
   const settingsValue = isRecord(value.settings) ? value.settings : {};
   const yuQuizEventCursor = finiteNumber(settingsValue.yuQuizEventCursor);
   const petPosition = normalizeRelativePetPosition(settingsValue.petPosition);
+  const studyAnchor = normalizeRelativePetPosition(settingsValue.studyAnchor);
   return {
     version: 2,
     ...(activeSessionStartedAt ? { activeSessionStartedAt } : {}),
@@ -243,6 +245,7 @@ export function normalizeStudyState(value: unknown, now = new Date()): StudyStat
       voiceEnabled: settingsValue.voiceEnabled !== false,
       voiceVolume: Math.max(0, Math.min(1, finiteNumber(settingsValue.voiceVolume) ?? 0.82)),
       ...(petPosition ? { petPosition } : {}),
+      ...(studyAnchor ? { studyAnchor } : {}),
       ...(yuQuizEventCursor !== undefined && yuQuizEventCursor >= 0
         ? { yuQuizEventCursor: Math.trunc(yuQuizEventCursor) }
         : {}),
@@ -637,6 +640,17 @@ export function setPetPosition(current: StudyState, position: RelativePetPositio
   return {
     ...state,
     settings: { ...state.settings, petPosition: normalized },
+    lastEvaluatedAt: now.toISOString(),
+  };
+}
+
+export function setStudyAnchor(current: StudyState, position: RelativePetPosition, now = new Date()): StudyState {
+  const state = normalizeStudyState(current, now);
+  const normalized = normalizeRelativePetPosition(position);
+  if (!normalized) return state;
+  return {
+    ...state,
+    settings: { ...state.settings, studyAnchor: normalized },
     lastEvaluatedAt: now.toISOString(),
   };
 }

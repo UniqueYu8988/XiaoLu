@@ -19,6 +19,7 @@ import {
   setDailyTaskRecurring,
   setYuQuizIntegration,
   setPetPosition,
+  setStudyAnchor,
   setVoiceEnabled,
   setVoiceVolume,
   saveYuQuizSnapshot,
@@ -94,6 +95,8 @@ state = setPetPosition(state, { x: 0.03125, y: 0.2875 }, at(8, 52));
 assert.deepEqual(state.settings.petPosition, { x: 0.03125, y: 0.2875 });
 state = setPetPosition(state, { x: -8, y: 9 }, at(8, 52));
 assert.deepEqual(state.settings.petPosition, { x: -0.25, y: 1.25 });
+state = setStudyAnchor(state, { x: 0.42, y: 0.36 }, at(8, 52));
+assert.deepEqual(state.settings.studyAnchor, { x: 0.42, y: 0.36 });
 state = setVoiceEnabled(state, true, at(8, 53));
 assert.equal(findPendingCheckIn(state, at(8, 54)), undefined);
 state = reconcileStudyState(state, at(8, 55)).state;

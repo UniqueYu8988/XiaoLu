@@ -334,7 +334,7 @@ def build_document() -> None:
     add_text(p, "她是住在桌面上的学习搭子，\n替现实里的你来陪我、提醒我，也见证我们一起认真过的每一天。", 9, False, INK)
     p = doc.add_paragraph()
     set_para(p, before=8, align=WD_ALIGN_PARAGRAPH.CENTER)
-    add_text(p, "VERSION 0.3.0  ·  2026", 6.8, True, PURPLE, "Consolas")
+    add_text(p, "VERSION 1.2.0  ·  2026", 6.8, True, PURPLE, "Consolas")
     add_footer(section, "00")
 
     # Page 1: identity and controls
@@ -363,7 +363,7 @@ def build_document() -> None:
     controls.alignment = WD_TABLE_ALIGNMENT.CENTER
     items = [
         ("双击小鹿", "开始或结束一段学习计时。一天可以分成很多段，最后自动相加。", GREEN),
-        ("右键小鹿", "打开像素风“共学日记”，看今日记录、历史统计与书签收藏。", PEACH),
+        ("右键小鹿", "打开像素风“共学日记”，看今日、任务、记录、统计与书签收藏。", PEACH),
         ("拖动小鹿", "把她挪到不挡视线的位置。她会朝拖动方向小跑，松手后恢复平常。", LILAC),
     ]
     for row, (title, body, fill) in zip(controls.rows, items):
@@ -460,8 +460,8 @@ def build_document() -> None:
         (sprites["review"], "回顾一下", "结束一段 / 填今日结算", CREAM),
         (sprites["failed"], "有点失落", "错过打卡 / 约定未完成", "FCE7E8"),
         (sprites["jump"], "开心跳起", "两个人都完成约定", "E8F1E5"),
-        (sprites["run_left"], "向左小跑", "拖动时朝左移动", LILAC),
-        (sprites["run_right"], "向右小跑", "拖动时朝右移动", PEACH),
+        (sprites["run_left"], "向左小跑", "拖动 / 自动赶路", LILAC),
+        (sprites["run_right"], "向右小跑", "拖动 / 自动赶路", PEACH),
     ]
     for cell, item in zip((c for row in action_table.rows for c in row.cells), action_items):
         add_action_card(cell, *item)
@@ -478,7 +478,7 @@ def build_document() -> None:
     fields.alignment = WD_TABLE_ALIGNMENT.CENTER
     field_items = [
         ("自动记录", "今日学习时长 · 五次打卡结果", LILAC),
-        ("我来填写", "今日做题数量 · 一句成果", CREAM),
+        ("我来填写", "一句成果；题量可由 YuQuiz 自动同步", CREAM),
         ("我的约定", "我今天是否完成：对勾 / 叉", "E8F1E5"),
         ("你的约定", "现实里的你是否完成：对勾 / 叉", PEACH),
     ]
@@ -597,14 +597,101 @@ def build_document() -> None:
 
     add_note_box(doc, "收藏的规则", "两枚单人书签现在都是悬赏奖励，不再代表“另一个人失败”。双人书签只记录共同完成。它们不会消费，也没有连续天数压力。", CREAM, PURPLE)
 
-    # Page 9: statistics, local data and closing note
+    # Page 9: getting started and offline voice
     add_page(doc, "09")
+    add_label(doc, "LET'S START", "最难的不是坚持，是迈出第一步")
+    p = doc.add_paragraph(); set_para(p, after=5, line=1.3)
+    add_text(p, "上午、下午和晚上，小鹿会各守一次“学习启动”。它不是新的打卡，也不会制造失败记录，只负责在你迟迟没有开始时，把第一步变得小一点。", 8.3)
+
+    starter = doc.add_table(rows=2, cols=2)
+    starter.alignment = WD_TABLE_ALIGNMENT.CENTER
+    starter_items = [
+        ("现在开始", "立刻进入五分钟启动陪伴；YuQuiz 可用时会替你打开学习台。", "E8F1E5"),
+        ("十分钟后", "给自己一次缓冲；这一时段只允许延后一次。", LILAC),
+        ("跳过这段", "今天这段不再追问，不记失败，也不影响其他记录。", CREAM),
+        ("先做第一题", "第一题完成后会得到特别反馈，随后安静回到普通陪伴。", PEACH),
+    ]
+    for cell, (title, body, fill) in zip((c for row in starter.rows for c in row.cells), starter_items):
+        clear_cell(cell); set_cell_shading(cell, fill); set_cell_border(cell, PURPLE_DARK, 9)
+        p = cell.paragraphs[0]; set_para(p, after=2)
+        add_text(p, title, 8.6, True, PURPLE_DARK)
+        p = cell.add_paragraph(); set_para(p, line=1.2)
+        add_text(p, body, 7.15, False, INK)
+
+    add_note_box(doc, "学习台开着，却还没有开始", "停留在 YuQuiz 首页不会计算学习时间。小鹿会隔一段时间再来叫你，直到进入具体题目或阅读；进入学习后，普通查资料不会被频繁打断。", "FCE7E8", ROSE)
+
+    p = doc.add_paragraph(); set_para(p, before=7, after=3)
+    add_text(p, "她真的会说话", 10.7, True, PURPLE_DARK)
+    add_bullet(doc, "离线语音", "语音已经随安装包放在本机，不调用在线 TTS，也不会上传文字或录音。", PURPLE)
+    add_bullet(doc, "逐字气泡", "文字会配合语音长度逐字出现；重要提醒更像面对面说出来。", PEACH)
+    add_bullet(doc, "点击试听", "在统计页点击小鹿人像，会随机播放一句台词并匹配相应动作。", GREEN)
+    add_bullet(doc, "随时安静", "统计页可以关闭语音并调整音量；新提醒会打断旧语音，避免重叠。", LILAC)
+
+    # Page 10: YuQuiz integration
+    add_page(doc, "10")
+    add_label(doc, "YUQUIZ", "网页做题，也能收进同一本日记")
+    p = doc.add_paragraph(); set_para(p, after=5, line=1.3)
+    add_text(p, "当本机 YuQuiz 运行在 127.0.0.1:8765 时，共学日记可以自动连接。网页开关与手动计时可以随时交替；两边的有效学习时间只会累加，不会互相覆盖。", 8.3)
+
+    states = doc.add_table(rows=6, cols=2)
+    states.alignment = WD_TABLE_ALIGNMENT.CENTER
+    state_items = [
+        ("READY", "学习台已打开，但仍在首页：不计时，小鹿会提醒你真正开始。"),
+        ("LEARNING", "正在题目、阅读、错题或考试页面进行有效学习。"),
+        ("CONSULTING", "复制题目去问 AI 或查资料：保留一段查询宽限。"),
+        ("PAUSED", "一段时间没有有效操作：暂停网页计时，回到页面操作即可恢复。"),
+        ("CLOSED", "页面或服务关闭：立即退出联动状态，并回到原来的桌面位置。"),
+        ("EVENTS", "答对、答错和整组完成只驱动动作与气泡，不直接参与题量统计。"),
+    ]
+    for idx, (state, body) in enumerate(state_items):
+        row = states.rows[idx]; no_split(row)
+        for col, text_value in enumerate((state, body)):
+            cell = row.cells[col]; clear_cell(cell)
+            set_cell_shading(cell, LILAC if idx % 2 == 0 else CREAM)
+            set_cell_border(cell, PURPLE_DARK, 8)
+            p = cell.paragraphs[0]; set_para(p, line=1.16, align=WD_ALIGN_PARAGRAPH.CENTER if col == 0 else WD_ALIGN_PARAGRAPH.LEFT)
+            add_text(p, text_value, 7.2 if col else 7.5, col == 0, PURPLE_DARK if col == 0 else INK, "Consolas" if col == 0 else "Microsoft YaHei")
+
+    add_note_box(doc, "题量只认今日总数", "“今日做题数量”读取 YuQuiz 状态接口里的 today_questions。事件编号只是动作游标；整组完成事件不会被误算成一道题。", "E8F1E5", GREEN)
+    add_note_box(doc, "需要查资料也没关系", "普通鼠标移动不会虚假启动学习。复制题目后可进入查询宽限；若长时间没有恢复，小鹿才会来到屏幕中央轻轻提醒。", CREAM, PURPLE)
+
+    # Page 11: movement and positions
+    add_page(doc, "11")
+    add_label(doc, "RUN TO YOU", "她会在不同的时刻，去该去的位置")
+    p = doc.add_paragraph(); set_para(p, after=5, line=1.3)
+    add_text(p, "小鹿现在有三类互不混淆的位置：平常停留的位置、学习驻守点，以及只用于重要提醒的屏幕中央。移动时会先水平、再垂直小跑过去。", 8.3)
+
+    movement = doc.add_table(rows=3, cols=2)
+    movement.alignment = WD_TABLE_ALIGNMENT.CENTER
+    movement_items = [
+        (sprites["run_right"], "打开 YuQuiz", "跑到学习驻守点；网页关闭后，再回到原来的自由位置。", LILAC),
+        (sprites["waiting"], "一直停在首页", "后续提醒时跑到屏幕中央，等你回应或真正进入学习。", PEACH),
+        (sprites["failed"], "学习停顿太久", "约三十分钟仍未恢复时来到中央提醒；不会每五分钟追着催。", "FCE7E8"),
+    ]
+    for row, (image_path, title, body, fill) in zip(movement.rows, movement_items):
+        no_split(row)
+        left, right = row.cells
+        clear_cell(left); clear_cell(right)
+        set_cell_shading(left, fill); set_cell_shading(right, fill)
+        set_cell_border(left, PURPLE_DARK, 9); set_cell_border(right, PURPLE_DARK, 9)
+        p = left.paragraphs[0]; set_para(p, align=WD_ALIGN_PARAGRAPH.CENTER)
+        p.add_run().add_picture(str(image_path), height=Cm(2.15))
+        p = right.paragraphs[0]; set_para(p, after=2)
+        add_text(p, title, 8.8, True, PURPLE_DARK)
+        p = right.add_paragraph(); set_para(p, line=1.22)
+        add_text(p, body, 7.35, False, INK)
+
+    add_note_box(doc, "保存自己的学习驻守点", "先把小鹿拖到想要的位置，再打开日记“今日”页，点击右下角的位置图标。图标变黄就表示已经保存；以后打开 YuQuiz，她会自动跑到这里。", "E8F1E5", GREEN)
+    add_note_box(doc, "提醒结束后会自己回去", "中央提醒停留约十五秒。YuQuiz 仍打开时回学习驻守点；网页已经关闭时回自由位置。临时提醒不会改写任何已保存的位置。", CREAM, PURPLE)
+
+    # Page 12: statistics, local data and closing note
+    add_page(doc, "12")
     add_label(doc, "OUR STORY", "日记只记录真正值得留下的事")
     stats = doc.add_table(rows=2, cols=3)
     stats.alignment = WD_TABLE_ALIGNMENT.CENTER
     stat_items = [
-        ("累计学习时长", "每次双击开启的学习段", LILAC),
-        ("累计做题数量", "来自每日结算填写", CREAM),
+        ("累计学习时长", "手动与 YuQuiz 有效时长", LILAC),
+        ("累计做题数量", "手填或由 YuQuiz 同步", CREAM),
         ("按时打卡", "五个时间点的到场记录", PEACH),
         ("双人书签", "只统计共同履约的书签", "E8F1E5"),
         ("累计完成任务", "普通任务与每日任务", LILAC),
@@ -619,9 +706,9 @@ def build_document() -> None:
 
     p = doc.add_paragraph(); set_para(p, before=7, after=3)
     add_text(p, "这套系统刻意保持简单", 10.7, True, PURPLE_DARK)
-    add_bullet(doc, "不记录暂停时长", "不学习的间隔不重要；只有主动双击开启的时间才累计。", GREEN)
+    add_bullet(doc, "不记录暂停时长", "只累计手动开启或 YuQuiz 确认有效的学习时间。", GREEN)
     add_bullet(doc, "不追逐连续天数", "偶尔中断不会变成需要找补的压力，累计完成永远保留。", PEACH)
-    add_bullet(doc, "数据只留在本机", "没有账号、排行榜或联网同步；所有学习记录都保存在这台电脑里。", PURPLE)
+    add_bullet(doc, "数据只留在本机", "没有账号、排行榜或云同步；YuQuiz 联动也只访问本机地址。", PURPLE)
 
     closing = doc.add_table(rows=1, cols=1)
     closing.alignment = WD_TABLE_ALIGNMENT.CENTER

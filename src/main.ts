@@ -37,6 +37,7 @@ import {
   setDailyTaskRecurring,
   setLaunchAtLogin,
   setPetPosition,
+  setStudyAnchor,
   setVoiceEnabled,
   setVoiceVolume,
   setYuQuizIntegration,
@@ -76,6 +77,7 @@ const STUDY_LAUNCH_REPEAT_MS = 10 * 60_000;
 const YUQUIZ_STALL_REMINDER_MS = 30 * 60_000;
 const STUDY_ANCHOR = { x: 0.03125, y: 0.2875 } as const;
 const PET_TRAVEL_SPEED = 230;
+const CENTER_ATTENTION_MS = 15_000;
 
 const voicePools = {
   checkIn: {
@@ -146,8 +148,11 @@ let yuQuizSyncQueued = false;
 let dragTimer: NodeJS.Timeout | null = null;
 let petTravelTimer: NodeJS.Timeout | null = null;
 let dragging: { startX: number; startY: number; windowX: number; windowY: number; lastCursorX: number } | null = null;
+let persistDraggedPositionAsHome = true;
+type PetTravelKind = "outbound" | "return" | "attention" | "attention-return-dock" | "attention-return-home";
+
 let petTravel: {
-  kind: "outbound" | "return";
+  kind: PetTravelKind;
   startedAt: number;
   horizontalMs: number;
   verticalMs: number;
@@ -160,6 +165,9 @@ let studyDockHome: { x: number; y: number } | null = null;
 let studyDocked = false;
 let studyDockSuppressedUntilClose = false;
 let petReady = false;
+let centerAttentionActive = false;
+let centerAttentionTimer: NodeJS.Timeout | null = null;
+let centerAttentionArrival: (() => void) | null = null;
 let isPetIgnoringMouse = false;
 let bubblePromptActive = false;
 let bubbleHitbox: { left: number; top: number; width: number; height: number } | null = null;
@@ -223,6 +231,7 @@ app.on("before-quit", () => {
   if (scheduleTimer) clearInterval(scheduleTimer);
   if (stateTimer) clearInterval(stateTimer);
   if (yuQuizTimer) clearTimeout(yuQuizTimer);
+  if (centerAttentionTimer) clearTimeout(centerAttentionTimer);
   cancelPetTravel();
   yuQuizWakeServer?.close();
   stopDragging();
@@ -269,6 +278,8 @@ function createPetWindow(): void {
   petWindow.on("closed", () => {
     stopDragging();
     cancelPetTravel();
+    centerAttentionActive = false;
+    centerAttentionArrival = null;
     petReady = false;
     petWindow = null;
     isPetIgnoringMouse = false;
@@ -437,6 +448,10 @@ function installIpc(): void {
     await updateYuQuizIntegration(enabled);
     return publicState();
   });
+  ipcMain.handle("xiaolu:set-study-anchor", async (event) => {
+    assertTrustedSender(event);
+    return performSetStudyAnchor();
+  });
   ipcMain.handle("xiaolu:set-voice-enabled", async (event, enabled: unknown) => {
     assertTrustedSender(event);
     if (typeof enabled !== "boolean") throw new Error("语音设置格式不正确。");
@@ -487,6 +502,11 @@ function installIpc(): void {
   ipcMain.on("xiaolu:hide-panel", (event) => { assertTrustedSender(event); hidePanel(); });
   ipcMain.on("xiaolu:drag-start", (event, point: unknown) => {
     if (!petWindow || event.sender !== petWindow.webContents || !isPoint(point)) return;
+    const yuQuizSnapshot = yuQuizRuntime.snapshot;
+    persistDraggedPositionAsHome = yuQuizSnapshot?.studyState === "closed" || yuQuizSnapshot?.pageOpen !== true;
+    if (centerAttentionActive || petTravel?.kind === "attention" || petTravel?.kind.startsWith("attention-return")) {
+      clearCenterAttentionState();
+    }
     if (petTravel || studyDocked) {
       cancelPetTravel();
       studyDocked = false;
@@ -535,7 +555,8 @@ function installIpc(): void {
   ipcMain.on("xiaolu:drag-end", (event) => {
     if (!petWindow || event.sender !== petWindow.webContents) return;
     stopDragging();
-    void rememberCurrentPetPosition();
+    if (persistDraggedPositionAsHome) void rememberCurrentPetPosition();
+    persistDraggedPositionAsHome = true;
   });
 }
 
@@ -575,6 +596,7 @@ async function performPetDoubleClick(): Promise<Record<string, unknown>> {
 
 async function performPromptAction(promptId: string, action: string): Promise<Record<string, unknown>> {
   if (promptId !== activePromptKey || !activePromptType) return publicState("这条提醒已经过去啦。");
+  if (centerAttentionActive || petTravel?.kind === "attention") finishCenterAttention();
   if (activePromptType === "check-in" && action === "primary") {
     const slot = promptId.split(":").slice(-2).join(":") as CheckInSlot;
     return performCheckIn(checkInSlots.has(slot) ? slot : undefined);
@@ -742,6 +764,16 @@ async function updateLaunchAtLogin(enabled: boolean): Promise<void> {
   await persistState();
   sendState();
   refreshTrayMenu();
+}
+
+async function performSetStudyAnchor(): Promise<Record<string, unknown>> {
+  if (!petWindow || petWindow.isDestroyed()) return publicState("现在还找不到小鹿的位置，再试一次吧。");
+  if (petTravel || centerAttentionActive) return publicState("等我先跑稳，再记住这个位置吧。");
+  const bounds = petWindow.getContentBounds();
+  studyState = setStudyAnchor(studyState, petPositionRatio(bounds.x, bounds.y), new Date());
+  await persistState();
+  sendState();
+  return publicState("记住啦，以后打开学习台，我会来这里陪你。");
 }
 
 function applyLoginSetting(): void {
@@ -1091,7 +1123,7 @@ async function maybeManageStudyLaunch(now: Date): Promise<void> {
       studyState = markStudyLaunchPrompted(studyState, period, true, now);
       await persistState();
       record = getDay(studyState, localDateKey(now)).studyLaunches[period] ?? record;
-      showStudyLaunchPrompt(period, true, now, false, record.reminderCount ?? 1, true);
+      presentRepeatedStudyLaunchPrompt(period, true, now, false, record.reminderCount ?? 1);
     }
     return;
   }
@@ -1118,8 +1150,22 @@ async function maybeManageStudyLaunch(now: Date): Promise<void> {
     studyState = markStudyLaunchPrompted(studyState, period, false, now);
     await persistState();
     record = getDay(studyState, localDateKey(now)).studyLaunches[period] ?? record;
-    showStudyLaunchPrompt(period, false, now, Boolean(record.snoozedUntil), record.reminderCount ?? 1, true);
+    presentRepeatedStudyLaunchPrompt(period, false, now, Boolean(record.snoozedUntil), record.reminderCount ?? 1);
   }
+}
+
+function presentRepeatedStudyLaunchPrompt(
+  period: StudyLaunchPeriod,
+  final: boolean,
+  now: Date,
+  alreadySnoozed: boolean,
+  reminderCount: number,
+): void {
+  const present = () => {
+    emitAction("waiting", undefined, undefined, 2_400);
+    showStudyLaunchPrompt(period, final, now, alreadySnoozed, reminderCount, true);
+  };
+  if (!requestCenterAttention(present)) present();
 }
 
 function showStudyLaunchPrompt(
@@ -1200,13 +1246,14 @@ function maybeRemindYuQuizStall(snapshot: YuQuizSnapshot, now: Date): void {
   if (!canSpeakStudyReminder() || activePromptType === "study-launch") return;
   if (lastYuQuizStallReminderAt && now.getTime() - lastYuQuizStallReminderAt < YUQUIZ_STALL_REMINDER_MS) return;
   lastYuQuizStallReminderAt = now.getTime();
-  emitAction(
-    "review",
-    chooseLine("yuQuizStalled", lines.yuQuizStalled),
-    undefined,
-    1_900,
-    chooseVoice("yuQuizStalled", voicePools.yuQuizPaused),
-  );
+  const present = () => emitAction(
+      "review",
+      chooseLine("yuQuizStalled", lines.yuQuizStalled),
+      undefined,
+      2_800,
+      chooseVoice("yuQuizStalled", voicePools.yuQuizPaused),
+    );
+  if (!requestCenterAttention(present)) present();
 }
 
 async function completeOrganicStudyLaunch(now: Date): Promise<void> {
@@ -1449,6 +1496,10 @@ function handleYuQuizDocking(snapshot?: YuQuizSnapshot): void {
   if (!petReady || !petWindow || petWindow.isDestroyed() || !snapshot) return;
   const isClosed = snapshot.studyState === "closed" || snapshot.pageOpen === false;
   if (isClosed) {
+    if (centerAttentionActive || petTravel?.kind === "attention" || petTravel?.kind === "attention-return-dock") {
+      clearCenterAttentionState();
+      cancelPetTravel();
+    }
     if (studyDockSuppressedUntilClose) {
       studyDockSuppressedUntilClose = false;
       studyDockHome = null;
@@ -1468,7 +1519,7 @@ function handleYuQuizDocking(snapshot?: YuQuizSnapshot): void {
   if (snapshot.pageOpen === true) {
     if (studyDockSuppressedUntilClose || studyDocked || petTravel || dragging) return;
     const home = petWindow.getContentBounds();
-    const target = petPositionFromRatio(STUDY_ANCHOR);
+    const target = petPositionFromRatio(studyState.settings.studyAnchor ?? STUDY_ANCHOR);
     studyDockHome = { x: home.x, y: home.y };
     studyState = setPetPosition(studyState, petPositionRatio(home.x, home.y), new Date());
     void persistState();
@@ -1476,7 +1527,43 @@ function handleYuQuizDocking(snapshot?: YuQuizSnapshot): void {
   }
 }
 
-function startPetTravel(targetX: number, targetY: number, kind: "outbound" | "return"): void {
+function requestCenterAttention(onArrival: () => void): boolean {
+  if (!petReady || !petWindow || petWindow.isDestroyed() || dragging || petTravel || centerAttentionActive) return false;
+  if (panelWindow?.isVisible() || powerMonitor.getSystemIdleTime() > 120) return false;
+  centerAttentionArrival = onArrival;
+  const work = screen.getPrimaryDisplay().workArea;
+  startPetTravel(
+    work.x + (work.width - PET_WINDOW.width) / 2,
+    work.y + (work.height - PET_WINDOW.height) / 2,
+    "attention",
+  );
+  return true;
+}
+
+function finishCenterAttention(): void {
+  if (!centerAttentionActive && petTravel?.kind !== "attention") return;
+  clearCenterAttentionState();
+  if (petTravel?.kind === "attention") cancelPetTravel();
+  const snapshot = yuQuizRuntime.snapshot;
+  const closed = snapshot?.studyState === "closed" || snapshot?.pageOpen === false;
+  if (closed) {
+    const target = studyDockHome
+      ?? (studyState.settings.petPosition ? petPositionFromRatio(studyState.settings.petPosition) : null);
+    if (target) startPetTravel(target.x, target.y, "attention-return-home");
+    return;
+  }
+  const target = petPositionFromRatio(studyState.settings.studyAnchor ?? STUDY_ANCHOR);
+  startPetTravel(target.x, target.y, "attention-return-dock");
+}
+
+function clearCenterAttentionState(): void {
+  if (centerAttentionTimer) clearTimeout(centerAttentionTimer);
+  centerAttentionTimer = null;
+  centerAttentionActive = false;
+  centerAttentionArrival = null;
+}
+
+function startPetTravel(targetX: number, targetY: number, kind: PetTravelKind): void {
   if (!petWindow || petWindow.isDestroyed()) return;
   cancelPetTravel();
   const from = petWindow.getContentBounds();
@@ -1517,12 +1604,19 @@ function startPetTravel(targetX: number, targetY: number, kind: "outbound" | "re
     if (elapsed < petTravel.horizontalMs + petTravel.verticalMs) return;
     const completedKind = petTravel.kind;
     cancelPetTravel();
-    if (completedKind === "outbound") {
+    if (completedKind === "outbound" || completedKind === "attention-return-dock") {
       studyDocked = true;
-    } else {
+    } else if (completedKind === "return" || completedKind === "attention-return-home") {
       studyDocked = false;
       studyDockHome = null;
       void rememberCurrentPetPosition();
+    } else if (completedKind === "attention") {
+      centerAttentionActive = true;
+      const onArrival = centerAttentionArrival;
+      centerAttentionArrival = null;
+      onArrival?.();
+      centerAttentionTimer = setTimeout(finishCenterAttention, CENTER_ATTENTION_MS);
+      centerAttentionTimer.unref?.();
     }
   }, 16);
   petTravelTimer.unref?.();

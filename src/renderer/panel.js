@@ -136,6 +136,7 @@ function render(state) {
   byId("voice-enabled").checked = state.settings.voiceEnabled !== false;
   byId("voice-volume").value = Number.isFinite(state.settings.voiceVolume) ? state.settings.voiceVolume : 0.82;
   byId("voice-volume").disabled = state.settings.voiceEnabled === false;
+  byId("save-study-anchor").classList.toggle("saved", Boolean(state.settings.studyAnchor));
   if (state.message) showFeedback(state.message);
 }
 
@@ -527,6 +528,12 @@ byId("voice-volume").addEventListener("change", async (event) => {
   render(await api.setVoiceVolume(Number(event.target.value)));
 });
 byId("portrait-preview").addEventListener("click", async () => render(await api.previewVoice()));
+byId("save-study-anchor").addEventListener("click", async () => {
+  const button = byId("save-study-anchor");
+  button.disabled = true;
+  try { render(await api.setStudyAnchor()); }
+  finally { button.disabled = false; }
+});
 
 api.onView(switchTab);
 api.onAction((action) => {
