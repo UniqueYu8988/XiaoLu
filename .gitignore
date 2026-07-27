@@ -4,6 +4,7 @@ release/
 output/
 qa/
 tmp/
+.playwright-cli/
 voice-source/
 *.log
 __pycache__/
