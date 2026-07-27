@@ -64,6 +64,7 @@ export interface YuQuizSnapshot {
   readonly pauseReason?: "idle" | "hidden" | "manual" | "none";
   readonly aiConsulting?: boolean;
   readonly lastActivityAt?: string;
+  readonly lastMeaningfulActivityAt?: string;
   readonly syncedAt: string;
 }
 
@@ -73,6 +74,8 @@ export interface StudyLaunchRecord {
   readonly snoozedUntil?: string;
   readonly ritualStartedAt?: string;
   readonly finalPromptedAt?: string;
+  readonly lastReminderAt?: string;
+  readonly reminderCount?: number;
   readonly completedAt?: string;
   readonly skippedAt?: string;
   readonly source?: StudyLaunchSource;
@@ -542,9 +545,14 @@ export function markStudyLaunchAvailable(current: StudyState, period: StudyLaunc
 }
 
 export function markStudyLaunchPrompted(current: StudyState, period: StudyLaunchPeriod, final: boolean, now = new Date()): StudyState {
-  return updateStudyLaunch(current, period, (record) => final
-    ? { ...record, finalPromptedAt: record.finalPromptedAt ?? now.toISOString() }
-    : { ...record, promptedAt: record.promptedAt ?? now.toISOString() }, now);
+  return updateStudyLaunch(current, period, (record) => ({
+    ...record,
+    ...(final
+      ? { finalPromptedAt: record.finalPromptedAt ?? now.toISOString() }
+      : { promptedAt: record.promptedAt ?? now.toISOString() }),
+    lastReminderAt: now.toISOString(),
+    reminderCount: (record.reminderCount ?? 0) + 1,
+  }), now);
 }
 
 export function snoozeStudyLaunch(current: StudyState, period: StudyLaunchPeriod, until: Date, now = new Date()): StudyState {
@@ -552,7 +560,17 @@ export function snoozeStudyLaunch(current: StudyState, period: StudyLaunchPeriod
 }
 
 export function beginStudyLaunchRitual(current: StudyState, period: StudyLaunchPeriod, source: StudyLaunchSource, now = new Date()): StudyState {
-  return updateStudyLaunch(current, period, (record) => ({ ...record, ritualStartedAt: now.toISOString(), source }), now);
+  return updateStudyLaunch(current, period, (record) => {
+    const {
+      finalPromptedAt: _finalPromptedAt,
+      lastReminderAt: _lastReminderAt,
+      reminderCount: _reminderCount,
+      completedAt: _completedAt,
+      skippedAt: _skippedAt,
+      ...rest
+    } = record;
+    return { ...rest, ritualStartedAt: now.toISOString(), source };
+  }, now);
 }
 
 export function completeStudyLaunch(current: StudyState, period: StudyLaunchPeriod, source: StudyLaunchSource, now = new Date()): StudyState {
@@ -827,6 +845,7 @@ function normalizeYuQuizSnapshot(value: unknown, date: string): YuQuizSnapshot |
       : {}),
     ...(typeof value.aiConsulting === "boolean" ? { aiConsulting: value.aiConsulting } : {}),
     ...(isDateString(value.lastActivityAt) ? { lastActivityAt: value.lastActivityAt } : {}),
+    ...(isDateString(value.lastMeaningfulActivityAt) ? { lastMeaningfulActivityAt: value.lastMeaningfulActivityAt } : {}),
     syncedAt: value.syncedAt,
   };
 }
@@ -855,12 +874,25 @@ function normalizeStudyLaunchRecord(value: unknown): StudyLaunchRecord {
   const source = typeof value.source === "string" && STUDY_LAUNCH_SOURCES.has(value.source as StudyLaunchSource)
     ? value.source as StudyLaunchSource
     : undefined;
+  const ritualStartedAt = isDateString(value.ritualStartedAt) ? value.ritualStartedAt : undefined;
+  const finalPromptedAt = isDateString(value.finalPromptedAt)
+    && (!ritualStartedAt || new Date(value.finalPromptedAt).getTime() >= new Date(ritualStartedAt).getTime())
+    ? value.finalPromptedAt
+    : undefined;
+  const lastReminderAt = isDateString(value.lastReminderAt)
+    && (!ritualStartedAt || new Date(value.lastReminderAt).getTime() >= new Date(ritualStartedAt).getTime())
+    ? value.lastReminderAt
+    : undefined;
   return {
     ...(isDateString(value.availableAt) ? { availableAt: value.availableAt } : {}),
     ...(isDateString(value.promptedAt) ? { promptedAt: value.promptedAt } : {}),
     ...(isDateString(value.snoozedUntil) ? { snoozedUntil: value.snoozedUntil } : {}),
-    ...(isDateString(value.ritualStartedAt) ? { ritualStartedAt: value.ritualStartedAt } : {}),
-    ...(isDateString(value.finalPromptedAt) ? { finalPromptedAt: value.finalPromptedAt } : {}),
+    ...(ritualStartedAt ? { ritualStartedAt } : {}),
+    ...(finalPromptedAt ? { finalPromptedAt } : {}),
+    ...(lastReminderAt ? { lastReminderAt } : {}),
+    ...((finalPromptedAt || lastReminderAt) && finiteNumber(value.reminderCount) !== undefined
+      ? { reminderCount: clampInteger(value.reminderCount, 0, 1_000_000) }
+      : {}),
     ...(isDateString(value.completedAt) ? { completedAt: value.completedAt } : {}),
     ...(isDateString(value.skippedAt) ? { skippedAt: value.skippedAt } : {}),
     ...(source ? { source } : {}),

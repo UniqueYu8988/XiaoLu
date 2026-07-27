@@ -71,6 +71,8 @@ const YUQUIZ_LEARNING_POLL_MS = 2_000;
 const STUDY_LAUNCH_GRACE_MS = 5 * 60_000;
 const STUDY_LAUNCH_SNOOZE_MS = 10 * 60_000;
 const STUDY_LAUNCH_RITUAL_MS = 5 * 60_000;
+const STUDY_LAUNCH_REPEAT_MS = 10 * 60_000;
+const YUQUIZ_STALL_REMINDER_MS = 30 * 60_000;
 
 const voicePools = {
   checkIn: {
@@ -122,6 +124,8 @@ const lines = {
   yuQuizSetCompleted: ["这一组收好啦，今天又向前走了一小步。", "这组题完成啦，认真留下了新的痕迹。", "题目一组组做完，今天的努力也亮起来啦。"],
   studyLaunchPrompt: ["先不想学多久。打开第一题，我陪你把开头走过去。", "不用先决定学多久，我们只把第一题打开。", "先迈最小的一步吧，我陪你从第一题开始。"],
   studyLaunchSuccess: ["好啦，已经开始了。最难的那一步过去了。", "第一题完成啦，接下来交给状态。", "你已经走进学习里了，我就不再催你啦。"],
+  studyLaunchReturn: ["学习台还在等你。先点进第一题，我就不再催啦。", "别在门口停太久，我们进去做第一题吧。", "再拉你一下：只做第一题，开始以后我就安静。"],
+  yuQuizStalled: ["这一题陪你想了很久。要是资料查完了，就回来继续吧。", "我先轻轻叫你一下。还在查资料的话慢慢来，准备好了就回来。", "题目还替你留着呢。忙完手边这一步，我们再接着做。"],
 } as const;
 
 let petWindow: BrowserWindow | null = null;
@@ -154,6 +158,7 @@ let yuQuizEventsInitialized = false;
 let yuQuizAutoSuppressed = false;
 let yuQuizStatusBubble = "";
 let studyLaunchStatusBubble = "";
+let lastYuQuizStallReminderAt = 0;
 const lastLineByPool = new Map<string, string>();
 const lastVoiceByPool = new Map<string, string>();
 
@@ -781,6 +786,9 @@ async function syncYuQuiz(announce: boolean): Promise<void> {
         ? { pauseReason: statusRecord.pause_reason } : {}),
       ...(typeof statusRecord.ai_consulting === "boolean" ? { aiConsulting: statusRecord.ai_consulting } : {}),
       ...(isValidDateString(statusRecord.last_activity_at) ? { lastActivityAt: statusRecord.last_activity_at } : {}),
+      ...(isValidDateString(statusRecord.last_meaningful_activity_at)
+        ? { lastMeaningfulActivityAt: statusRecord.last_meaningful_activity_at }
+        : {}),
       syncedAt: now.toISOString(),
     };
     if (!snapshot.isLearning) yuQuizAutoSuppressed = false;
@@ -801,6 +809,7 @@ async function syncYuQuiz(announce: boolean): Promise<void> {
       emitVoice(chooseVoice("yuQuizReady", voicePools.yuQuizReady));
     }
     updateYuQuizStatusBubble(snapshot);
+    maybeRemindYuQuizStall(snapshot, now);
     await persistState();
     if (announce && previous?.isLearning && !snapshot.isLearning && activityTimedOut(snapshot, now)) {
       emitAction("review", "稍微走神也没关系，这段计时先替你停好啦。", undefined, 1_650, chooseVoice("yuQuizPaused", voicePools.yuQuizPaused));
@@ -1022,7 +1031,7 @@ async function maybeManageStudyLaunch(now: Date): Promise<void> {
     setStudyLaunchStatusBubble("");
     return;
   }
-  if (studyState.activeSessionStartedAt || isYuQuizActivelyStudying()) {
+  if (studyState.activeSessionStartedAt || hasYuQuizEnteredStudyContent()) {
     studyState = completeStudyLaunch(studyState, period, "organic", now);
     if (activePromptType === "study-launch") clearActivePrompt();
     setStudyLaunchStatusBubble("");
@@ -1038,7 +1047,15 @@ async function maybeManageStudyLaunch(now: Date): Promise<void> {
     if (!record.finalPromptedAt && activePromptType !== "check-in") {
       studyState = markStudyLaunchPrompted(studyState, period, true, now);
       await persistState();
-      showStudyLaunchPrompt(period, true, now);
+      record = getDay(studyState, localDateKey(now)).studyLaunches[period] ?? record;
+      showStudyLaunchPrompt(period, true, now, false, record.reminderCount ?? 1);
+      return;
+    }
+    if (isYuQuizWaitingAtHome() && reminderIsDue(record, now) && canSpeakStudyReminder()) {
+      studyState = markStudyLaunchPrompted(studyState, period, true, now);
+      await persistState();
+      record = getDay(studyState, localDateKey(now)).studyLaunches[period] ?? record;
+      showStudyLaunchPrompt(period, true, now, false, record.reminderCount ?? 1, true);
     }
     return;
   }
@@ -1057,12 +1074,27 @@ async function maybeManageStudyLaunch(now: Date): Promise<void> {
   if (!record.promptedAt) {
     studyState = markStudyLaunchPrompted(studyState, period, false, now);
     await persistState();
+    record = getDay(studyState, localDateKey(now)).studyLaunches[period] ?? record;
+    showStudyLaunchPrompt(period, false, now, Boolean(record.snoozedUntil), record.reminderCount ?? 1);
+    return;
   }
-  showStudyLaunchPrompt(period, false, now, Boolean(record.snoozedUntil));
+  if (isYuQuizWaitingAtHome() && reminderIsDue(record, now) && canSpeakStudyReminder()) {
+    studyState = markStudyLaunchPrompted(studyState, period, false, now);
+    await persistState();
+    record = getDay(studyState, localDateKey(now)).studyLaunches[period] ?? record;
+    showStudyLaunchPrompt(period, false, now, Boolean(record.snoozedUntil), record.reminderCount ?? 1, true);
+  }
 }
 
-function showStudyLaunchPrompt(period: StudyLaunchPeriod, final: boolean, now: Date, alreadySnoozed = false): void {
-  const key = `${localDateKey(now)}:launch:${period}:${final ? "final" : "initial"}`;
+function showStudyLaunchPrompt(
+  period: StudyLaunchPeriod,
+  final: boolean,
+  now: Date,
+  alreadySnoozed = false,
+  reminderCount = 1,
+  repeated = false,
+): void {
+  const key = `${localDateKey(now)}:launch:${period}:${final ? "final" : "initial"}:${reminderCount}`;
   if (activePromptKey === key) return;
   activePromptKey = key;
   activePromptType = "study-launch";
@@ -1075,7 +1107,11 @@ function showStudyLaunchPrompt(period: StudyLaunchPeriod, final: boolean, now: D
   petWindow?.webContents.send("xiaolu:prompt", {
     id: key,
     type: "study-launch",
-    message: final ? "我还在等你。现在做第一题，今天就不算被拖延带走。" : chooseLine(`studyLaunch-${period}`, lines.studyLaunchPrompt),
+    message: repeated
+      ? chooseLine(`studyLaunchReturn-${period}`, lines.studyLaunchReturn)
+      : final
+        ? "我还在等你。现在做第一题，今天就不算被拖延带走。"
+        : chooseLine(`studyLaunch-${period}`, lines.studyLaunchPrompt),
     voice: final ? chooseVoice("launchFinal", voicePools.launchFinal) : chooseVoice("launchPrompt", voicePools.launchPrompt),
     actions,
   });
@@ -1090,6 +1126,51 @@ function isUserAvailableForLaunch(): boolean {
 function isYuQuizActivelyStudying(): boolean {
   const mode = yuQuizRuntime.snapshot?.studyState;
   return mode === "learning" || mode === "consulting";
+}
+
+function hasYuQuizEnteredStudyContent(): boolean {
+  const snapshot = yuQuizRuntime.snapshot;
+  if (!snapshot?.pageOpen) return false;
+  const mode = snapshot.studyState ?? (snapshot.isLearning ? "learning" : "ready");
+  return mode === "learning" || mode === "consulting" || mode === "paused" || snapshot.currentView !== "home";
+}
+
+function isYuQuizWaitingAtHome(): boolean {
+  const snapshot = yuQuizRuntime.snapshot;
+  if (!snapshot?.pageOpen) return false;
+  const mode = snapshot.studyState ?? (snapshot.isLearning ? "learning" : "ready");
+  return mode === "ready" && snapshot.currentView === "home";
+}
+
+function reminderIsDue(record: { readonly lastReminderAt?: string }, now: Date): boolean {
+  if (!record.lastReminderAt) return true;
+  const lastReminderAt = new Date(record.lastReminderAt).getTime();
+  return Number.isFinite(lastReminderAt) && now.getTime() - lastReminderAt >= STUDY_LAUNCH_REPEAT_MS;
+}
+
+function canSpeakStudyReminder(): boolean {
+  return powerMonitor.getSystemIdleTime() <= 120 && activePromptType !== "check-in";
+}
+
+function maybeRemindYuQuizStall(snapshot: YuQuizSnapshot, now: Date): void {
+  const mode = snapshot.studyState ?? (snapshot.isLearning ? "learning" : "ready");
+  if (!snapshot.pageOpen || mode !== "paused" || snapshot.currentView === "home") {
+    lastYuQuizStallReminderAt = 0;
+    return;
+  }
+  const activityAt = snapshot.lastMeaningfulActivityAt ?? snapshot.lastActivityAt;
+  const activityTime = activityAt ? new Date(activityAt).getTime() : Number.NaN;
+  if (!Number.isFinite(activityTime) || now.getTime() - activityTime < YUQUIZ_STALL_REMINDER_MS) return;
+  if (!canSpeakStudyReminder() || activePromptType === "study-launch") return;
+  if (lastYuQuizStallReminderAt && now.getTime() - lastYuQuizStallReminderAt < YUQUIZ_STALL_REMINDER_MS) return;
+  lastYuQuizStallReminderAt = now.getTime();
+  emitAction(
+    "review",
+    chooseLine("yuQuizStalled", lines.yuQuizStalled),
+    undefined,
+    1_900,
+    chooseVoice("yuQuizStalled", voicePools.yuQuizPaused),
+  );
 }
 
 async function completeOrganicStudyLaunch(now: Date): Promise<void> {

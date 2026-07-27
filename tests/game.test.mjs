@@ -46,7 +46,12 @@ let launchState = initialStudyState(at(8, 0));
 launchState = markStudyLaunchAvailable(launchState, "morning", at(8, 0));
 launchState = markStudyLaunchPrompted(launchState, "morning", false, at(8, 5));
 launchState = snoozeStudyLaunch(launchState, "morning", at(8, 15), at(8, 5));
+launchState = markStudyLaunchPrompted(launchState, "morning", true, at(8, 14));
+assert.equal(launchState.days[date]?.studyLaunches.morning?.reminderCount, 2);
 launchState = beginStudyLaunchRitual(launchState, "morning", "prompt", at(8, 15));
+assert.equal(launchState.days[date]?.studyLaunches.morning?.finalPromptedAt, undefined);
+assert.equal(launchState.days[date]?.studyLaunches.morning?.lastReminderAt, undefined);
+assert.equal(launchState.days[date]?.studyLaunches.morning?.reminderCount, undefined);
 launchState = completeStudyLaunch(launchState, "morning", "prompt", at(8, 17));
 launchState = normalizeStudyState(JSON.parse(JSON.stringify(launchState)), at(8, 17));
 const morningLaunch = launchState.days[date]?.studyLaunches.morning;
@@ -54,6 +59,28 @@ assert.equal(morningLaunch?.source, "prompt");
 assert.equal(morningLaunch?.completedAt, at(8, 17).toISOString());
 launchState = skipStudyLaunch(launchState, "afternoon", at(14, 0));
 assert.equal(launchState.days[date]?.studyLaunches.afternoon?.skippedAt, at(14, 0).toISOString());
+
+const repairedLaunchState = normalizeStudyState({
+  ...initialStudyState(at(15, 0)),
+  days: {
+    [date]: {
+      date,
+      sessions: [],
+      checkIns: {},
+      tasks: [],
+      taskReminders: [],
+      studyLaunches: {
+        afternoon: {
+          ritualStartedAt: at(14, 38).toISOString(),
+          finalPromptedAt: at(14, 26).toISOString(),
+          source: "double-click",
+        },
+      },
+    },
+  },
+}, at(15, 0));
+assert.equal(repairedLaunchState.days[date]?.studyLaunches.afternoon?.finalPromptedAt, undefined);
+assert.equal(repairedLaunchState.days[date]?.studyLaunches.afternoon?.ritualStartedAt, at(14, 38).toISOString());
 
 let state = initialStudyState(at(8, 50));
 assert.equal(state.settings.voiceEnabled, true);
@@ -147,6 +174,7 @@ const authoritativeYuQuizState = normalizeStudyState({
         studyState: "ready",
         pauseReason: "none",
         aiConsulting: false,
+        lastMeaningfulActivityAt: at(23, 35).toISOString(),
         syncedAt: at(23, 40).toISOString(),
       },
       report: {
@@ -166,6 +194,7 @@ const authoritativeYuQuizState = normalizeStudyState({
 assert.equal(authoritativeYuQuizState.settings.yuQuizEventCursor, 47);
 assert.equal(authoritativeYuQuizState.days[date]?.yuQuiz?.todayQuestions, 84);
 assert.equal(authoritativeYuQuizState.days[date]?.yuQuiz?.studyState, "ready");
+assert.equal(authoritativeYuQuizState.days[date]?.yuQuiz?.lastMeaningfulActivityAt, at(23, 35).toISOString());
 assert.equal(authoritativeYuQuizState.days[date]?.report?.problemCount, 84);
 assert.equal(daySummaries(authoritativeYuQuizState, at(23, 50))[0]?.problemCount, 84);
 assert.equal(calculateStats(authoritativeYuQuizState, at(23, 50)).totalProblems, 84);

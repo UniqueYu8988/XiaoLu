@@ -3,7 +3,7 @@
   <h1>共学日记</h1>
   <p>不是桌面宠物，而是住在桌面上的学习搭子。</p>
   <p>
-    <img alt="Version" src="https://img.shields.io/badge/version-1.1.0-76558f" />
+    <img alt="Version" src="https://img.shields.io/badge/version-1.1.1-76558f" />
     <img alt="Platform" src="https://img.shields.io/badge/platform-Windows-4b315e" />
     <img alt="Data" src="https://img.shields.io/badge/data-local--only-a9c99e" />
     <img alt="License" src="https://img.shields.io/badge/code%20license-MIT-f4d57b" />
@@ -211,7 +211,7 @@ tests/                  核心状态逻辑测试
 
 ## 版本计划
 
-当前为 `1.1.0`：新增上午、下午与晚上的学习启动陪伴；完善 YuQuiz 状态、题量和即时动作联动；加入 62 条完全离线的角色语音、随机试听与音量控制；桌面气泡统一像素字体，并根据语音时长逐字显示提醒。所有新增功能仍保持本地优先，不引入账号、云同步或在线 TTS。
+当前为 `1.1.1`：修复重新开始学习时旧提醒状态残留的问题；首页等待改为每十分钟持续拉回，进入具体学习内容后不再受到五分钟启动催促；题库停滞提醒延长至三十分钟，更适合查资料和咨询 AI。其余语音、YuQuiz 联动与本地数据机制保持不变。
 
 后续功能会在实际使用一段时间后集中整理，再提升次版本号发布，避免为了增加功能而让学习助理本身变成负担。
 
