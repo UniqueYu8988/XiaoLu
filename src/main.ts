@@ -76,7 +76,6 @@ const STUDY_LAUNCH_REPEAT_MS = 10 * 60_000;
 const YUQUIZ_STALL_REMINDER_MS = 30 * 60_000;
 const STUDY_ANCHOR = { x: 0.03125, y: 0.2875 } as const;
 const PET_TRAVEL_SPEED = 230;
-const STUDY_DOCK_RETURN_DELAY_MS = 8_000;
 
 const voicePools = {
   checkIn: {
@@ -146,7 +145,6 @@ let yuQuizSyncInFlight = false;
 let yuQuizSyncQueued = false;
 let dragTimer: NodeJS.Timeout | null = null;
 let petTravelTimer: NodeJS.Timeout | null = null;
-let studyDockReturnTimer: NodeJS.Timeout | null = null;
 let dragging: { startX: number; startY: number; windowX: number; windowY: number; lastCursorX: number } | null = null;
 let petTravel: {
   kind: "outbound" | "return";
@@ -226,7 +224,6 @@ app.on("before-quit", () => {
   if (stateTimer) clearInterval(stateTimer);
   if (yuQuizTimer) clearTimeout(yuQuizTimer);
   cancelPetTravel();
-  if (studyDockReturnTimer) clearTimeout(studyDockReturnTimer);
   yuQuizWakeServer?.close();
   stopDragging();
 });
@@ -1450,9 +1447,25 @@ function stopDragging(): void {
 
 function handleYuQuizDocking(snapshot?: YuQuizSnapshot): void {
   if (!petReady || !petWindow || petWindow.isDestroyed() || !snapshot) return;
+  const isClosed = snapshot.studyState === "closed" || snapshot.pageOpen === false;
+  if (isClosed) {
+    if (studyDockSuppressedUntilClose) {
+      studyDockSuppressedUntilClose = false;
+      studyDockHome = null;
+      studyDocked = false;
+      return;
+    }
+    if (!studyDocked && petTravel?.kind !== "outbound") return;
+    const returnTarget = studyDockHome
+      ?? (studyState.settings.petPosition ? petPositionFromRatio(studyState.settings.petPosition) : null);
+    if (!returnTarget) {
+      studyDocked = false;
+      return;
+    }
+    startPetTravel(returnTarget.x, returnTarget.y, "return");
+    return;
+  }
   if (snapshot.pageOpen === true) {
-    if (studyDockReturnTimer) clearTimeout(studyDockReturnTimer);
-    studyDockReturnTimer = null;
     if (studyDockSuppressedUntilClose || studyDocked || petTravel || dragging) return;
     const home = petWindow.getContentBounds();
     const target = petPositionFromRatio(STUDY_ANCHOR);
@@ -1460,25 +1473,7 @@ function handleYuQuizDocking(snapshot?: YuQuizSnapshot): void {
     studyState = setPetPosition(studyState, petPositionRatio(home.x, home.y), new Date());
     void persistState();
     startPetTravel(target.x, target.y, "outbound");
-    return;
   }
-  if (snapshot.pageOpen !== false || studyDockReturnTimer) return;
-  studyDockReturnTimer = setTimeout(() => {
-    studyDockReturnTimer = null;
-    if (yuQuizRuntime.snapshot?.pageOpen === true) return;
-    if (studyDockSuppressedUntilClose) {
-      studyDockSuppressedUntilClose = false;
-      studyDockHome = null;
-      studyDocked = false;
-      return;
-    }
-    if (!studyDockHome) {
-      studyDocked = false;
-      return;
-    }
-    startPetTravel(studyDockHome.x, studyDockHome.y, "return");
-  }, STUDY_DOCK_RETURN_DELAY_MS);
-  studyDockReturnTimer.unref?.();
 }
 
 function startPetTravel(targetX: number, targetY: number, kind: "outbound" | "return"): void {

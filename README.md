@@ -3,7 +3,7 @@
   <h1>共学日记</h1>
   <p>不是桌面宠物，而是住在桌面上的学习搭子。</p>
   <p>
-    <img alt="Version" src="https://img.shields.io/badge/version-1.1.2-76558f" />
+    <img alt="Version" src="https://img.shields.io/badge/version-1.1.3-76558f" />
     <img alt="Platform" src="https://img.shields.io/badge/platform-Windows-4b315e" />
     <img alt="Data" src="https://img.shields.io/badge/data-local--only-a9c99e" />
     <img alt="License" src="https://img.shields.io/badge/code%20license-MIT-f4d57b" />
@@ -211,7 +211,7 @@ tests/                  核心状态逻辑测试
 
 ## 版本计划
 
-当前为 `1.1.2`：新增 YuQuiz 学习驻守点。网页打开后，小鹿会保存自由位置并播放跑步动画，先水平、再垂直移动到固定驻守点；网页确认关闭后沿同样路线返回。自动路线支持主屏边界保护、鼠标穿透与手动拖动中断，并会持久保存自由位置。
+当前为 `1.1.3`：修复普通点击被误判为拖动、导致学习驻守返程目标丢失的问题。现在只有鼠标移动超过阈值才会进入拖动；YuQuiz 返回 `study_state=closed` 后立即返程，且位置逻辑不受 `active_session` 影响。自由位置与学习驻守点继续分别保存。
 
 后续功能会在实际使用一段时间后集中整理，再提升次版本号发布，避免为了增加功能而让学习助理本身变成负担。
 

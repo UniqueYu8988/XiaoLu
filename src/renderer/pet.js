@@ -28,7 +28,7 @@ let transientSequence = 0;
 let transientActive = false;
 const completedMessageKeys = new Set();
 let dragging = false;
-let dragMoved = false;
+let pointerHeld = false;
 let dragStart = null;
 let dragDirection = "right";
 let autoRunning = false;
@@ -300,26 +300,29 @@ function updateLookDirection(now) {
 
 card.addEventListener("pointerdown", (event) => {
   if (event.button !== 0) return;
-  dragging = true;
-  dragMoved = false;
+  pointerHeld = true;
+  dragging = false;
   dragStart = { x: event.screenX, y: event.screenY };
   card.setPointerCapture(event.pointerId);
-  applyAnimation(`running-${dragDirection}`, true);
-  api.dragStart({ screenX: event.screenX, screenY: event.screenY });
 });
 
 card.addEventListener("pointermove", (event) => {
-  if (!dragging || !dragStart) return;
-  if (Math.hypot(event.screenX - dragStart.x, event.screenY - dragStart.y) > 4) dragMoved = true;
+  if (!pointerHeld || !dragStart || dragging) return;
+  if (Math.hypot(event.screenX - dragStart.x, event.screenY - dragStart.y) <= 4) return;
+  dragging = true;
+  applyAnimation(`running-${dragDirection}`, true);
+  api.dragStart({ screenX: dragStart.x, screenY: dragStart.y });
 });
 
 function finishDrag(event) {
-  if (!dragging) return;
+  if (!pointerHeld) return;
+  const wasDragging = dragging;
+  pointerHeld = false;
   dragging = false;
   dragStart = null;
-  api.dragEnd();
+  if (wasDragging) api.dragEnd();
   try { card.releasePointerCapture(event.pointerId); } catch {}
-  if (queuedAction) {
+  if (wasDragging && queuedAction) {
     const action = queuedAction;
     queuedAction = null;
     const voiceDuration = playVoice(action.voice);
