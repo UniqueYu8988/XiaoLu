@@ -36,6 +36,7 @@ import {
   setDailyTaskCompleted,
   setDailyTaskRecurring,
   setLaunchAtLogin,
+  setPetPosition,
   setVoiceEnabled,
   setVoiceVolume,
   setYuQuizIntegration,
@@ -73,6 +74,9 @@ const STUDY_LAUNCH_SNOOZE_MS = 10 * 60_000;
 const STUDY_LAUNCH_RITUAL_MS = 5 * 60_000;
 const STUDY_LAUNCH_REPEAT_MS = 10 * 60_000;
 const YUQUIZ_STALL_REMINDER_MS = 30 * 60_000;
+const STUDY_ANCHOR = { x: 0.03125, y: 0.2875 } as const;
+const PET_TRAVEL_SPEED = 230;
+const STUDY_DOCK_RETURN_DELAY_MS = 8_000;
 
 const voicePools = {
   checkIn: {
@@ -141,7 +145,23 @@ let yuQuizWakeServer: Server | null = null;
 let yuQuizSyncInFlight = false;
 let yuQuizSyncQueued = false;
 let dragTimer: NodeJS.Timeout | null = null;
+let petTravelTimer: NodeJS.Timeout | null = null;
+let studyDockReturnTimer: NodeJS.Timeout | null = null;
 let dragging: { startX: number; startY: number; windowX: number; windowY: number; lastCursorX: number } | null = null;
+let petTravel: {
+  kind: "outbound" | "return";
+  startedAt: number;
+  horizontalMs: number;
+  verticalMs: number;
+  fromX: number;
+  fromY: number;
+  toX: number;
+  toY: number;
+} | null = null;
+let studyDockHome: { x: number; y: number } | null = null;
+let studyDocked = false;
+let studyDockSuppressedUntilClose = false;
+let petReady = false;
 let isPetIgnoringMouse = false;
 let bubblePromptActive = false;
 let bubbleHitbox: { left: number; top: number; width: number; height: number } | null = null;
@@ -205,14 +225,21 @@ app.on("before-quit", () => {
   if (scheduleTimer) clearInterval(scheduleTimer);
   if (stateTimer) clearInterval(stateTimer);
   if (yuQuizTimer) clearTimeout(yuQuizTimer);
+  cancelPetTravel();
+  if (studyDockReturnTimer) clearTimeout(studyDockReturnTimer);
   yuQuizWakeServer?.close();
   stopDragging();
 });
 
 function createPetWindow(): void {
   const display = screen.getPrimaryDisplay();
-  const x = display.workArea.x + display.workArea.width - PET_WINDOW.width - 36;
-  const y = display.workArea.y + display.workArea.height - PET_WINDOW.height - 20;
+  const savedPosition = studyState.settings.petPosition;
+  const x = savedPosition
+    ? display.workArea.x + Math.round(display.workArea.width * savedPosition.x)
+    : display.workArea.x + display.workArea.width - PET_WINDOW.width - 36;
+  const y = savedPosition
+    ? display.workArea.y + Math.round(display.workArea.height * savedPosition.y)
+    : display.workArea.y + display.workArea.height - PET_WINDOW.height - 20;
   petWindow = new BrowserWindow({
     title: "共学日记",
     width: PET_WINDOW.width,
@@ -244,6 +271,8 @@ function createPetWindow(): void {
   hardenWindow(petWindow);
   petWindow.on("closed", () => {
     stopDragging();
+    cancelPetTravel();
+    petReady = false;
     petWindow = null;
     isPetIgnoringMouse = false;
   });
@@ -251,9 +280,11 @@ function createPetWindow(): void {
     if (!petWindow || petWindow.isDestroyed()) return;
     petWindow.setContentBounds({ x, y, width: PET_WINDOW.width, height: PET_WINDOW.height }, false);
     petWindow.showInactive();
+    petReady = true;
     syncPetMousePassthrough();
     sendState();
     void evaluateSchedule(false);
+    handleYuQuizDocking(yuQuizRuntime.snapshot);
   });
   void petWindow.loadFile(join(app.getAppPath(), "dist", "renderer", "pet.html"));
 }
@@ -459,6 +490,12 @@ function installIpc(): void {
   ipcMain.on("xiaolu:hide-panel", (event) => { assertTrustedSender(event); hidePanel(); });
   ipcMain.on("xiaolu:drag-start", (event, point: unknown) => {
     if (!petWindow || event.sender !== petWindow.webContents || !isPoint(point)) return;
+    if (petTravel || studyDocked) {
+      cancelPetTravel();
+      studyDocked = false;
+      studyDockHome = null;
+      if (yuQuizRuntime.snapshot?.pageOpen) studyDockSuppressedUntilClose = true;
+    }
     const expanded = petWindow.getContentBounds();
     const visualPetLeft = expanded.x + (expanded.width - PET_HITBOX.width) / 2;
     const visualPetBottom = expanded.y + expanded.height - PET_HITBOX.bottom;
@@ -501,6 +538,7 @@ function installIpc(): void {
   ipcMain.on("xiaolu:drag-end", (event) => {
     if (!petWindow || event.sender !== petWindow.webContents) return;
     stopDragging();
+    void rememberCurrentPetPosition();
   });
 }
 
@@ -804,6 +842,7 @@ async function syncYuQuiz(announce: boolean): Promise<void> {
       studyState = setYuQuizIntegration(studyState, false, now);
     }
     yuQuizRuntime = { connected: true, statusAvailable: Boolean(status), snapshot };
+    handleYuQuizDocking(snapshot);
     if (shouldEnable) await completeOrganicStudyLaunch(now);
     if (snapshot.pageOpen === true && studyMode === "ready" && (previous?.pageOpen !== true || previous.studyState !== "ready")) {
       emitVoice(chooseVoice("yuQuizReady", voicePools.yuQuizReady));
@@ -1409,6 +1448,124 @@ function stopDragging(): void {
   dragTimer = null;
 }
 
+function handleYuQuizDocking(snapshot?: YuQuizSnapshot): void {
+  if (!petReady || !petWindow || petWindow.isDestroyed() || !snapshot) return;
+  if (snapshot.pageOpen === true) {
+    if (studyDockReturnTimer) clearTimeout(studyDockReturnTimer);
+    studyDockReturnTimer = null;
+    if (studyDockSuppressedUntilClose || studyDocked || petTravel || dragging) return;
+    const home = petWindow.getContentBounds();
+    const target = petPositionFromRatio(STUDY_ANCHOR);
+    studyDockHome = { x: home.x, y: home.y };
+    studyState = setPetPosition(studyState, petPositionRatio(home.x, home.y), new Date());
+    void persistState();
+    startPetTravel(target.x, target.y, "outbound");
+    return;
+  }
+  if (snapshot.pageOpen !== false || studyDockReturnTimer) return;
+  studyDockReturnTimer = setTimeout(() => {
+    studyDockReturnTimer = null;
+    if (yuQuizRuntime.snapshot?.pageOpen === true) return;
+    if (studyDockSuppressedUntilClose) {
+      studyDockSuppressedUntilClose = false;
+      studyDockHome = null;
+      studyDocked = false;
+      return;
+    }
+    if (!studyDockHome) {
+      studyDocked = false;
+      return;
+    }
+    startPetTravel(studyDockHome.x, studyDockHome.y, "return");
+  }, STUDY_DOCK_RETURN_DELAY_MS);
+  studyDockReturnTimer.unref?.();
+}
+
+function startPetTravel(targetX: number, targetY: number, kind: "outbound" | "return"): void {
+  if (!petWindow || petWindow.isDestroyed()) return;
+  cancelPetTravel();
+  const from = petWindow.getContentBounds();
+  const target = clampPetPosition(targetX, targetY);
+  const horizontalMs = Math.abs(target.x - from.x) / PET_TRAVEL_SPEED * 1_000;
+  const verticalMs = Math.abs(target.y - from.y) / PET_TRAVEL_SPEED * 1_000;
+  const direction = target.x < from.x ? "left" : target.x > from.x ? "right" : lastDragDirection;
+  lastDragDirection = direction;
+  petTravel = {
+    kind,
+    startedAt: Date.now(),
+    horizontalMs,
+    verticalMs,
+    fromX: from.x,
+    fromY: from.y,
+    toX: target.x,
+    toY: target.y,
+  };
+  petWindow.webContents.send("xiaolu:auto-run", { active: true, direction });
+  setPetMousePassthrough(true);
+  petTravelTimer = setInterval(() => {
+    if (!petTravel || !petWindow || petWindow.isDestroyed()) {
+      cancelPetTravel();
+      return;
+    }
+    const elapsed = Date.now() - petTravel.startedAt;
+    const horizontalProgress = petTravel.horizontalMs > 0
+      ? Math.min(1, elapsed / petTravel.horizontalMs)
+      : 1;
+    const verticalElapsed = Math.max(0, elapsed - petTravel.horizontalMs);
+    const verticalProgress = petTravel.verticalMs > 0
+      ? Math.min(1, verticalElapsed / petTravel.verticalMs)
+      : 1;
+    movePetWindow(
+      petTravel.fromX + (petTravel.toX - petTravel.fromX) * horizontalProgress,
+      petTravel.fromY + (petTravel.toY - petTravel.fromY) * verticalProgress,
+    );
+    if (elapsed < petTravel.horizontalMs + petTravel.verticalMs) return;
+    const completedKind = petTravel.kind;
+    cancelPetTravel();
+    if (completedKind === "outbound") {
+      studyDocked = true;
+    } else {
+      studyDocked = false;
+      studyDockHome = null;
+      void rememberCurrentPetPosition();
+    }
+  }, 16);
+  petTravelTimer.unref?.();
+}
+
+function cancelPetTravel(): void {
+  if (petTravelTimer) clearInterval(petTravelTimer);
+  petTravelTimer = null;
+  if (petTravel && petWindow && !petWindow.isDestroyed()) {
+    petWindow.webContents.send("xiaolu:auto-run", { active: false, direction: lastDragDirection });
+  }
+  petTravel = null;
+  syncPetMousePassthrough();
+}
+
+async function rememberCurrentPetPosition(): Promise<void> {
+  if (!petWindow || petWindow.isDestroyed() || petTravel || studyDocked) return;
+  const bounds = petWindow.getContentBounds();
+  studyState = setPetPosition(studyState, petPositionRatio(bounds.x, bounds.y), new Date());
+  await persistState();
+}
+
+function petPositionRatio(x: number, y: number): { x: number; y: number } {
+  const work = screen.getPrimaryDisplay().workArea;
+  return {
+    x: work.width > 0 ? (x - work.x) / work.width : 0,
+    y: work.height > 0 ? (y - work.y) / work.height : 0,
+  };
+}
+
+function petPositionFromRatio(position: { readonly x: number; readonly y: number }): { x: number; y: number } {
+  const work = screen.getPrimaryDisplay().workArea;
+  return clampPetPosition(
+    work.x + work.width * position.x,
+    work.y + work.height * position.y,
+  );
+}
+
 function setPetMousePassthrough(ignoreMouse: boolean): void {
   if (!petWindow || petWindow.isDestroyed() || isPetIgnoringMouse === ignoreMouse) return;
   petWindow.setIgnoreMouseEvents(ignoreMouse, { forward: true });
@@ -1417,6 +1574,10 @@ function setPetMousePassthrough(ignoreMouse: boolean): void {
 
 function syncPetMousePassthrough(cursor = screen.getCursorScreenPoint()): void {
   if (!petWindow || petWindow.isDestroyed()) return;
+  if (petTravel) {
+    setPetMousePassthrough(true);
+    return;
+  }
   if (dragging) {
     setPetMousePassthrough(false);
     return;
@@ -1438,6 +1599,16 @@ function syncPetMousePassthrough(cursor = screen.getCursorScreenPoint()): void {
 
 function movePetWindow(x: number, y: number): void {
   if (!petWindow || petWindow.isDestroyed()) return;
+  const position = clampPetPosition(x, y);
+  petWindow.setContentBounds({
+    x: position.x,
+    y: position.y,
+    width: PET_WINDOW.width,
+    height: PET_WINDOW.height,
+  }, false);
+}
+
+function clampPetPosition(x: number, y: number): { x: number; y: number } {
   const work = screen.getPrimaryDisplay().workArea;
   const hitboxLeft = (PET_WINDOW.width - PET_HITBOX.width) / 2;
   const hitboxTop = PET_WINDOW.height - PET_HITBOX.bottom - PET_HITBOX.height;
@@ -1447,12 +1618,10 @@ function movePetWindow(x: number, y: number): void {
   const maxX = work.x + work.width - hitboxRight;
   const minY = work.y - hitboxTop;
   const maxY = work.y + work.height - hitboxBottom;
-  petWindow.setContentBounds({
+  return {
     x: Math.round(Math.min(maxX, Math.max(minX, x))),
     y: Math.round(Math.min(maxY, Math.max(minY, y))),
-    width: PET_WINDOW.width,
-    height: PET_WINDOW.height,
-  }, false);
+  };
 }
 
 function keepPetOnPrimaryDisplay(): void {

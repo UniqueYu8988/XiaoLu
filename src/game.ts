@@ -97,7 +97,13 @@ export interface StudySettings {
   readonly yuQuizIntegration: boolean;
   readonly voiceEnabled: boolean;
   readonly voiceVolume: number;
+  readonly petPosition?: RelativePetPosition;
   readonly yuQuizEventCursor?: number;
+}
+
+export interface RelativePetPosition {
+  readonly x: number;
+  readonly y: number;
 }
 
 export interface StudyState {
@@ -224,6 +230,7 @@ export function normalizeStudyState(value: unknown, now = new Date()): StudyStat
   }
   const settingsValue = isRecord(value.settings) ? value.settings : {};
   const yuQuizEventCursor = finiteNumber(settingsValue.yuQuizEventCursor);
+  const petPosition = normalizeRelativePetPosition(settingsValue.petPosition);
   return {
     version: 2,
     ...(activeSessionStartedAt ? { activeSessionStartedAt } : {}),
@@ -235,6 +242,7 @@ export function normalizeStudyState(value: unknown, now = new Date()): StudyStat
       yuQuizIntegration: settingsValue.yuQuizIntegration === true,
       voiceEnabled: settingsValue.voiceEnabled !== false,
       voiceVolume: Math.max(0, Math.min(1, finiteNumber(settingsValue.voiceVolume) ?? 0.82)),
+      ...(petPosition ? { petPosition } : {}),
       ...(yuQuizEventCursor !== undefined && yuQuizEventCursor >= 0
         ? { yuQuizEventCursor: Math.trunc(yuQuizEventCursor) }
         : {}),
@@ -622,6 +630,17 @@ export function setVoiceVolume(current: StudyState, volume: number, now = new Da
   };
 }
 
+export function setPetPosition(current: StudyState, position: RelativePetPosition, now = new Date()): StudyState {
+  const state = normalizeStudyState(current, now);
+  const normalized = normalizeRelativePetPosition(position);
+  if (!normalized) return state;
+  return {
+    ...state,
+    settings: { ...state.settings, petPosition: normalized },
+    lastEvaluatedAt: now.toISOString(),
+  };
+}
+
 export function setYuQuizEventCursor(current: StudyState, cursor: number, now = new Date()): StudyState {
   const state = normalizeStudyState(current, now);
   return {
@@ -896,6 +915,17 @@ function normalizeStudyLaunchRecord(value: unknown): StudyLaunchRecord {
     ...(isDateString(value.completedAt) ? { completedAt: value.completedAt } : {}),
     ...(isDateString(value.skippedAt) ? { skippedAt: value.skippedAt } : {}),
     ...(source ? { source } : {}),
+  };
+}
+
+function normalizeRelativePetPosition(value: unknown): RelativePetPosition | undefined {
+  if (!isRecord(value)) return undefined;
+  const x = finiteNumber(value.x);
+  const y = finiteNumber(value.y);
+  if (x === undefined || y === undefined) return undefined;
+  return {
+    x: Math.max(-0.25, Math.min(1.25, x)),
+    y: Math.max(-0.25, Math.min(1.25, y)),
   };
 }
 

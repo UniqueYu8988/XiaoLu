@@ -31,6 +31,8 @@ let dragging = false;
 let dragMoved = false;
 let dragStart = null;
 let dragDirection = "right";
+let autoRunning = false;
+let autoRunDirection = "right";
 let queuedAction = null;
 let persistentAnimation = "idle";
 let currentPrompt = null;
@@ -64,6 +66,10 @@ function applyAnimation(name, persistent = false) {
 function restorePersistentAnimation() {
   if (dragging) {
     applyAnimation(`running-${dragDirection}`, true);
+    return;
+  }
+  if (autoRunning) {
+    applyAnimation(`running-${autoRunDirection}`, true);
     return;
   }
   applyAnimation(persistentAnimation, true);
@@ -265,7 +271,7 @@ function setLookFrame(index) {
 function updateLookDirection(now) {
   const elapsed = Math.min(100, Math.max(0, now - lastLookFrameTime));
   lastLookFrameTime = now;
-  if (!actionLocked && !dragging && persistentAnimation === "idle" && latestCursorPoint) {
+  if (!actionLocked && !dragging && !autoRunning && persistentAnimation === "idle" && latestCursorPoint) {
     const distance = Math.hypot(latestCursorPoint.x, latestCursorPoint.y);
     if (!lookActive && distance >= LOOK_ENTER_DISTANCE) {
       lookActive = true;
@@ -341,6 +347,11 @@ api.onDragDirection((direction) => {
   if (direction !== "left" && direction !== "right") return;
   dragDirection = direction;
   if (dragging) applyAnimation(`running-${dragDirection}`, true);
+});
+api.onAutoRun((state) => {
+  autoRunning = state?.active === true;
+  if (state?.direction === "left" || state?.direction === "right") autoRunDirection = state.direction;
+  if (!dragging && !actionLocked) restorePersistentAnimation();
 });
 api.onPrompt((prompt) => {
   transientActive = false;
