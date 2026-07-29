@@ -3,7 +3,7 @@
   <h1>共学日记</h1>
   <p>不是桌面宠物，而是住在桌面上的学习搭子。</p>
   <p>
-    <img alt="Version" src="https://img.shields.io/badge/version-1.3.0-76558f" />
+    <img alt="Version" src="https://img.shields.io/badge/version-1.3.1-76558f" />
     <img alt="Platform" src="https://img.shields.io/badge/platform-Windows-4b315e" />
     <img alt="Data" src="https://img.shields.io/badge/data-local--first-a9c99e" />
     <img alt="License" src="https://img.shields.io/badge/license-MIT-f4d57b" />
@@ -17,10 +17,10 @@
 
 ## 图文说明书
 
-说明书介绍了打卡、计时、任务与悬赏、书签、离线语音、YuQuiz 联动，以及小鹿的位置与提醒机制。可以直接[下载 PDF](docs/xiaolu-study-guide.pdf)，也可以在下方展开阅读。
+说明书介绍了打卡、计时、任务与悬赏、书签、强监督巡逻、离线语音、YuQuiz 联动，以及小鹿的位置与提醒机制；其中“今日、任务、记录、统计、书签”均使用当前版本的真实界面和虚构演示数据。可以直接[下载 PDF](docs/xiaolu-study-guide.pdf)，也可以在下方展开阅读。
 
 <details>
-  <summary><strong>展开完整图文说明书（13 页）</strong></summary>
+  <summary><strong>展开完整图文说明书（18 页）</strong></summary>
   <br />
   <img src="docs/images/xiaolu-study-guide-long.png" alt="共学日记完整图文说明书" />
 </details>

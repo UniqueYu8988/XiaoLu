@@ -989,7 +989,7 @@ async function syncYuQuiz(announce: boolean): Promise<void> {
     yuQuizRuntime = { connected: true, statusAvailable: Boolean(status), snapshot };
     handleYuQuizDocking(snapshot);
     if (shouldEnable) await completeOrganicStudyLaunch(now);
-    updateYuQuizStatusBubble(snapshot);
+    updateYuQuizStatusBubble(snapshot, now);
     maybeRemindYuQuizStall(snapshot, now);
     if (activePromptType !== "check-in") manageRoaming(now);
     await persistState();
@@ -1114,11 +1114,15 @@ function activityTimedOut(snapshot: YuQuizSnapshot, now: Date): boolean {
   return Number.isFinite(lastActivityAt) && now.getTime() - lastActivityAt >= 5 * 60_000;
 }
 
-function updateYuQuizStatusBubble(snapshot: YuQuizSnapshot): void {
+function updateYuQuizStatusBubble(snapshot: YuQuizSnapshot, now = new Date()): void {
   if (snapshot.pageOpen !== true) {
     setYuQuizStatusBubble(snapshot.pageSuspectedOpen
       ? "YuQuiz 好像还开着，但联动信号断开啦。刷新一下页面，我就能继续陪你计时。"
       : "");
+    return;
+  }
+  if (!studyLaunchPeriodAt(now)) {
+    setYuQuizStatusBubble("");
     return;
   }
   const studyMode = snapshot.studyState ?? (snapshot.isLearning ? "learning" : "ready");
@@ -1221,6 +1225,9 @@ function meaningfulActivityTime(): number {
 }
 
 function manageRoaming(now: Date): void {
+  if (!studyLaunchPeriodAt(now) && (centerAttentionActive || petTravel?.kind === "attention")) {
+    finishCenterAttention();
+  }
   if (!studyState.settings.patrolEnabled) {
     if (roamingMode) stopRoaming(false);
     return;
@@ -1537,6 +1544,10 @@ function canSpeakStudyReminder(): boolean {
 }
 
 function maybeRemindYuQuizStall(snapshot: YuQuizSnapshot, now: Date): void {
+  if (!strictStudyPeriodAt(now)) {
+    lastYuQuizStallReminderAt = 0;
+    return;
+  }
   const mode = snapshot.studyState ?? (snapshot.isLearning ? "learning" : "ready");
   if (!snapshot.pageOpen || mode !== "paused" || snapshot.currentView === "home") {
     lastYuQuizStallReminderAt = 0;

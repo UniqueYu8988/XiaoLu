@@ -18,6 +18,7 @@ OUT = ROOT / "output" / "doc"
 TMP = ROOT / "tmp" / "docs" / "xiaolu_manual"
 SHEET = ROOT / "assets" / "xiaolu" / "spritesheet.webp"
 BOOKMARKS = ROOT / "assets" / "bookmarks"
+SCREENSHOTS = ROOT / "docs" / "images" / "manual"
 DOCX_PATH = OUT / "共学日记说明书.docx"
 
 PURPLE = "76558F"
@@ -282,6 +283,28 @@ def add_bullet(doc: Document, title: str, body: str, color: str = PURPLE) -> Non
     add_text(p, body, 7.35, False, MUTED)
 
 
+def add_interface_page(doc: Document, english: str, title: str, intro: str, image: Path, note_title: str, note_body: str) -> None:
+    add_page(doc, "")
+    add_label(doc, english, title)
+    p = doc.add_paragraph()
+    set_para(p, after=5, line=1.28)
+    add_text(p, intro, 8.2)
+
+    frame = doc.add_table(rows=1, cols=1)
+    frame.alignment = WD_TABLE_ALIGNMENT.CENTER
+    cell = frame.cell(0, 0)
+    clear_cell(cell)
+    set_cell_shading(cell, PAPER)
+    set_cell_border(cell, PURPLE_DARK, 10)
+    set_cell_margins(cell, 100, 100, 100, 100)
+    p = cell.paragraphs[0]
+    set_para(p, align=WD_ALIGN_PARAGRAPH.CENTER)
+    p.add_run().add_picture(str(image), width=Cm(9.2))
+
+    doc.add_paragraph().paragraph_format.space_after = Pt(0)
+    add_note_box(doc, note_title, note_body, CREAM, PURPLE)
+
+
 def build_document() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     sprites = extract_sprites()
@@ -334,7 +357,7 @@ def build_document() -> None:
     add_text(p, "她是住在桌面上的学习搭子，\n替现实里的你来陪我、提醒我，也见证我们一起认真过的每一天。", 9, False, INK)
     p = doc.add_paragraph()
     set_para(p, before=8, align=WD_ALIGN_PARAGRAPH.CENTER)
-    add_text(p, "VERSION 1.3.0  ·  2026", 6.8, True, PURPLE, "Consolas")
+    add_text(p, "VERSION 1.3.1  ·  2026", 6.8, True, PURPLE, "Consolas")
     add_footer(section, "00")
 
     # Page 1: identity and controls
@@ -374,6 +397,63 @@ def build_document() -> None:
         no_split(row)
     add_note_box(doc, "平常的她", "没有计时时，小鹿会安静待着，也会顺着鼠标方向看过来。暂停不用登记；想学时再双击就好。", CREAM, PURPLE)
 
+    # Interface tour: real pages rendered with public demo data.
+    add_interface_page(
+        doc,
+        "TODAY",
+        "真实界面 · 今日与结算",
+        "右键小鹿后，首页把当天最重要的事情放在同一屏：当前累计时间、五次在场确认、今日成果，以及保存学习驻守点的按钮。",
+        SCREENSHOTS / "manual-today.png",
+        "这是一份演示日记",
+        "截图由当前 1.3.0 界面直接渲染，日期、题量、任务和累计数字均为虚构演示数据，不来自任何真实使用记录。",
+    )
+
+    add_interface_page(
+        doc,
+        "TASKS",
+        "真实界面 · 悬赏与今日清单",
+        "任务页先展示两枚固定悬赏书签，再放普通清单。目标直接写在书签和任务框里；完成、撤回、每日重复都不需要进入二级菜单。",
+        SCREENSHOTS / "manual-tasks.png",
+        "悬赏和任务各做一件事",
+        "悬赏奖励想长期坚持的挑战；普通任务收下今天要完成的小事。清单固定每页三项，内容再多也不会挤出滚动条。",
+    )
+
+    add_page(doc, "")
+    add_label(doc, "LOG & SUM", "真实界面 · 记录与统计")
+    p = doc.add_paragraph()
+    set_para(p, after=5, line=1.28)
+    add_text(p, "记录页保留每天的短摘要；统计页只累计真正有意义的六项结果。两个页面都坚持一屏到底，不用在小窗口里滚动寻找内容。", 8.2)
+    pair = doc.add_table(rows=1, cols=2)
+    pair.alignment = WD_TABLE_ALIGNMENT.CENTER
+    pair.autofit = False
+    for cell, image, caption in zip(
+        pair.rows[0].cells,
+        (SCREENSHOTS / "manual-history.png", SCREENSHOTS / "manual-stats.png"),
+        ("每天四条 · 像素翻页", "六项累计 · 四个开关"),
+    ):
+        clear_cell(cell)
+        set_cell_shading(cell, PAPER)
+        set_cell_border(cell, PURPLE_DARK, 9)
+        set_cell_margins(cell, 70, 70, 70, 70)
+        p = cell.paragraphs[0]
+        set_para(p, after=2, align=WD_ALIGN_PARAGRAPH.CENTER)
+        p.add_run().add_picture(str(image), width=Cm(5.25))
+        p = cell.add_paragraph()
+        set_para(p, align=WD_ALIGN_PARAGRAPH.CENTER)
+        add_text(p, caption, 7.2, True, PURPLE_DARK)
+    doc.add_paragraph().paragraph_format.space_after = Pt(0)
+    add_note_box(doc, "只留下摘要，不复制生活", "每条记录只显示日期、学习时长、打卡、悬赏、任务、题量和一句成果。页面截图使用虚构数字，仓库与说明书都不包含真实日记。", CREAM, PURPLE)
+
+    add_interface_page(
+        doc,
+        "COLLECTION",
+        "真实界面 · 我们的书签",
+        "书签入口独立放在右上角。收藏页不做密集格子，而是完整展示三种书签图案，再用 × 数量记录它们被赢得了多少次。",
+        SCREENSHOTS / "manual-bookmarks.png",
+        "三种认真，各自累计",
+        "两枚单人书签来自每日悬赏；中间的双人书签只来自两个人共同完成约定的一天。它们不会消费，也不会因为中断而失去。",
+    )
+
     # Page 2: schedule and check-in rules
     add_page(doc, "02")
     add_label(doc, "CHECK IN", "一天五次，只确认“我在”")
@@ -408,7 +488,7 @@ def build_document() -> None:
             add_text(p, text, 7.3 if idx == 2 else 7.7, idx == 0, PURPLE_DARK if idx == 0 else INK, "Consolas" if idx < 2 else "Microsoft YaHei")
 
     doc.add_paragraph().paragraph_format.space_after = Pt(1)
-    add_note_box(doc, "十分钟规则", "每次打卡只有正负五分钟的有效期。超时没有点，就会记为“未打卡”；不能普通补签，但也不会打断正在进行的学习计时。", "FCE7E8", ROSE)
+    add_note_box(doc, "十分钟规则", "每次打卡只有正负五分钟的有效期。进入窗口后，打卡提示拥有最高优先级：小鹿会先停下巡逻等你回应。超时没有点，就会记为“未打卡”。", "FCE7E8", ROSE)
     doc.add_paragraph().paragraph_format.space_after = Pt(1)
     add_note_box(doc, "开机就会在", "小鹿会随 Windows 登录自动启动。若电脑在有效窗口内刚开机或刚唤醒，仍可以正常打卡；窗口已经结束，则按未打卡记录。", "E8F1E5", GREEN)
 
@@ -601,7 +681,7 @@ def build_document() -> None:
     add_page(doc, "09")
     add_label(doc, "LET'S START", "最难的不是坚持，是迈出第一步")
     p = doc.add_paragraph(); set_para(p, after=5, line=1.3)
-    add_text(p, "上午、下午和晚上，小鹿会各守一次“学习启动”。它不是新的打卡，也不会制造失败记录，只负责在你迟迟没有开始时，把第一步变得小一点。", 8.3)
+    add_text(p, "上午、下午和晚上，小鹿会守着学习启动。它不是新的打卡，也不会制造失败记录；真正需要加强监督的是 09:00-12:00 与 15:00-18:00 两段约定学习时间。", 8.3)
 
     starter = doc.add_table(rows=2, cols=2)
     starter.alignment = WD_TABLE_ALIGNMENT.CENTER
@@ -626,6 +706,37 @@ def build_document() -> None:
     add_bullet(doc, "逐字气泡", "文字会配合语音长度逐字出现；重要提醒更像面对面说出来。", PEACH)
     add_bullet(doc, "点击试听", "在统计页点击小鹿人像，会随机播放一句台词并匹配相应动作。", GREEN)
     add_bullet(doc, "随时安静", "统计页可以关闭语音并调整音量；新提醒会打断旧语音，避免重叠。", LILAC)
+
+    add_page(doc, "")
+    add_label(doc, "PATROL", "强监督时段，小鹿会主动来找你")
+    p = doc.add_paragraph()
+    set_para(p, after=5, line=1.3)
+    add_text(p, "“小鹿巡逻”默认开启。它只在约定时段需要你开始或重新回到学习时出现，不会把普通休息变成新的失败记录。", 8.3)
+
+    patrol = doc.add_table(rows=2, cols=2)
+    patrol.alignment = WD_TABLE_ALIGNMENT.CENTER
+    patrol_items = [
+        (sprites["run_right"], "还没有开始", "09:00-12:00 或 15:00-18:00 迟迟没有进入学习，小鹿会在屏幕上走走停停，用随机台词把你叫回来。", LILAC),
+        (sprites["waiting"], "开始后又停下", "已经启动却超过约十五分钟没有继续计时或有效做题，巡逻会再次出现。", "FCE7E8"),
+        (sprites["wave"], "重新进入学习", "双击开始计时或 YuQuiz 恢复有效学习后，她会给出成功反馈，再回到学习驻守点。", "E8F1E5"),
+        (sprites["review"], "21 点结算以后", "当天已经收进日记但没有继续学习时，她会偶尔在桌面散步；重新学习后立刻安静下来。", PEACH),
+    ]
+    for cell, (image, title, body, fill) in zip((c for row in patrol.rows for c in row.cells), patrol_items):
+        clear_cell(cell)
+        set_cell_shading(cell, fill)
+        set_cell_border(cell, PURPLE_DARK, 9)
+        p = cell.paragraphs[0]
+        set_para(p, after=1, align=WD_ALIGN_PARAGRAPH.CENTER)
+        p.add_run().add_picture(str(image), height=Cm(2.05))
+        p = cell.add_paragraph()
+        set_para(p, after=2, align=WD_ALIGN_PARAGRAPH.CENTER)
+        add_text(p, title, 8.6, True, PURPLE_DARK)
+        p = cell.add_paragraph()
+        set_para(p, line=1.2, align=WD_ALIGN_PARAGRAPH.CENTER)
+        add_text(p, body, 7.0, False, INK)
+
+    add_note_box(doc, "打卡永远优先", "进入五个打卡窗口时，小鹿会立即停下当前巡逻并显示“我在”提示。回应或超时后，才根据当前学习状态决定恢复巡逻、回驻守点或回自由位置。", CREAM, PURPLE)
+    add_note_box(doc, "随时可以关闭", "如果某天只想安静使用，在统计页关闭“小鹿巡逻”即可。计时、打卡、任务、书签和 YuQuiz 联动都不会因此失效。", "E8F1E5", GREEN)
 
     # Page 10: YuQuiz integration
     add_page(doc, "10")

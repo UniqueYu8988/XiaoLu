@@ -9,7 +9,7 @@ let portraitPersistent = "idle";
 let historyPage = 0;
 let taskPage = 0;
 let taskRenderKey = null;
-const HISTORY_PAGE_SIZE = 3;
+const HISTORY_PAGE_SIZE = 4;
 const TASK_PAGE_SIZE = 3;
 
 const portraitAnimations = {
