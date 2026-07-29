@@ -14,3 +14,16 @@ Thumbs.db
 .env
 .env.*
 !.env.example
+
+# Local/private runtime data must never enter the repository.
+xiaolu-study-state*.json
+user-data/
+userdata/
+local-data/
+personal/
+private/
+backups/
+*.local.json
+*.db
+*.sqlite
+*.sqlite3

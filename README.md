@@ -39,6 +39,8 @@
 
 应用没有账号、排行榜或云同步。可选的 YuQuiz 联动只读取本机 `http://127.0.0.1:8765` 提供的学习状态与当日题量；不会读取题目、答案、API Key 或个人笔记，也不会把数据上传到外部服务器。卸载前如需保留日记，请备份上面的状态文件。
 
+仓库不会收录使用者的日记、任务、打卡、位置、数据库、日志、密钥或备份。原始肖像、源录音和私人制作文件也不随项目发布；常见的本地数据路径已经加入 `.gitignore`。
+
 ## 本地开发与打包
 
 需要 Node.js 20 或更高版本，以及 pnpm。
@@ -79,6 +81,6 @@ tests/                  核心状态逻辑测试
 
 ## 许可证
 
-项目自行编写的源代码、测试、构建脚本和配置采用 [MIT License](LICENSE)。`assets/` 与 `docs/` 中的小鹿角色、动画、图标、语音及带有人物的说明书素材不属于 MIT，仍由项目所有者保留全部权利。
+共学日记已经完整开源。项目原创的代码、角色动画、图标、书签、离线语音、文档和说明书素材统一采用宽松的 [MIT License](LICENSE)，可以自由使用、修改、分发或制作自己的桌面搭子；分发时请保留版权声明和许可证。
 
-完整边界见 [ASSET_LICENSE.md](ASSET_LICENSE.md)，第三方声明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+个人学习数据不会随仓库公开。完整授权与隐私边界见 [ASSET_LICENSE.md](ASSET_LICENSE.md)，第三方声明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。

@@ -1,7 +1,11 @@
 const { copyFileSync, mkdirSync } = require("node:fs");
 const { join, resolve } = require("node:path");
 
-const sourcePath = resolve(process.argv[2] || "C:/Users/Yu/Downloads/鹿美.svg");
+if (!process.argv[2]) {
+  throw new Error("Usage: node scripts/create_icon_assets.cjs <source-svg> [output-directory]");
+}
+
+const sourcePath = resolve(process.argv[2]);
 const outputDir = resolve(process.argv[3] || join(__dirname, "..", "assets", "icons"));
 
 mkdirSync(outputDir, { recursive: true });
