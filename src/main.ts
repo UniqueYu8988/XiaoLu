@@ -36,6 +36,7 @@ import {
   setDailyTaskCompleted,
   setDailyTaskRecurring,
   setLaunchAtLogin,
+  setPatrolEnabled,
   setPetPosition,
   setStudyAnchor,
   setVoiceEnabled,
@@ -48,6 +49,7 @@ import {
   beginStudyLaunchRitual,
   completeStudyLaunch,
   studyLaunchPeriodAt,
+  strictStudyPeriodAt,
   studyMsForDay,
   submitDailyReport,
   toggleStudy,
@@ -75,9 +77,24 @@ const STUDY_LAUNCH_SNOOZE_MS = 10 * 60_000;
 const STUDY_LAUNCH_RITUAL_MS = 5 * 60_000;
 const STUDY_LAUNCH_REPEAT_MS = 10 * 60_000;
 const YUQUIZ_STALL_REMINDER_MS = 30 * 60_000;
+const SUPERVISION_RESTART_MS = 15 * 60_000;
+const YUQUIZ_STABLE_START_MS = 3 * 60_000;
+const NIGHT_STROLL_RESUME_MS = 2 * 60_000;
 const STUDY_ANCHOR = { x: 0.03125, y: 0.2875 } as const;
 const PET_TRAVEL_SPEED = 230;
+const PATROL_TRAVEL_SPEED = 115;
+const NIGHT_STROLL_SPEED = 72;
 const CENTER_ATTENTION_MS = 15_000;
+
+type VoiceVariant = {
+  readonly message: string;
+  readonly voice: string;
+  readonly animation: string;
+};
+
+function voiceVariants(prefix: string, messages: readonly string[], animation: string): readonly VoiceVariant[] {
+  return messages.map((message, index) => ({ message, voice: `${prefix}-${index + 1}`, animation }));
+}
 
 const voicePools = {
   checkIn: {
@@ -133,6 +150,57 @@ const lines = {
   yuQuizStalled: ["这一题陪你想了很久。要是资料查完了，就回来继续吧。", "我先轻轻叫你一下。还在查资料的话慢慢来，准备好了就回来。", "题目还替你留着呢。忙完手边这一步，我们再接着做。"],
 } as const;
 
+const supervisionVoices = {
+  startPlayful: voiceVariants("patrol-start-playful", [
+    "你还没有开始，我可要在这里巡逻啦。",
+    "我先跑一圈。等我回来，你会不会已经开始了？",
+    "先做一点点也算开始呀。我就在这里等你。",
+    "你不叫我停，我就继续跑喽。",
+    "我又路过一次。第一题还是没有打开吗？",
+    "我都跑到这里啦。你也该往前走一步了。",
+    "不用想今天要学多久。现在先开始三分钟。",
+    "我去那边看看。回来时，希望能看见你已经开始。",
+  ], "waiting"),
+  startFirm: voiceVariants("patrol-start-firm", [
+    "我已经回来好几次啦。我们先把第一步走出去吧。",
+    "不用等状态变好。开始以后，状态会慢慢跟上的。",
+    "先打开题目。剩下的事情，我们开始以后再想。",
+    "我知道你不是不想学。只是还没有迈出去。",
+    "这段时间是我们约好的。我还没有等到你开始。",
+    "已经拖得够久啦。现在，先做第一题。",
+  ], "waiting"),
+  returning: voiceVariants("patrol-return", [
+    "休息得差不多啦。我们回来继续吧。",
+    "我来接你回去。下一小段，从哪里开始？",
+    "刚才那一段已经收好了。现在接着往下走吧。",
+    "十五分钟到啦。该从休息里回来喽。",
+    "你已经开始过一次了。重新回来，也不会很难。",
+    "这一程还没有结束。我来带你回去。",
+    "先回来做一点。别让短短的休息，变成长长的拖延。",
+    "我又开始巡逻啦。等你重新进入学习，我就停下。",
+  ], "review"),
+  success: voiceVariants("patrol-success", [
+    "好啦，这次是真的开始了。我回去陪你。",
+    "已经稳稳开始三分钟啦。接下来交给你。",
+    "你已经回到学习里了。我不再到处跑啦。",
+  ], "jumping"),
+  night: voiceVariants("night-stroll", [
+    "今天这一页已经收好啦。我随便走走。",
+    "你忙你的。我就在这里待一会儿。",
+    "今天也留下了一点，值得记住的东西。",
+    "已经九点以后啦。接下来慢慢来就好。",
+    "我去那边看看。一会儿再回来。",
+    "今天的事情暂时告一段落。桌面借我散散步吧。",
+    "我没有在催你。只是想四处走一走。",
+    "夜晚安静下来啦。我也慢一点陪着你。",
+  ], "idle"),
+  nightResume: voiceVariants("night-resume", [
+    "这一段也结束啦。那我继续随便走走。",
+    "你先休息。我去桌面上转一圈。",
+    "学习的时候我安静陪你。现在我又可以散步啦。",
+  ], "review"),
+} as const;
+
 let petWindow: BrowserWindow | null = null;
 let panelWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
@@ -149,7 +217,8 @@ let dragTimer: NodeJS.Timeout | null = null;
 let petTravelTimer: NodeJS.Timeout | null = null;
 let dragging: { startX: number; startY: number; windowX: number; windowY: number; lastCursorX: number } | null = null;
 let persistDraggedPositionAsHome = true;
-type PetTravelKind = "outbound" | "return" | "attention" | "attention-return-dock" | "attention-return-home";
+type PetTravelKind = "outbound" | "return" | "attention" | "attention-return-dock" | "attention-return-home" | "patrol" | "stroll" | "roaming-return";
+type RoamingMode = "strong-start" | "strong-return" | "night";
 
 let petTravel: {
   kind: PetTravelKind;
@@ -185,8 +254,22 @@ let yuQuizAutoSuppressed = false;
 let yuQuizStatusBubble = "";
 let studyLaunchStatusBubble = "";
 let lastYuQuizStallReminderAt = 0;
+let yuQuizLearningSince = 0;
+let lastYuQuizAnswerAt = 0;
+let lastEffectiveStudyAt = 0;
+let wasEffectivelyStudying = false;
+let roamingMode: RoamingMode | null = null;
+let roamingTimer: NodeJS.Timeout | null = null;
+let roamingRounds = 0;
+let roamingHome: { x: number; y: number } | null = null;
+let checkInPausedHome: { x: number; y: number } | null = null;
+let nightStrollHasStarted = false;
+let nightStrollDate = "";
+let strongPatrolSuppressedKey = "";
+const studiedStrictPeriods = new Set<string>();
 const lastLineByPool = new Map<string, string>();
 const lastVoiceByPool = new Map<string, string>();
+const lastVariantByPool = new Map<string, string>();
 
 if (process.platform === "win32") app.commandLine.appendSwitch("disable-features", "CalculateNativeWinOcclusion");
 app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
@@ -232,6 +315,7 @@ app.on("before-quit", () => {
   if (stateTimer) clearInterval(stateTimer);
   if (yuQuizTimer) clearTimeout(yuQuizTimer);
   if (centerAttentionTimer) clearTimeout(centerAttentionTimer);
+  if (roamingTimer) clearTimeout(roamingTimer);
   cancelPetTravel();
   yuQuizWakeServer?.close();
   stopDragging();
@@ -335,6 +419,7 @@ function createPanelWindow(): BrowserWindow {
 
 function showPanel(view = "today"): void {
   const window = createPanelWindow();
+  if (roamingMode) stopRoaming(false, false);
   petWindow?.hide();
   const display = screen.getPrimaryDisplay();
   const x = display.workArea.x + display.workArea.width - PANEL_WINDOW.width - 28;
@@ -350,6 +435,7 @@ function showPanel(view = "today"): void {
 function hidePanel(): void {
   panelWindow?.hide();
   petWindow?.showInactive();
+  void evaluateSchedule(false);
 }
 
 function createTray(): void {
@@ -362,6 +448,7 @@ function createTray(): void {
 
 function refreshTrayMenu(): void {
   if (!tray) return;
+  const strictPeriod = strictStudyPeriodAt(new Date());
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: "打开共学日记", click: () => showPanel() },
     { label: studyState.activeSessionStartedAt ? "结束本段学习" : "开始学习", click: () => void performToggleStudy() },
@@ -374,6 +461,16 @@ function refreshTrayMenu(): void {
     },
     { label: "显示小鹿", click: () => petWindow?.showInactive() },
     { label: "暂时隐藏", click: () => petWindow?.hide() },
+    ...(strictPeriod && studyState.settings.patrolEnabled ? [{
+      label: "暂停本时段强监督",
+      type: "checkbox" as const,
+      checked: strongPatrolSuppressedKey === strictPeriod.key,
+      click: (item: Electron.MenuItem) => {
+        strongPatrolSuppressedKey = item.checked ? strictPeriod.key : "";
+        if (item.checked && roamingMode?.startsWith("strong")) stopRoaming(false);
+        void evaluateSchedule(false);
+      },
+    }] : []),
     { type: "separator" },
     { label: "退出（提醒也会停止）", click: () => { isQuitting = true; app.quit(); } },
   ]));
@@ -446,6 +543,17 @@ function installIpc(): void {
     assertTrustedSender(event);
     if (typeof enabled !== "boolean") throw new Error("YuQuiz 联动设置格式不正确。");
     await updateYuQuizIntegration(enabled);
+    return publicState();
+  });
+  ipcMain.handle("xiaolu:set-patrol-enabled", async (event, enabled: unknown) => {
+    assertTrustedSender(event);
+    if (typeof enabled !== "boolean") throw new Error("巡逻设置格式不正确。");
+    studyState = setPatrolEnabled(studyState, enabled, new Date());
+    if (!enabled && roamingMode) stopRoaming(false);
+    await persistState();
+    sendState();
+    refreshTrayMenu();
+    if (enabled) void evaluateSchedule(false);
     return publicState();
   });
   ipcMain.handle("xiaolu:set-study-anchor", async (event) => {
@@ -557,6 +665,7 @@ function installIpc(): void {
     stopDragging();
     if (persistDraggedPositionAsHome) void rememberCurrentPetPosition();
     persistDraggedPositionAsHome = true;
+    if (roamingMode) scheduleRoamingStep(2_000);
   });
 }
 
@@ -575,10 +684,12 @@ async function performToggleStudy(): Promise<Record<string, unknown>> {
   await persistState();
   sendState();
   refreshTrayMenu();
+  const stoppedStrongPatrol = Boolean(roamingMode?.startsWith("strong"));
+  manageRoaming(now);
   if (result.messageKey === "started") {
-    emitAction("waving", chooseLine("studyStarted", lines.studyStarted), "✦", 1_500, chooseVoice("studyStarted", voicePools.studyStarted));
+    if (!stoppedStrongPatrol) emitPairedAction("studyStarted", "waving", lines.studyStarted, voicePools.studyStarted, "✦", 1_500);
   } else if (result.messageKey === "stopped") {
-    emitAction("review", chooseLine("studyStopped", lines.studyStopped), "✓", 1_650, chooseVoice("studyStopped", voicePools.studyStopped));
+    emitPairedAction("studyStopped", "review", lines.studyStopped, voicePools.studyStopped, "✓", 1_650);
   } else {
     emitAction("idle", chooseLine("dayClosed", lines.dayClosed), undefined, 1_200);
   }
@@ -619,7 +730,7 @@ async function performPromptAction(promptId: string, action: string): Promise<Re
     clearActivePrompt();
     await persistState();
     sendState();
-    emitAction("review", "好，十分钟后我再来。先把手边这件事收个尾吧。", undefined, 1_550, chooseVoice("launchSnooze", voicePools.launchSnooze));
+    emitAction("review", "好，十分钟后我再来。先把手边这件事收个尾吧。", undefined, 1_550);
     return publicState();
   }
   if (action === "skip") {
@@ -628,7 +739,7 @@ async function performPromptAction(promptId: string, action: string): Promise<Re
     setStudyLaunchStatusBubble("");
     await persistState();
     sendState();
-    emitAction("waving", "好，这一段先不催你。下一段见。", undefined, 1_450, chooseVoice("launchSkip", voicePools.launchSkip));
+    emitAction("waving", "好，这一段先不催你。下一段见。", undefined, 1_450);
   }
   return publicState();
 }
@@ -643,7 +754,7 @@ async function startStudyLaunchRitual(period: StudyLaunchPeriod, source: "prompt
   const health = pageOpen ? true : Boolean(await fetchYuQuizJson("/api/health", false));
   if (health) {
     if (!pageOpen) await shell.openExternal(YUQUIZ_BASE_URL);
-    emitAction("waving", "我陪你走到第一题。做完它，今天就真正开始啦。", "✦", 1_650, chooseVoice("studyStarted", voicePools.studyStarted));
+    emitPairedAction("studyStarted", "waving", lines.studyStarted, voicePools.studyStarted, "✦", 1_650);
     scheduleYuQuizSync(100);
     return publicState();
   }
@@ -653,7 +764,7 @@ async function startStudyLaunchRitual(period: StudyLaunchPeriod, source: "prompt
   await persistState();
   sendState();
   refreshTrayMenu();
-  emitAction("waving", "网页还没启动，我先替你记下这段学习。现在开始吧。", "✦", 1_750, chooseVoice("studyStarted", voicePools.studyStarted));
+  emitPairedAction("studyStarted", "waving", lines.studyStarted, voicePools.studyStarted, "✦", 1_750);
   return publicState();
 }
 
@@ -664,7 +775,7 @@ async function performCheckIn(requested?: CheckInSlot): Promise<Record<string, u
   clearActivePrompt();
   await persistState();
   sendState();
-  emitAction("waving", chooseLine("checkInSuccess", lines.checkInSuccess), "✓", 1_500, chooseVoice("checkInSuccess", voicePools.checkInSuccess));
+  emitPairedAction("checkInSuccess", "waving", lines.checkInSuccess, voicePools.checkInSuccess, "✓", 1_500);
   if (result.shouldOpenReport) setTimeout(() => showPanel("report"), 650);
   return publicState();
 }
@@ -725,12 +836,12 @@ async function performSetTaskCompleted(id: string, completed: boolean): Promise<
   if (completed && taskBeforeUpdate?.bountySlot) {
     const pool = taskBeforeUpdate.bountySlot === "self" ? lines.bountySelf : lines.bountyGift;
     const bountyVoice = taskBeforeUpdate.bountySlot === "self" ? voicePools.bountySelf : voicePools.bountyGift;
-    emitAction("jumping", chooseLine(`bounty-${taskBeforeUpdate.bountySlot}`, pool), "✦", 1_900, chooseVoice(`bounty-${taskBeforeUpdate.bountySlot}`, bountyVoice));
+    emitPairedAction(`bounty-${taskBeforeUpdate.bountySlot}`, "jumping", pool, bountyVoice, "✦", 1_900);
   } else if (completed && tasks.length > 0 && tasks.every((task) => task.completedAt)) {
     if (activePromptType === "task-reminder") clearActivePrompt();
-    emitAction("jumping", chooseLine("allTasksCompleted", lines.allTasksCompleted), "✦", 1_800, chooseVoice("allTasksCompleted", voicePools.allTasksCompleted));
+    emitPairedAction("allTasksCompleted", "jumping", lines.allTasksCompleted, voicePools.allTasksCompleted, "✦", 1_800);
   } else if (completed) {
-    emitAction("waving", chooseLine("taskCompleted", lines.taskCompleted), "✓", 1_350, chooseVoice("taskCompleted", voicePools.taskCompleted));
+    emitPairedAction("taskCompleted", "waving", lines.taskCompleted, voicePools.taskCompleted, "✓", 1_350);
   }
   return publicState();
 }
@@ -860,6 +971,11 @@ async function syncYuQuiz(announce: boolean): Promise<void> {
     };
     if (!snapshot.isLearning) yuQuizAutoSuppressed = false;
     const studyMode = snapshot.studyState ?? (snapshot.isLearning ? "learning" : "ready");
+    if (studyMode === "learning" || studyMode === "consulting") {
+      if (!yuQuizLearningSince) yuQuizLearningSince = now.getTime();
+    } else {
+      yuQuizLearningSince = 0;
+    }
     const shouldEnable = (studyMode === "learning" || studyMode === "consulting") && !yuQuizAutoSuppressed;
     if (shouldEnable && !studyState.settings.yuQuizIntegration) {
       if (studyState.activeSessionStartedAt) studyState = toggleStudy(studyState, now).state;
@@ -873,14 +989,12 @@ async function syncYuQuiz(announce: boolean): Promise<void> {
     yuQuizRuntime = { connected: true, statusAvailable: Boolean(status), snapshot };
     handleYuQuizDocking(snapshot);
     if (shouldEnable) await completeOrganicStudyLaunch(now);
-    if (snapshot.pageOpen === true && studyMode === "ready" && (previous?.pageOpen !== true || previous.studyState !== "ready")) {
-      emitVoice(chooseVoice("yuQuizReady", voicePools.yuQuizReady));
-    }
     updateYuQuizStatusBubble(snapshot);
     maybeRemindYuQuizStall(snapshot, now);
+    if (activePromptType !== "check-in") manageRoaming(now);
     await persistState();
     if (announce && previous?.isLearning && !snapshot.isLearning && activityTimedOut(snapshot, now)) {
-      emitAction("review", "稍微走神也没关系，这段计时先替你停好啦。", undefined, 1_650, chooseVoice("yuQuizPaused", voicePools.yuQuizPaused));
+      emitAction("review", "稍微走神也没关系，这段计时先替你停好啦。", undefined, 1_650);
     }
     nextDelay = shouldEnable ? YUQUIZ_LEARNING_POLL_MS : YUQUIZ_IDLE_POLL_MS;
   } catch (error) {
@@ -951,17 +1065,19 @@ async function syncYuQuizEvents(playEvents: boolean): Promise<Record<string, unk
   if (events.length) {
     const completion = events.find((event) => event.type === "set_completed");
     const latestAnswer = [...events].reverse().find((event) => event.type === "answer");
+    if (latestAnswer) lastYuQuizAnswerAt = Date.now();
     const launchCompleted = latestAnswer ? await completeActiveStudyLaunch(new Date()) : false;
     if (launchCompleted) {
-      emitAction("jumping", chooseLine("studyLaunchSuccess", lines.studyLaunchSuccess), "✦", 1_900, chooseVoice("launchSuccess", voicePools.launchSuccess));
+      emitPairedAction("studyLaunchSuccess", "jumping", lines.studyLaunchSuccess, voicePools.launchSuccess, "✦", 1_900);
     } else if (completion) {
       const accuracy = completion.accuracy ?? 0;
-      emitAction(
+      emitPairedAction(
+        "yuQuizSetCompleted",
         accuracy >= 80 ? "jumping" : "waving",
-        chooseLine("yuQuizSetCompleted", lines.yuQuizSetCompleted),
+        lines.yuQuizSetCompleted,
+        voicePools.yuQuizSetCompleted,
         accuracy >= 80 ? "✦" : "✓",
         accuracy >= 80 ? 1_900 : 1_600,
-        chooseVoice("yuQuizSetCompleted", voicePools.yuQuizSetCompleted),
       );
     } else {
       if (latestAnswer?.result === "correct") emitAction("waving", undefined, undefined, 750);
@@ -1052,6 +1168,7 @@ async function evaluateSchedule(announceMissed: boolean): Promise<void> {
   if (changed) void persistState();
 
   if (result.pendingCheckIn) {
+    pauseRoamingForCheckIn();
     const key = `${localDateKey(now)}:${result.pendingCheckIn.slot}`;
     if (activePromptKey !== key || activePromptType !== "check-in") {
       activePromptKey = key;
@@ -1059,14 +1176,14 @@ async function evaluateSchedule(announceMissed: boolean): Promise<void> {
       activePromptExpiresAt = new Date(result.pendingCheckIn.windowEnd).getTime();
       bubblePromptActive = true;
       const slot = result.pendingCheckIn.slot;
-      const pool = lines.checkIn[slot];
+      const paired = choosePaired(`checkIn-${slot}`, lines.checkIn[slot], voicePools.checkIn[slot]);
       petWindow?.webContents.send("xiaolu:prompt", {
         id: key,
         type: "check-in",
         slot,
         label: "我在",
-        message: chooseLine(`checkIn-${slot}`, pool),
-        voice: chooseVoice(`checkIn-${slot}`, voicePools.checkIn[slot]),
+        message: paired.message,
+        voice: paired.voice,
         expiresAt: result.pendingCheckIn.windowEnd,
       });
     }
@@ -1075,14 +1192,196 @@ async function evaluateSchedule(announceMissed: boolean): Promise<void> {
   }
 
   if (announceMissed && result.newlyMissed.length > 0) {
-    emitAction("failed", chooseLine("missed", lines.missed), undefined, 1_850, chooseVoice("missed", voicePools.missed));
+    emitPairedAction("missed", "failed", lines.missed, voicePools.missed, undefined, 1_850);
   }
   if (!result.pendingCheckIn) {
-    await maybeManageStudyLaunch(now);
-    if (activePromptType !== "study-launch") maybePromptIncompleteTasks(now);
+    manageRoaming(now);
+    if (!roamingMode?.startsWith("strong")) await maybeManageStudyLaunch(now);
+    if (activePromptType !== "study-launch" && !roamingMode?.startsWith("strong")) maybePromptIncompleteTasks(now);
   }
   maybePlaySettlementAction(now);
   sendState();
+}
+
+function effectiveStudyIsActive(now: Date): boolean {
+  if (studyState.activeSessionStartedAt) return true;
+  const snapshot = yuQuizRuntime.snapshot;
+  const mode = snapshot?.studyState ?? (snapshot?.isLearning ? "learning" : "ready");
+  if (mode !== "learning" && mode !== "consulting") return false;
+  return Boolean(
+    (yuQuizLearningSince && now.getTime() - yuQuizLearningSince >= YUQUIZ_STABLE_START_MS)
+    || (lastYuQuizAnswerAt && now.getTime() - lastYuQuizAnswerAt <= SUPERVISION_RESTART_MS),
+  );
+}
+
+function meaningfulActivityTime(): number {
+  const value = yuQuizRuntime.snapshot?.lastMeaningfulActivityAt ?? yuQuizRuntime.snapshot?.lastActivityAt;
+  const time = value ? new Date(value).getTime() : Number.NaN;
+  return Number.isFinite(time) ? time : 0;
+}
+
+function manageRoaming(now: Date): void {
+  if (!studyState.settings.patrolEnabled) {
+    if (roamingMode) stopRoaming(false);
+    return;
+  }
+  const date = localDateKey(now);
+  if (nightStrollDate !== date) {
+    nightStrollDate = date;
+    nightStrollHasStarted = false;
+  }
+  const effectiveStudy = effectiveStudyIsActive(now);
+  if (effectiveStudy) {
+    const strict = strictStudyPeriodAt(now);
+    if (strict) studiedStrictPeriods.add(strict.key);
+    lastEffectiveStudyAt = now.getTime();
+    if (roamingMode?.startsWith("strong")) stopRoaming(true);
+    else if (roamingMode === "night") stopRoaming(false);
+    wasEffectivelyStudying = true;
+    return;
+  }
+  if (wasEffectivelyStudying) lastEffectiveStudyAt = now.getTime();
+  wasEffectivelyStudying = false;
+
+  const strict = strictStudyPeriodAt(now);
+  if (strict) {
+    if (strongPatrolSuppressedKey === strict.key) {
+      if (roamingMode?.startsWith("strong")) stopRoaming(false);
+      return;
+    }
+    const activityAt = meaningfulActivityTime();
+    const completedAtValue = getDay(studyState, date).studyLaunches[strict.period]?.completedAt;
+    const completedAt = completedAtValue ? new Date(completedAtValue).getTime() : 0;
+    const launchCompleted = Boolean(completedAt && completedAt <= now.getTime() - YUQUIZ_STABLE_START_MS);
+    const snapshotMode = yuQuizRuntime.snapshot?.studyState;
+    const recoveredPausedStudy = snapshotMode === "paused" && activityAt >= strict.startedAt && activityAt <= now.getTime();
+    const studied = studiedStrictPeriods.has(strict.key)
+      || launchCompleted
+      || recoveredPausedStudy;
+    if (studied) {
+      studiedStrictPeriods.add(strict.key);
+      const inactiveSince = Math.max(lastEffectiveStudyAt, activityAt, strict.startedAt);
+      if (now.getTime() - inactiveSince < SUPERVISION_RESTART_MS) {
+        if (roamingMode?.startsWith("strong")) stopRoaming(false);
+        return;
+      }
+      startRoaming("strong-return");
+      return;
+    }
+    startRoaming("strong-start");
+    return;
+  }
+
+  if (roamingMode?.startsWith("strong")) stopRoaming(false);
+  const minutes = now.getHours() * 60 + now.getMinutes();
+  const hasSettlement = Boolean(getDay(studyState, date).report);
+  const mayStroll = minutes >= 21 * 60 && hasSettlement
+    && (!lastEffectiveStudyAt || now.getTime() - lastEffectiveStudyAt >= NIGHT_STROLL_RESUME_MS);
+  if (mayStroll) startRoaming("night");
+  else if (roamingMode === "night") stopRoaming(false);
+}
+
+function pauseRoamingForCheckIn(): void {
+  if (!roamingMode) return;
+  checkInPausedHome = checkInPausedHome ?? roamingHome;
+  stopRoaming(false, false);
+}
+
+function restoreMovementAfterCheckIn(): void {
+  const home = checkInPausedHome;
+  checkInPausedHome = null;
+  if (!home || !petWindow || petWindow.isDestroyed() || dragging || petTravel) return;
+  const now = new Date();
+  if (strictStudyPeriodAt(now) && studyState.settings.patrolEnabled) {
+    roamingHome = home;
+    manageRoaming(now);
+    return;
+  }
+  if (yuQuizRuntime.snapshot?.pageOpen) {
+    handleYuQuizDocking(yuQuizRuntime.snapshot);
+    return;
+  }
+  startPetTravel(home.x, home.y, "roaming-return", PATROL_TRAVEL_SPEED);
+}
+
+function startRoaming(mode: RoamingMode): void {
+  if (!petReady || !petWindow || petWindow.isDestroyed() || panelWindow?.isVisible()) return;
+  if (roamingMode === mode) return;
+  if (roamingMode) stopRoaming(false, false);
+  if (centerAttentionActive || petTravel?.kind === "attention" || petTravel?.kind.startsWith("attention-return")) {
+    clearCenterAttentionState();
+    cancelPetTravel();
+  }
+  if (petTravel) cancelPetTravel();
+  studyDocked = false;
+  if (!roamingHome) {
+    const bounds = petWindow.getContentBounds();
+    roamingHome = { x: bounds.x, y: bounds.y };
+  }
+  if (activePromptType === "study-launch") clearActivePrompt();
+  roamingMode = mode;
+  roamingRounds = 0;
+  if (mode === "night") {
+    const pool = nightStrollHasStarted ? supervisionVoices.nightResume : supervisionVoices.night;
+    emitVoiceVariant("night-stroll-entry", pool);
+    nightStrollHasStarted = true;
+  } else {
+    emitVoiceVariant(mode, mode === "strong-return" ? supervisionVoices.returning : supervisionVoices.startPlayful);
+  }
+  scheduleRoamingStep(mode === "night" ? randomBetween(4_000, 10_000) : randomBetween(3_200, 5_000));
+  refreshTrayMenu();
+}
+
+function stopRoaming(success: boolean, returnHome = true): void {
+  const stoppedMode = roamingMode;
+  roamingMode = null;
+  if (roamingTimer) clearTimeout(roamingTimer);
+  roamingTimer = null;
+  if (petTravel?.kind === "patrol" || petTravel?.kind === "stroll") cancelPetTravel();
+  if (success && stoppedMode?.startsWith("strong")) emitVoiceVariant("patrol-success", supervisionVoices.success, "✦");
+  const home = roamingHome;
+  roamingHome = null;
+  if (returnHome && home && !dragging && !petTravel) {
+    const snapshot = yuQuizRuntime.snapshot;
+    if (snapshot?.pageOpen) handleYuQuizDocking(snapshot);
+    else startPetTravel(home.x, home.y, "roaming-return", PATROL_TRAVEL_SPEED);
+  }
+  refreshTrayMenu();
+}
+
+function scheduleRoamingStep(delay: number): void {
+  if (roamingTimer) clearTimeout(roamingTimer);
+  roamingTimer = setTimeout(() => {
+    roamingTimer = null;
+    if (!roamingMode || !petWindow || petWindow.isDestroyed() || dragging || panelWindow?.isVisible()) return;
+    const work = screen.getPrimaryDisplay().workArea;
+    const marginX = roamingMode === "night" ? work.width * 0.12 : work.width * 0.04;
+    const marginY = roamingMode === "night" ? work.height * 0.18 : work.height * 0.08;
+    const targetX = work.x + marginX + Math.random() * Math.max(1, work.width - PET_WINDOW.width - marginX * 2);
+    const targetY = work.y + marginY + Math.random() * Math.max(1, work.height - PET_WINDOW.height - marginY * 2);
+    startPetTravel(
+      targetX,
+      targetY,
+      roamingMode === "night" ? "stroll" : "patrol",
+      roamingMode === "night" ? NIGHT_STROLL_SPEED : PATROL_TRAVEL_SPEED,
+    );
+  }, delay);
+  roamingTimer.unref?.();
+}
+
+function finishRoamingStep(kind: "patrol" | "stroll"): void {
+  if (!roamingMode) return;
+  roamingRounds += 1;
+  if (kind === "patrol") {
+    const pool = roamingMode === "strong-return"
+      ? supervisionVoices.returning
+      : roamingRounds >= 4 ? supervisionVoices.startFirm : supervisionVoices.startPlayful;
+    emitVoiceVariant(roamingMode === "strong-return" ? "patrol-return" : roamingRounds >= 4 ? "patrol-firm" : "patrol-playful", pool);
+    scheduleRoamingStep(randomBetween(8_000, 18_000));
+  } else {
+    if (Math.random() < 0.42) emitVoiceVariant("night-stroll", supervisionVoices.night);
+    scheduleRoamingStep(randomBetween(35_000, 80_000));
+  }
 }
 
 async function maybeManageStudyLaunch(now: Date): Promise<void> {
@@ -1186,15 +1485,18 @@ function showStudyLaunchPrompt(
   const actions = final
     ? [{ id: "start", label: "再试一次" }, { id: "skip", label: "跳过" }]
     : [{ id: "start", label: "现在开始" }, ...(!alreadySnoozed ? [{ id: "snooze", label: "10分后" }] : []), { id: "skip", label: "跳过" }];
+  const paired = !final && !repeated
+    ? choosePaired(`studyLaunch-${period}`, lines.studyLaunchPrompt, voicePools.launchPrompt)
+    : undefined;
   petWindow?.webContents.send("xiaolu:prompt", {
     id: key,
     type: "study-launch",
-    message: repeated
+    message: paired?.message ?? (repeated
       ? chooseLine(`studyLaunchReturn-${period}`, lines.studyLaunchReturn)
       : final
         ? "我还在等你。现在做第一题，今天就不算被拖延带走。"
-        : chooseLine(`studyLaunch-${period}`, lines.studyLaunchPrompt),
-    voice: final ? chooseVoice("launchFinal", voicePools.launchFinal) : chooseVoice("launchPrompt", voicePools.launchPrompt),
+        : lines.studyLaunchPrompt[0]),
+    ...(paired ? { voice: paired.voice } : {}),
     actions,
   });
   syncPetMousePassthrough();
@@ -1251,7 +1553,6 @@ function maybeRemindYuQuizStall(snapshot: YuQuizSnapshot, now: Date): void {
       chooseLine("yuQuizStalled", lines.yuQuizStalled),
       undefined,
       2_800,
-      chooseVoice("yuQuizStalled", voicePools.yuQuizPaused),
     );
   if (!requestCenterAttention(present)) present();
 }
@@ -1309,17 +1610,18 @@ function maybePromptIncompleteTasks(now: Date): void {
     type: "task-reminder",
     label: "看任务",
     message: chooseLine(`taskReminder-${reminderSlot}`, pool),
-    voice: chooseVoice("taskReminder", voicePools.taskReminder),
     expiresAt: new Date(activePromptExpiresAt).toISOString(),
   });
 }
 
 function clearActivePrompt(): void {
+  const clearedType = activePromptType;
   activePromptKey = null;
   activePromptType = null;
   activePromptExpiresAt = 0;
   bubblePromptActive = Boolean(studyLaunchStatusBubble || yuQuizStatusBubble);
   petWindow?.webContents.send("xiaolu:clear-prompt");
+  if (clearedType === "check-in") restoreMovementAfterCheckIn();
 }
 
 function setYuQuizStatusBubble(message: string): void {
@@ -1448,6 +1750,47 @@ function emitVoice(voice: string): void {
   if (voice) petWindow?.webContents.send("xiaolu:play-voice", voice);
 }
 
+function emitVoiceVariant(poolKey: string, pool: readonly VoiceVariant[], effect?: string): void {
+  const variant = chooseVariant(poolKey, pool);
+  emitAction(variant.animation, variant.message, effect, 2_800, variant.voice);
+}
+
+function emitPairedAction(
+  poolKey: string,
+  animation: string,
+  messages: readonly string[],
+  voices: readonly string[],
+  effect?: string,
+  lockMs = 1_700,
+): void {
+  const paired = choosePaired(poolKey, messages, voices);
+  emitAction(animation, paired.message, effect, lockMs, paired.voice);
+}
+
+function choosePaired(poolKey: string, messages: readonly string[], voices: readonly string[]): { message: string; voice: string } {
+  const count = Math.min(messages.length, voices.length);
+  if (count <= 0) return { message: messages[0] ?? "", voice: "" };
+  const variants = Array.from({ length: count }, (_, index) => ({
+    message: messages[index] ?? "",
+    voice: voices[index] ?? "",
+  }));
+  const previous = lastVariantByPool.get(poolKey);
+  const candidates = variants.filter((item) => item.voice !== previous);
+  const selected = candidates[Math.floor(Math.random() * candidates.length)] ?? variants[0] ?? { message: "", voice: "" };
+  lastVariantByPool.set(poolKey, selected.voice);
+  return selected;
+}
+
+function chooseVariant(poolKey: string, pool: readonly VoiceVariant[]): VoiceVariant {
+  const fallback = pool[0] ?? { message: "", voice: "", animation: "idle" };
+  if (pool.length <= 1) return fallback;
+  const previous = lastVariantByPool.get(poolKey);
+  const candidates = pool.filter((item) => item.voice !== previous);
+  const selected = candidates[Math.floor(Math.random() * candidates.length)] ?? fallback;
+  lastVariantByPool.set(poolKey, selected.voice);
+  return selected;
+}
+
 function chooseVoice(poolKey: string, pool: readonly string[]): string {
   if (pool.length === 1) return pool[0] ?? "";
   const previous = lastVoiceByPool.get(poolKey);
@@ -1563,13 +1906,13 @@ function clearCenterAttentionState(): void {
   centerAttentionArrival = null;
 }
 
-function startPetTravel(targetX: number, targetY: number, kind: PetTravelKind): void {
+function startPetTravel(targetX: number, targetY: number, kind: PetTravelKind, speed = PET_TRAVEL_SPEED): void {
   if (!petWindow || petWindow.isDestroyed()) return;
   cancelPetTravel();
   const from = petWindow.getContentBounds();
   const target = clampPetPosition(targetX, targetY);
-  const horizontalMs = Math.abs(target.x - from.x) / PET_TRAVEL_SPEED * 1_000;
-  const verticalMs = Math.abs(target.y - from.y) / PET_TRAVEL_SPEED * 1_000;
+  const horizontalMs = Math.abs(target.x - from.x) / speed * 1_000;
+  const verticalMs = Math.abs(target.y - from.y) / speed * 1_000;
   const direction = target.x < from.x ? "left" : target.x > from.x ? "right" : lastDragDirection;
   lastDragDirection = direction;
   petTravel = {
@@ -1617,6 +1960,10 @@ function startPetTravel(targetX: number, targetY: number, kind: PetTravelKind): 
       onArrival?.();
       centerAttentionTimer = setTimeout(finishCenterAttention, CENTER_ATTENTION_MS);
       centerAttentionTimer.unref?.();
+    } else if (completedKind === "patrol" || completedKind === "stroll") {
+      finishRoamingStep(completedKind);
+    } else if (completedKind === "roaming-return") {
+      void rememberCurrentPetPosition();
     }
   }, 16);
   petTravelTimer.unref?.();

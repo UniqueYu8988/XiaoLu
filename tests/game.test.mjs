@@ -18,6 +18,7 @@ import {
   setDailyTaskCompleted,
   setDailyTaskRecurring,
   setYuQuizIntegration,
+  setPatrolEnabled,
   setPetPosition,
   setStudyAnchor,
   setVoiceEnabled,
@@ -28,6 +29,7 @@ import {
   completeStudyLaunch,
   skipStudyLaunch,
   studyLaunchPeriodAt,
+  strictStudyPeriodAt,
   studyMsForDay,
   submitDailyReport,
   toggleStudy,
@@ -36,13 +38,21 @@ import {
 const at = (hour, minute, day = 18) => new Date(2026, 6, day, hour, minute, 0, 0);
 const date = localDateKey(at(9, 0));
 
-assert.equal(studyLaunchPeriodAt(at(6, 59)), undefined);
-assert.equal(studyLaunchPeriodAt(at(7, 0)), "morning");
+assert.equal(studyLaunchPeriodAt(at(8, 59)), undefined);
+assert.equal(studyLaunchPeriodAt(at(9, 0)), "morning");
 assert.equal(studyLaunchPeriodAt(at(11, 59)), "morning");
 assert.equal(studyLaunchPeriodAt(at(12, 0)), undefined);
-assert.equal(studyLaunchPeriodAt(at(13, 0)), "afternoon");
-assert.equal(studyLaunchPeriodAt(at(19, 0)), "evening");
-assert.equal(studyLaunchPeriodAt(at(23, 30)), undefined);
+assert.equal(studyLaunchPeriodAt(at(15, 0)), "afternoon");
+assert.equal(studyLaunchPeriodAt(at(18, 0)), "evening");
+assert.equal(studyLaunchPeriodAt(at(21, 0)), undefined);
+assert.equal(strictStudyPeriodAt(at(9, 4)), undefined);
+assert.equal(strictStudyPeriodAt(at(9, 5))?.period, "morning");
+assert.equal(strictStudyPeriodAt(at(11, 59))?.period, "morning");
+assert.equal(strictStudyPeriodAt(at(12, 0)), undefined);
+assert.equal(strictStudyPeriodAt(at(15, 4)), undefined);
+assert.equal(strictStudyPeriodAt(at(15, 5))?.period, "afternoon");
+assert.equal(strictStudyPeriodAt(at(17, 59))?.period, "afternoon");
+assert.equal(strictStudyPeriodAt(at(18, 0)), undefined);
 
 let launchState = initialStudyState(at(8, 0));
 launchState = markStudyLaunchAvailable(launchState, "morning", at(8, 0));
@@ -87,10 +97,13 @@ assert.equal(repairedLaunchState.days[date]?.studyLaunches.afternoon?.ritualStar
 let state = initialStudyState(at(8, 50));
 assert.equal(state.settings.voiceEnabled, true);
 assert.equal(state.settings.voiceVolume, 0.82);
+assert.equal(state.settings.patrolEnabled, true);
 state = setVoiceEnabled(state, false, at(8, 51));
 state = setVoiceVolume(state, 0.35, at(8, 52));
+state = setPatrolEnabled(state, false, at(8, 52));
 assert.equal(state.settings.voiceEnabled, false);
 assert.equal(state.settings.voiceVolume, 0.35);
+assert.equal(state.settings.patrolEnabled, false);
 state = setPetPosition(state, { x: 0.03125, y: 0.2875 }, at(8, 52));
 assert.deepEqual(state.settings.petPosition, { x: 0.03125, y: 0.2875 });
 state = setPetPosition(state, { x: -8, y: 9 }, at(8, 52));

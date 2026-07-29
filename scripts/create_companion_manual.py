@@ -334,7 +334,7 @@ def build_document() -> None:
     add_text(p, "她是住在桌面上的学习搭子，\n替现实里的你来陪我、提醒我，也见证我们一起认真过的每一天。", 9, False, INK)
     p = doc.add_paragraph()
     set_para(p, before=8, align=WD_ALIGN_PARAGRAPH.CENTER)
-    add_text(p, "VERSION 1.2.0  ·  2026", 6.8, True, PURPLE, "Consolas")
+    add_text(p, "VERSION 1.3.0  ·  2026", 6.8, True, PURPLE, "Consolas")
     add_footer(section, "00")
 
     # Page 1: identity and controls

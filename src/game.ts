@@ -6,6 +6,7 @@ export type BookmarkType = "together";
 export type BountySlot = "self" | "gift";
 export type TaskReminderSlot = "21:00" | "22:00";
 export type StudyLaunchPeriod = "morning" | "afternoon" | "evening";
+export type StrictStudyPeriod = "morning" | "afternoon";
 export type StudyLaunchSource = "prompt" | "double-click" | "manual" | "organic";
 
 export interface StudySession {
@@ -95,6 +96,7 @@ export interface DayRecord {
 export interface StudySettings {
   readonly launchAtLogin: boolean;
   readonly yuQuizIntegration: boolean;
+  readonly patrolEnabled: boolean;
   readonly voiceEnabled: boolean;
   readonly voiceVolume: number;
   readonly petPosition?: RelativePetPosition;
@@ -193,7 +195,7 @@ export function initialStudyState(now = new Date()): StudyState {
     days: {},
     recurringTasks: [],
     bounties: {},
-    settings: { launchAtLogin: true, yuQuizIntegration: false, voiceEnabled: true, voiceVolume: 0.82 },
+    settings: { launchAtLogin: true, yuQuizIntegration: false, patrolEnabled: true, voiceEnabled: true, voiceVolume: 0.82 },
     lastEvaluatedAt: now.toISOString(),
   };
 }
@@ -242,6 +244,7 @@ export function normalizeStudyState(value: unknown, now = new Date()): StudyStat
     settings: {
       launchAtLogin: settingsValue.launchAtLogin !== false,
       yuQuizIntegration: settingsValue.yuQuizIntegration === true,
+      patrolEnabled: settingsValue.patrolEnabled !== false,
       voiceEnabled: settingsValue.voiceEnabled !== false,
       voiceVolume: Math.max(0, Math.min(1, finiteNumber(settingsValue.voiceVolume) ?? 0.82)),
       ...(petPosition ? { petPosition } : {}),
@@ -526,9 +529,25 @@ export function markTaskReminderShown(current: StudyState, slot: TaskReminderSlo
 
 export function studyLaunchPeriodAt(now = new Date()): StudyLaunchPeriod | undefined {
   const minutes = now.getHours() * 60 + now.getMinutes();
-  if (minutes >= 7 * 60 && minutes < 12 * 60) return "morning";
-  if (minutes >= 13 * 60 && minutes < 18 * 60) return "afternoon";
-  if (minutes >= 19 * 60 && minutes < 23 * 60 + 30) return "evening";
+  if (minutes >= 9 * 60 && minutes < 12 * 60) return "morning";
+  if (minutes >= 15 * 60 && minutes < 18 * 60) return "afternoon";
+  if (minutes >= 18 * 60 && minutes < 21 * 60) return "evening";
+  return undefined;
+}
+
+export function strictStudyPeriodAt(now = new Date()): { key: string; period: StrictStudyPeriod; startedAt: number } | undefined {
+  const minutes = now.getHours() * 60 + now.getMinutes();
+  const date = localDateKey(now);
+  if (minutes >= 9 * 60 + 5 && minutes < 12 * 60) {
+    const start = new Date(now);
+    start.setHours(9, 0, 0, 0);
+    return { key: `${date}:morning`, period: "morning", startedAt: start.getTime() };
+  }
+  if (minutes >= 15 * 60 + 5 && minutes < 18 * 60) {
+    const start = new Date(now);
+    start.setHours(15, 0, 0, 0);
+    return { key: `${date}:afternoon`, period: "afternoon", startedAt: start.getTime() };
+  }
   return undefined;
 }
 
@@ -611,6 +630,15 @@ export function setYuQuizIntegration(current: StudyState, enabled: boolean, now 
       ...state.settings,
       yuQuizIntegration: enabled,
     },
+    lastEvaluatedAt: now.toISOString(),
+  };
+}
+
+export function setPatrolEnabled(current: StudyState, enabled: boolean, now = new Date()): StudyState {
+  const state = normalizeStudyState(current, now);
+  return {
+    ...state,
+    settings: { ...state.settings, patrolEnabled: enabled },
     lastEvaluatedAt: now.toISOString(),
   };
 }

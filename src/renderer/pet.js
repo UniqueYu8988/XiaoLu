@@ -57,10 +57,12 @@ function applyAnimation(name, persistent = false) {
   lookActive = false;
   displayedLookIndex = null;
   smoothedLookAngle = null;
+  ensureKeyframes(name, animation);
+  sprite.style.animation = "none";
+  void sprite.offsetWidth;
   sprite.style.backgroundPosition = `0 -${animation.row * 208}px`;
   const iterations = persistent ? "infinite" : animation.oneShotIterations;
   sprite.style.animation = `sprite-${name} ${animation.duration}ms steps(${animation.frames}) ${iterations}`;
-  ensureKeyframes(name, animation);
 }
 
 function restorePersistentAnimation() {

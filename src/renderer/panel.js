@@ -9,7 +9,7 @@ let portraitPersistent = "idle";
 let historyPage = 0;
 let taskPage = 0;
 let taskRenderKey = null;
-const HISTORY_PAGE_SIZE = 4;
+const HISTORY_PAGE_SIZE = 3;
 const TASK_PAGE_SIZE = 3;
 
 const portraitAnimations = {
@@ -133,6 +133,7 @@ function render(state) {
   renderStats(state.stats);
   byId("launch-at-login").checked = state.settings.launchAtLogin;
   byId("yuquiz-integration").checked = Boolean(yuQuiz.enabled);
+  byId("patrol-enabled").checked = state.settings.patrolEnabled !== false;
   byId("voice-enabled").checked = state.settings.voiceEnabled !== false;
   byId("voice-volume").value = Number.isFinite(state.settings.voiceVolume) ? state.settings.voiceVolume : 0.82;
   byId("voice-volume").disabled = state.settings.voiceEnabled === false;
@@ -166,6 +167,7 @@ function renderReport(report, yuQuiz = { enabled: false }) {
 
 function renderHistory(history) {
   const list = byId("history-list");
+  list.classList.toggle("empty", history.length === 0);
   byId("history-total").textContent = `累计 ${history.length} 条`;
   if (history.length === 0) {
     list.replaceChildren(emptyMessage("这里还空着，今天会成为第一页。"));
@@ -516,6 +518,12 @@ byId("yuquiz-integration").addEventListener("change", async (event) => {
   const input = event.target;
   input.disabled = true;
   try { render(await api.setYuQuizIntegration(input.checked)); }
+  finally { input.disabled = false; }
+});
+byId("patrol-enabled").addEventListener("change", async (event) => {
+  const input = event.target;
+  input.disabled = true;
+  try { render(await api.setPatrolEnabled(input.checked)); }
   finally { input.disabled = false; }
 });
 byId("voice-enabled").addEventListener("change", async (event) => {

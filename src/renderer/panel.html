@@ -101,6 +101,7 @@
           <div class="section-title"><span>LOG</span><h2>学习记录</h2></div>
           <div id="history-list" class="history-list"></div>
           <div class="history-footer"><div id="history-pager" class="pager pager-inline" aria-label="学习记录翻页" hidden><button id="history-prev" type="button" aria-label="上一页">‹</button><span id="history-page">1 / 1</span><button id="history-next" type="button" aria-label="下一页">›</button></div><span id="history-total">累计 0 条</span></div>
+          <div class="privacy-note history-privacy">这些学习记忆，只安静地留在你的电脑里。</div>
         </section>
 
         <section id="view-bookmarks" class="view">
@@ -127,12 +128,16 @@
           <div class="section-title"><span>SUM</span><h2>累计统计</h2></div>
           <div id="stats-grid" class="stats-grid"></div>
           <label class="setting-row">
-            <span><strong>开机自动启动</strong><small>让我准时来提醒你</small></span>
+            <span><strong>小鹿自启</strong><small>开机后准时来找你</small></span>
             <input id="launch-at-login" type="checkbox" />
           </label>
           <label class="setting-row">
-            <span><strong>YuQuiz 自动联动</strong><small>使用网页时自行接管，离开后安静退出</small></span>
+            <span><strong>小鹿做题</strong><small>连接 YuQuiz，自动记录做题</small></span>
             <input id="yuquiz-integration" type="checkbox" />
+          </label>
+          <label class="setting-row">
+            <span><strong>小鹿巡逻</strong><small>约定时段没开始，就在桌面找你</small></span>
+            <input id="patrol-enabled" type="checkbox" />
           </label>
           <div class="setting-row voice-setting">
             <span><strong>小鹿语音</strong><small>只在重要时刻开口</small></span>
@@ -141,7 +146,6 @@
               <input id="voice-enabled" type="checkbox" aria-label="启用小鹿语音" />
             </div>
           </div>
-          <div class="privacy-note">这些学习记忆，只安静地留在你的电脑里。</div>
         </section>
       </main>
 
