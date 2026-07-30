@@ -30,6 +30,7 @@ import {
   skipStudyLaunch,
   studyLaunchPeriodAt,
   strictStudyPeriodAt,
+  supervisionTierForElapsed,
   studyMsForDay,
   submitDailyReport,
   toggleStudy,
@@ -53,6 +54,13 @@ assert.equal(strictStudyPeriodAt(at(15, 4)), undefined);
 assert.equal(strictStudyPeriodAt(at(15, 5))?.period, "afternoon");
 assert.equal(strictStudyPeriodAt(at(17, 59))?.period, "afternoon");
 assert.equal(strictStudyPeriodAt(at(18, 0)), undefined);
+assert.equal(supervisionTierForElapsed(-1), "playful");
+assert.equal(supervisionTierForElapsed(4 * 60_000 + 59_999), "playful");
+assert.equal(supervisionTierForElapsed(5 * 60_000), "firm");
+assert.equal(supervisionTierForElapsed(14 * 60_000 + 59_999), "firm");
+assert.equal(supervisionTierForElapsed(15 * 60_000), "angry");
+assert.equal(supervisionTierForElapsed(29 * 60_000 + 59_999), "angry");
+assert.equal(supervisionTierForElapsed(30 * 60_000), "final");
 
 let launchState = initialStudyState(at(8, 0));
 launchState = markStudyLaunchAvailable(launchState, "morning", at(8, 0));

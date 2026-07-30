@@ -50,6 +50,7 @@ import {
   completeStudyLaunch,
   studyLaunchPeriodAt,
   strictStudyPeriodAt,
+  supervisionTierForElapsed,
   studyMsForDay,
   submitDailyReport,
   toggleStudy,
@@ -59,6 +60,7 @@ import {
   type ReportInput,
   type StudyState,
   type StudyLaunchPeriod,
+  type SupervisionTier,
   type YuQuizSnapshot,
 } from "./game.js";
 import { createYuQuizWakeServer } from "./yuquiz-wakeup.js";
@@ -169,6 +171,24 @@ const supervisionVoices = {
     "这段时间是我们约好的。我还没有等到你开始。",
     "已经拖得够久啦。现在，先做第一题。",
   ], "waiting"),
+  startAngry: voiceVariants("patrol-start-angry", [
+    "我真的要生气了。我们约好的学习时间，不是拿来一直拖延的。",
+    "已经提醒你好几次了。现在，把别的事情放下，打开第一题。",
+    "你明明知道，开始以后就能学进去。为什么还要一直躲着第一步？",
+    "别再看着我跑啦。看题目。现在就开始。",
+    "这段时间是我们约好的。我已经等了很久，可你还是没有开始。",
+    "我不是来陪你继续拖延的。先坐好，把题目打开。",
+    "不要再告诉自己等一会儿。你已经等过很多个一会儿了。",
+    "这次我不哄你了。别想今天要学多久，先把第一题做掉。",
+  ], "failed"),
+  startFinal: voiceVariants("patrol-start-final", [
+    "听好。现在打开题目，不要再给拖延找理由。",
+    "已经拖得太久了。你答应过的事情，需要认真对待。",
+    "我现在真的很生气。先开始学习，再去做其他事情。",
+    "不要继续消耗今天了。现在开始，还来得及把时间拿回来。",
+    "这不是状态好不好的问题。是你现在愿不愿意迈出第一步。",
+    "我会继续在这里盯着你。直到你真正进入学习。",
+  ], "waiting"),
   returning: voiceVariants("patrol-return", [
     "休息得差不多啦。我们回来继续吧。",
     "我来接你回去。下一小段，从哪里开始？",
@@ -179,6 +199,14 @@ const supervisionVoices = {
     "先回来做一点。别让短短的休息，变成长长的拖延。",
     "我又开始巡逻啦。等你重新进入学习，我就停下。",
   ], "review"),
+  returningAngry: voiceVariants("patrol-return-angry", [
+    "休息已经超过十五分钟了。现在该回来了。",
+    "十五分钟是休息，不是让你悄悄结束今天的学习。",
+    "你都已经开始过一次了。重新回来，真的没有那么难。",
+    "我又来找你了。别让一小段休息，变成一整个下午的拖延。",
+    "先把正在看的东西停一下。回到题目，我们继续。",
+    "这次别再说马上。现在就回来，接着完成刚才那一段。",
+  ], "failed"),
   success: voiceVariants("patrol-success", [
     "好啦，这次是真的开始了。我回去陪你。",
     "已经稳稳开始三分钟啦。接下来交给你。",
@@ -260,7 +288,7 @@ let lastEffectiveStudyAt = 0;
 let wasEffectivelyStudying = false;
 let roamingMode: RoamingMode | null = null;
 let roamingTimer: NodeJS.Timeout | null = null;
-let roamingRounds = 0;
+let roamingEscalationStartedAt = 0;
 let roamingHome: { x: number; y: number } | null = null;
 let checkInPausedHome: { x: number; y: number } | null = null;
 let nightStrollHasStarted = false;
@@ -584,6 +612,9 @@ function installIpc(): void {
       { voice: "checkin-15-2", animation: "jumping", message: "啊，三点了。下午这一程走到哪里啦？" },
       { voice: "launch-prompt-3", animation: "waiting", message: "我抓到你还没有开始啦。我们先走到第一题，好不好？" },
       { voice: "launch-success-3", animation: "jumping", message: "我就知道你可以开始。好啦，我不再催你了。" },
+      { voice: "patrol-start-angry-1", animation: "failed", message: "我真的要生气了。我们约好的学习时间，不是拿来一直拖延的。" },
+      { voice: "patrol-start-final-1", animation: "waiting", message: "听好。现在打开题目，不要再给拖延找理由。" },
+      { voice: "patrol-return-angry-1", animation: "failed", message: "休息已经超过十五分钟了。现在该回来了。" },
       { voice: "yuquiz-set-complete-3", animation: "jumping", message: "一组题做完啦。快看一眼自己的成果吧。" },
       { voice: "all-tasks-completed-1", animation: "jumping", message: "今天列下的事情都完成啦。真的一件也没有落下！" },
       { voice: "bounty-gift-2", animation: "review", message: "又替她赢下一枚。今天的努力，也有了可以留下的样子。" },
@@ -1272,10 +1303,10 @@ function manageRoaming(now: Date): void {
         if (roamingMode?.startsWith("strong")) stopRoaming(false);
         return;
       }
-      startRoaming("strong-return");
+      startRoaming("strong-return", inactiveSince + SUPERVISION_RESTART_MS);
       return;
     }
-    startRoaming("strong-start");
+    startRoaming("strong-start", strict.startedAt + STUDY_LAUNCH_GRACE_MS);
     return;
   }
 
@@ -1311,7 +1342,27 @@ function restoreMovementAfterCheckIn(): void {
   startPetTravel(home.x, home.y, "roaming-return", PATROL_TRAVEL_SPEED);
 }
 
-function startRoaming(mode: RoamingMode): void {
+function strongPatrolVoice(mode: Exclude<RoamingMode, "night">, now = new Date()): { key: string; pool: readonly VoiceVariant[]; tier: SupervisionTier } {
+  const tier = supervisionTierForElapsed(now.getTime() - roamingEscalationStartedAt);
+  if (mode === "strong-return") {
+    return tier === "angry" || tier === "final"
+      ? { key: "patrol-return-angry", pool: supervisionVoices.returningAngry, tier }
+      : { key: "patrol-return", pool: supervisionVoices.returning, tier };
+  }
+  if (tier === "final") return { key: "patrol-final", pool: supervisionVoices.startFinal, tier };
+  if (tier === "angry") return { key: "patrol-angry", pool: supervisionVoices.startAngry, tier };
+  if (tier === "firm") return { key: "patrol-firm", pool: supervisionVoices.startFirm, tier };
+  return { key: "patrol-playful", pool: supervisionVoices.startPlayful, tier };
+}
+
+function strongPatrolStepDelay(tier: SupervisionTier): number {
+  if (tier === "final") return randomBetween(6_000, 11_000);
+  if (tier === "angry") return randomBetween(8_000, 14_000);
+  if (tier === "firm") return randomBetween(10_000, 18_000);
+  return randomBetween(14_000, 24_000);
+}
+
+function startRoaming(mode: RoamingMode, escalationStartedAt = Date.now()): void {
   if (!petReady || !petWindow || petWindow.isDestroyed() || panelWindow?.isVisible()) return;
   if (roamingMode === mode) return;
   if (roamingMode) stopRoaming(false, false);
@@ -1327,13 +1378,14 @@ function startRoaming(mode: RoamingMode): void {
   }
   if (activePromptType === "study-launch") clearActivePrompt();
   roamingMode = mode;
-  roamingRounds = 0;
+  roamingEscalationStartedAt = mode === "night" ? 0 : Math.min(Date.now(), escalationStartedAt);
   if (mode === "night") {
     const pool = nightStrollHasStarted ? supervisionVoices.nightResume : supervisionVoices.night;
     emitVoiceVariant("night-stroll-entry", pool);
     nightStrollHasStarted = true;
   } else {
-    emitVoiceVariant(mode, mode === "strong-return" ? supervisionVoices.returning : supervisionVoices.startPlayful);
+    const selection = strongPatrolVoice(mode);
+    emitVoiceVariant(selection.key, selection.pool);
   }
   scheduleRoamingStep(mode === "night" ? randomBetween(4_000, 10_000) : randomBetween(3_200, 5_000));
   refreshTrayMenu();
@@ -1342,6 +1394,7 @@ function startRoaming(mode: RoamingMode): void {
 function stopRoaming(success: boolean, returnHome = true): void {
   const stoppedMode = roamingMode;
   roamingMode = null;
+  roamingEscalationStartedAt = 0;
   if (roamingTimer) clearTimeout(roamingTimer);
   roamingTimer = null;
   if (petTravel?.kind === "patrol" || petTravel?.kind === "stroll") cancelPetTravel();
@@ -1378,13 +1431,11 @@ function scheduleRoamingStep(delay: number): void {
 
 function finishRoamingStep(kind: "patrol" | "stroll"): void {
   if (!roamingMode) return;
-  roamingRounds += 1;
   if (kind === "patrol") {
-    const pool = roamingMode === "strong-return"
-      ? supervisionVoices.returning
-      : roamingRounds >= 4 ? supervisionVoices.startFirm : supervisionVoices.startPlayful;
-    emitVoiceVariant(roamingMode === "strong-return" ? "patrol-return" : roamingRounds >= 4 ? "patrol-firm" : "patrol-playful", pool);
-    scheduleRoamingStep(randomBetween(8_000, 18_000));
+    if (roamingMode === "night") return;
+    const selection = strongPatrolVoice(roamingMode);
+    emitVoiceVariant(selection.key, selection.pool);
+    scheduleRoamingStep(strongPatrolStepDelay(selection.tier));
   } else {
     if (Math.random() < 0.42) emitVoiceVariant("night-stroll", supervisionVoices.night);
     scheduleRoamingStep(randomBetween(35_000, 80_000));

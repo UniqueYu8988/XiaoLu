@@ -8,6 +8,7 @@ export type TaskReminderSlot = "21:00" | "22:00";
 export type StudyLaunchPeriod = "morning" | "afternoon" | "evening";
 export type StrictStudyPeriod = "morning" | "afternoon";
 export type StudyLaunchSource = "prompt" | "double-click" | "manual" | "organic";
+export type SupervisionTier = "playful" | "firm" | "angry" | "final";
 
 export interface StudySession {
   readonly startedAt: string;
@@ -549,6 +550,14 @@ export function strictStudyPeriodAt(now = new Date()): { key: string; period: St
     return { key: `${date}:afternoon`, period: "afternoon", startedAt: start.getTime() };
   }
   return undefined;
+}
+
+export function supervisionTierForElapsed(elapsedMs: number): SupervisionTier {
+  const elapsed = Number.isFinite(elapsedMs) ? Math.max(0, elapsedMs) : 0;
+  if (elapsed < 5 * 60_000) return "playful";
+  if (elapsed < 15 * 60_000) return "firm";
+  if (elapsed < 30 * 60_000) return "angry";
+  return "final";
 }
 
 export function updateStudyLaunch(
