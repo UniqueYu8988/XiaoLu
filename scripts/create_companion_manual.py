@@ -357,7 +357,7 @@ def build_document() -> None:
     add_text(p, "她是住在桌面上的学习搭子，\n替现实里的你来陪我、提醒我，也见证我们一起认真过的每一天。", 9, False, INK)
     p = doc.add_paragraph()
     set_para(p, before=8, align=WD_ALIGN_PARAGRAPH.CENTER)
-    add_text(p, "VERSION 1.3.1  ·  2026", 6.8, True, PURPLE, "Consolas")
+    add_text(p, "VERSION 1.4.0  ·  2026", 6.8, True, PURPLE, "Consolas")
     add_footer(section, "00")
 
     # Page 1: identity and controls
@@ -711,7 +711,7 @@ def build_document() -> None:
     add_label(doc, "PATROL", "强监督时段，小鹿会主动来找你")
     p = doc.add_paragraph()
     set_para(p, after=5, line=1.3)
-    add_text(p, "“小鹿巡逻”默认开启。它只在约定时段需要你开始或重新回到学习时出现，不会把普通休息变成新的失败记录。", 8.3)
+    add_text(p, "“小鹿巡逻”默认开启，也可以在统计页随时关闭。它只在约定时段需要你开始或重新回到学习时出现，不会把普通休息变成新的失败记录。", 8.3)
 
     patrol = doc.add_table(rows=2, cols=2)
     patrol.alignment = WD_TABLE_ALIGNMENT.CENTER
@@ -736,7 +736,7 @@ def build_document() -> None:
         add_text(p, body, 7.0, False, INK)
 
     add_note_box(doc, "打卡永远优先", "进入五个打卡窗口时，小鹿会立即停下当前巡逻并显示“我在”提示。回应或超时后，才根据当前学习状态决定恢复巡逻、回驻守点或回自由位置。", CREAM, PURPLE)
-    add_note_box(doc, "随时可以关闭", "如果某天只想安静使用，在统计页关闭“小鹿巡逻”即可。计时、打卡、任务、书签和 YuQuiz 联动都不会因此失效。", "E8F1E5", GREEN)
+    add_note_box(doc, "声音会逐级变严", "巡逻开始后的 0-5 分钟保持活泼，5-15 分钟转为认真，15-30 分钟会明确生气，超过 30 分钟进入最终警告。软件晚启动时会直接进入当时应有的档位。", "E8F1E5", GREEN)
 
     # Page 10: YuQuiz integration
     add_page(doc, "10")
