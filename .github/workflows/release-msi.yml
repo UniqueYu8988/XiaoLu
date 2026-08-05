@@ -35,6 +35,9 @@ jobs:
         env:
           PNPM_CONFIG_DANGEROUSLY_ALLOW_ALL_BUILDS: "true"
 
+      - name: Install Electron runtime
+        run: node node_modules/electron/install.js
+
       - name: Verify project
         run: pnpm check
 
