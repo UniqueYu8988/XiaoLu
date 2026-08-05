@@ -11,10 +11,12 @@ import {
   Tray,
   type IpcMainEvent,
 } from "electron";
+import { existsSync, readFileSync } from "node:fs";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import type { Server } from "node:http";
+import { fileURLToPath } from "node:url";
 
 import {
   CHECK_IN_SLOTS,
@@ -74,19 +76,71 @@ const YUQUIZ_BASE_URL = "http://127.0.0.1:8765";
 const YUQUIZ_OFFLINE_POLL_MS = 60_000;
 const YUQUIZ_IDLE_POLL_MS = 15_000;
 const YUQUIZ_LEARNING_POLL_MS = 2_000;
-const STUDY_LAUNCH_GRACE_MS = 5 * 60_000;
+const STUDY_LAUNCH_GRACE_MS = 10 * 60_000;
 const STUDY_LAUNCH_SNOOZE_MS = 10 * 60_000;
 const STUDY_LAUNCH_RITUAL_MS = 5 * 60_000;
 const STUDY_LAUNCH_REPEAT_MS = 10 * 60_000;
-const YUQUIZ_STALL_REMINDER_MS = 30 * 60_000;
-const SUPERVISION_RESTART_MS = 15 * 60_000;
-const YUQUIZ_STABLE_START_MS = 3 * 60_000;
+const YUQUIZ_ACTIVITY_TIMEOUT_MS = 10 * 60_000;
+const STUDY_PAUSE_PATROL_GRACE_MS = 15 * 60_000;
 const NIGHT_STROLL_RESUME_MS = 2 * 60_000;
 const STUDY_ANCHOR = { x: 0.03125, y: 0.2875 } as const;
 const PET_TRAVEL_SPEED = 230;
 const PATROL_TRAVEL_SPEED = 115;
 const NIGHT_STROLL_SPEED = 72;
 const CENTER_ATTENTION_MS = 15_000;
+const HOURLY_CHATTER_WINDOW_MS = 90_000;
+const HOURLY_CHATTER_HOURS = new Map<number, string>([
+  [0, "hourly-midnight"],
+  [8, "hourly-morning"], [10, "hourly-morning"], [11, "hourly-morning"],
+  [13, "hourly-afternoon"], [14, "hourly-afternoon"], [16, "hourly-afternoon"], [17, "hourly-afternoon"],
+  [19, "hourly-evening"], [20, "hourly-evening"], [22, "hourly-evening"], [23, "hourly-evening"],
+]);
+const HOURLY_GROUP_HOURS = new Map<string, readonly number[]>([
+  ["hourly-midnight", [0]],
+  ["hourly-morning", [8, 10, 11]],
+  ["hourly-afternoon", [13, 14, 16, 17]],
+  ["hourly-evening", [19, 20, 22, 23]],
+]);
+
+type CatalogVoice = {
+  readonly id: string;
+  readonly group: string;
+  readonly message: string;
+  readonly animation: string;
+};
+
+const runtimeDirectory = dirname(fileURLToPath(import.meta.url));
+const runtimeVoiceDirectory = join(runtimeDirectory, "assets", "voice");
+const hourlyChatter = loadVoiceCatalog("hourly-v1.5.json");
+const functionalVoices = loadVoiceCatalog("functional-v1.5.json");
+
+function loadVoiceCatalog(fileName: string): readonly CatalogVoice[] {
+  try {
+    const payload = JSON.parse(readFileSync(join(runtimeVoiceDirectory, fileName), "utf8")) as unknown;
+    if (!isRecord(payload) || !Array.isArray(payload.entries)) return [];
+    return payload.entries.filter((entry): entry is CatalogVoice => isRecord(entry)
+      && typeof entry.id === "string"
+      && typeof entry.group === "string"
+      && typeof entry.message === "string"
+      && typeof entry.animation === "string");
+  } catch {
+    return [];
+  }
+}
+
+function functionalVoicePool(group: string): readonly VoiceVariant[] {
+  return functionalVoices
+    .filter((entry) => entry.group === group)
+    .map((entry) => ({ voice: entry.id, message: entry.message, animation: entry.animation }));
+}
+
+function pairedVoiceVariants(messages: readonly string[], voices: readonly string[], animation: string): readonly VoiceVariant[] {
+  return Array.from({ length: Math.min(messages.length, voices.length) }, (_, index) => ({
+    message: messages[index] ?? "",
+    voice: voices[index] ?? "",
+    animation,
+  }));
+}
 
 type VoiceVariant = {
   readonly message: string;
@@ -113,8 +167,6 @@ const voicePools = {
   launchSkip: ["launch-skip-1", "launch-skip-2"],
   launchFinal: ["launch-final-1", "launch-final-2"],
   launchSuccess: ["launch-success-1", "launch-success-2", "launch-success-3"],
-  yuQuizPaused: ["yuquiz-paused-1", "yuquiz-paused-2", "yuquiz-paused-3"],
-  yuQuizReady: ["yuquiz-ready-1", "yuquiz-ready-2", "yuquiz-ready-3"],
   yuQuizSetCompleted: ["yuquiz-set-complete-1", "yuquiz-set-complete-2", "yuquiz-set-complete-3"],
   taskReminder: ["task-reminder-1", "task-reminder-2", "task-reminder-3"],
   taskCompleted: ["task-completed-1", "task-completed-2"],
@@ -148,8 +200,7 @@ const lines = {
   yuQuizSetCompleted: ["这一组收好啦，今天又向前走了一小步。", "这组题完成啦，认真留下了新的痕迹。", "题目一组组做完，今天的努力也亮起来啦。"],
   studyLaunchPrompt: ["先不想学多久。打开第一题，我陪你把开头走过去。", "不用先决定学多久，我们只把第一题打开。", "先迈最小的一步吧，我陪你从第一题开始。"],
   studyLaunchSuccess: ["好啦，已经开始了。最难的那一步过去了。", "第一题完成啦，接下来交给状态。", "你已经走进学习里了，我就不再催你啦。"],
-  studyLaunchReturn: ["学习台还在等你。先点进第一题，我就不再催啦。", "别在门口停太久，我们进去做第一题吧。", "再拉你一下：只做第一题，开始以后我就安静。"],
-  yuQuizStalled: ["这一题陪你想了很久。要是资料查完了，就回来继续吧。", "我先轻轻叫你一下。还在查资料的话慢慢来，准备好了就回来。", "题目还替你留着呢。忙完手边这一步，我们再接着做。"],
+  studyLaunchReturn: ["学习台还在等你。打开一道题或一段教材，我就不再催啦。", "别在门口停太久，我们进去学一点吧。", "再拉你一下：先进入具体内容，开始以后我就安静。"],
 } as const;
 
 const supervisionVoices = {
@@ -199,14 +250,6 @@ const supervisionVoices = {
     "先回来做一点。别让短短的休息，变成长长的拖延。",
     "我又开始巡逻啦。等你重新进入学习，我就停下。",
   ], "review"),
-  returningAngry: voiceVariants("patrol-return-angry", [
-    "休息已经超过十五分钟了。现在该回来了。",
-    "十五分钟是休息，不是让你悄悄结束今天的学习。",
-    "你都已经开始过一次了。重新回来，真的没有那么难。",
-    "我又来找你了。别让一小段休息，变成一整个下午的拖延。",
-    "先把正在看的东西停一下。回到题目，我们继续。",
-    "这次别再说马上。现在就回来，接着完成刚才那一段。",
-  ], "failed"),
   success: voiceVariants("patrol-success", [
     "好啦，这次是真的开始了。我回去陪你。",
     "已经稳稳开始三分钟啦。接下来交给你。",
@@ -281,13 +324,11 @@ let yuQuizEventsInitialized = false;
 let yuQuizAutoSuppressed = false;
 let yuQuizStatusBubble = "";
 let studyLaunchStatusBubble = "";
-let lastYuQuizStallReminderAt = 0;
-let yuQuizLearningSince = 0;
-let lastYuQuizAnswerAt = 0;
 let lastEffectiveStudyAt = 0;
 let wasEffectivelyStudying = false;
 let roamingMode: RoamingMode | null = null;
 let roamingTimer: NodeJS.Timeout | null = null;
+let lastHourlyChatterKey = "";
 let roamingEscalationStartedAt = 0;
 let roamingHome: { x: number; y: number } | null = null;
 let checkInPausedHome: { x: number; y: number } | null = null;
@@ -614,11 +655,14 @@ function installIpc(): void {
       { voice: "launch-success-3", animation: "jumping", message: "我就知道你可以开始。好啦，我不再催你了。" },
       { voice: "patrol-start-angry-1", animation: "failed", message: "我真的要生气了。我们约好的学习时间，不是拿来一直拖延的。" },
       { voice: "patrol-start-final-1", animation: "waiting", message: "听好。现在打开题目，不要再给拖延找理由。" },
-      { voice: "patrol-return-angry-1", animation: "failed", message: "休息已经超过十五分钟了。现在该回来了。" },
       { voice: "yuquiz-set-complete-3", animation: "jumping", message: "一组题做完啦。快看一眼自己的成果吧。" },
       { voice: "all-tasks-completed-1", animation: "jumping", message: "今天列下的事情都完成啦。真的一件也没有落下！" },
       { voice: "bounty-gift-2", animation: "review", message: "又替她赢下一枚。今天的努力，也有了可以留下的样子。" },
       { voice: "study-stopped-2", animation: "review", message: "我记下来啦。休息一下，也没有关系。" },
+      ...hourlyChatter.map((entry) => ({ voice: entry.id, animation: entry.animation, message: entry.message })),
+      ...functionalVoices
+        .filter((entry) => ["task-completed-extra", "all-tasks-completed-extra", "yuquiz-set-complete-extra"].includes(entry.group))
+        .map((entry) => ({ voice: entry.id, animation: entry.animation, message: entry.message })),
     ] as const;
     const previous = lastVoiceByPool.get("voicePreview");
     const candidates = previews.filter((item) => item.voice !== previous);
@@ -870,9 +914,15 @@ async function performSetTaskCompleted(id: string, completed: boolean): Promise<
     emitPairedAction(`bounty-${taskBeforeUpdate.bountySlot}`, "jumping", pool, bountyVoice, "✦", 1_900);
   } else if (completed && tasks.length > 0 && tasks.every((task) => task.completedAt)) {
     if (activePromptType === "task-reminder") clearActivePrompt();
-    emitPairedAction("allTasksCompleted", "jumping", lines.allTasksCompleted, voicePools.allTasksCompleted, "✦", 1_800);
+    emitVoiceVariant("allTasksCompleted", [
+      ...pairedVoiceVariants(lines.allTasksCompleted, voicePools.allTasksCompleted, "jumping"),
+      ...functionalVoicePool("all-tasks-completed-extra"),
+    ], "✦");
   } else if (completed) {
-    emitPairedAction("taskCompleted", "waving", lines.taskCompleted, voicePools.taskCompleted, "✓", 1_350);
+    emitVoiceVariant("taskCompleted", [
+      ...pairedVoiceVariants(lines.taskCompleted, voicePools.taskCompleted, "waving"),
+      ...functionalVoicePool("task-completed-extra"),
+    ], "✓");
   }
   return publicState();
 }
@@ -1002,11 +1052,6 @@ async function syncYuQuiz(announce: boolean): Promise<void> {
     };
     if (!snapshot.isLearning) yuQuizAutoSuppressed = false;
     const studyMode = snapshot.studyState ?? (snapshot.isLearning ? "learning" : "ready");
-    if (studyMode === "learning" || studyMode === "consulting") {
-      if (!yuQuizLearningSince) yuQuizLearningSince = now.getTime();
-    } else {
-      yuQuizLearningSince = 0;
-    }
     const shouldEnable = (studyMode === "learning" || studyMode === "consulting") && !yuQuizAutoSuppressed;
     if (shouldEnable && !studyState.settings.yuQuizIntegration) {
       if (studyState.activeSessionStartedAt) studyState = toggleStudy(studyState, now).state;
@@ -1021,11 +1066,10 @@ async function syncYuQuiz(announce: boolean): Promise<void> {
     handleYuQuizDocking(snapshot);
     if (shouldEnable) await completeOrganicStudyLaunch(now);
     updateYuQuizStatusBubble(snapshot, now);
-    maybeRemindYuQuizStall(snapshot, now);
     if (activePromptType !== "check-in") manageRoaming(now);
     await persistState();
     if (announce && previous?.isLearning && !snapshot.isLearning && activityTimedOut(snapshot, now)) {
-      emitAction("review", "稍微走神也没关系，这段计时先替你停好啦。", undefined, 1_650);
+      emitVoiceVariant("yuquiz-pause-gentle", functionalVoicePool("yuquiz-pause-gentle"));
     }
     nextDelay = shouldEnable ? YUQUIZ_LEARNING_POLL_MS : YUQUIZ_IDLE_POLL_MS;
   } catch (error) {
@@ -1096,17 +1140,17 @@ async function syncYuQuizEvents(playEvents: boolean): Promise<Record<string, unk
   if (events.length) {
     const completion = events.find((event) => event.type === "set_completed");
     const latestAnswer = [...events].reverse().find((event) => event.type === "answer");
-    if (latestAnswer) lastYuQuizAnswerAt = Date.now();
     const launchCompleted = latestAnswer ? await completeActiveStudyLaunch(new Date()) : false;
     if (launchCompleted) {
       emitPairedAction("studyLaunchSuccess", "jumping", lines.studyLaunchSuccess, voicePools.launchSuccess, "✦", 1_900);
     } else if (completion) {
       const accuracy = completion.accuracy ?? 0;
+      const extraVoices = functionalVoicePool("yuquiz-set-complete-extra");
       emitPairedAction(
         "yuQuizSetCompleted",
         accuracy >= 80 ? "jumping" : "waving",
-        lines.yuQuizSetCompleted,
-        voicePools.yuQuizSetCompleted,
+        [...lines.yuQuizSetCompleted, ...extraVoices.map((entry) => entry.message)],
+        [...voicePools.yuQuizSetCompleted, ...extraVoices.map((entry) => entry.voice)],
         accuracy >= 80 ? "✦" : "✓",
         accuracy >= 80 ? 1_900 : 1_600,
       );
@@ -1142,7 +1186,7 @@ function startYuQuizWakeListener(): void {
 function activityTimedOut(snapshot: YuQuizSnapshot, now: Date): boolean {
   if (!snapshot.lastActivityAt) return false;
   const lastActivityAt = new Date(snapshot.lastActivityAt).getTime();
-  return Number.isFinite(lastActivityAt) && now.getTime() - lastActivityAt >= 5 * 60_000;
+  return Number.isFinite(lastActivityAt) && now.getTime() - lastActivityAt >= YUQUIZ_ACTIVITY_TIMEOUT_MS;
 }
 
 function updateYuQuizStatusBubble(snapshot: YuQuizSnapshot, now = new Date()): void {
@@ -1156,16 +1200,9 @@ function updateYuQuizStatusBubble(snapshot: YuQuizSnapshot, now = new Date()): v
     setYuQuizStatusBubble("");
     return;
   }
-  const studyMode = snapshot.studyState ?? (snapshot.isLearning ? "learning" : "ready");
-  if (studyMode === "learning" || studyMode === "consulting") {
-    setYuQuizStatusBubble("");
-  } else if (studyMode === "paused") {
-    setYuQuizStatusBubble(snapshot.pauseReason === "hidden"
-      ? "页面还开着呢，回来继续时我再接上计时。"
-      : "这段计时先停着，继续做题时我再陪你。");
-  } else {
-    setYuQuizStatusBubble("题库已经打开啦，选一组开始吧。");
-  }
+  // Normal study guidance is handled by the launch/patrol state machine. A
+  // persistent status bubble here would duplicate those reminders.
+  setYuQuizStatusBubble("");
 }
 
 async function fetchYuQuizJson(path: string, required = true): Promise<Record<string, unknown> | undefined> {
@@ -1230,6 +1267,7 @@ async function evaluateSchedule(announceMissed: boolean): Promise<void> {
     emitPairedAction("missed", "failed", lines.missed, voicePools.missed, undefined, 1_850);
   }
   if (!result.pendingCheckIn) {
+    maybePlayHourlyChatter(now);
     manageRoaming(now);
     if (!roamingMode?.startsWith("strong")) await maybeManageStudyLaunch(now);
     if (activePromptType !== "study-launch" && !roamingMode?.startsWith("strong")) maybePromptIncompleteTasks(now);
@@ -1238,15 +1276,34 @@ async function evaluateSchedule(announceMissed: boolean): Promise<void> {
   sendState();
 }
 
+function maybePlayHourlyChatter(now: Date): void {
+  const group = HOURLY_CHATTER_HOURS.get(now.getHours());
+  if (!group || now.getMinutes() !== 0 || now.getSeconds() * 1_000 + now.getMilliseconds() >= HOURLY_CHATTER_WINDOW_MS) return;
+  const key = `${localDateKey(now)}:${String(now.getHours()).padStart(2, "0")}`;
+  if (lastHourlyChatterKey === key) return;
+  if (activePromptType || bubblePromptActive || roamingMode?.startsWith("strong") || dragging || centerAttentionActive) return;
+  if (panelWindow?.isVisible() || petTravel || powerMonitor.getSystemIdleTime() > 180) return;
+  if (strictStudyPeriodAt(now) && !effectiveStudyIsActive(now)) return;
+
+  const pool = hourlyChatter.filter((entry) => entry.group === group);
+  const groupHours = HOURLY_GROUP_HOURS.get(group) ?? [];
+  const slotIndex = groupHours.indexOf(now.getHours());
+  if (pool.length === 0 || slotIndex < 0) return;
+  const dayNumber = Math.floor(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()) / 86_400_000);
+  const index = (dayNumber * groupHours.length + slotIndex) % pool.length;
+  const entry = pool[index];
+  if (!entry) return;
+
+  lastHourlyChatterKey = key;
+  const voice = existsSync(join(runtimeVoiceDirectory, `${entry.id}.mp3`)) ? entry.id : undefined;
+  emitAction(entry.animation, entry.message, undefined, 2_800, voice);
+}
+
 function effectiveStudyIsActive(now: Date): boolean {
   if (studyState.activeSessionStartedAt) return true;
   const snapshot = yuQuizRuntime.snapshot;
   const mode = snapshot?.studyState ?? (snapshot?.isLearning ? "learning" : "ready");
-  if (mode !== "learning" && mode !== "consulting") return false;
-  return Boolean(
-    (yuQuizLearningSince && now.getTime() - yuQuizLearningSince >= YUQUIZ_STABLE_START_MS)
-    || (lastYuQuizAnswerAt && now.getTime() - lastYuQuizAnswerAt <= SUPERVISION_RESTART_MS),
-  );
+  return mode === "learning" || mode === "consulting";
 }
 
 function meaningfulActivityTime(): number {
@@ -1290,7 +1347,7 @@ function manageRoaming(now: Date): void {
     const activityAt = meaningfulActivityTime();
     const completedAtValue = getDay(studyState, date).studyLaunches[strict.period]?.completedAt;
     const completedAt = completedAtValue ? new Date(completedAtValue).getTime() : 0;
-    const launchCompleted = Boolean(completedAt && completedAt <= now.getTime() - YUQUIZ_STABLE_START_MS);
+    const launchCompleted = Boolean(completedAt && completedAt <= now.getTime());
     const snapshotMode = yuQuizRuntime.snapshot?.studyState;
     const recoveredPausedStudy = snapshotMode === "paused" && activityAt >= strict.startedAt && activityAt <= now.getTime();
     const studied = studiedStrictPeriods.has(strict.key)
@@ -1299,11 +1356,11 @@ function manageRoaming(now: Date): void {
     if (studied) {
       studiedStrictPeriods.add(strict.key);
       const inactiveSince = Math.max(lastEffectiveStudyAt, activityAt, strict.startedAt);
-      if (now.getTime() - inactiveSince < SUPERVISION_RESTART_MS) {
+      if (now.getTime() - inactiveSince < STUDY_PAUSE_PATROL_GRACE_MS) {
         if (roamingMode?.startsWith("strong")) stopRoaming(false);
         return;
       }
-      startRoaming("strong-return", inactiveSince + SUPERVISION_RESTART_MS);
+      startRoaming("strong-return", inactiveSince + STUDY_PAUSE_PATROL_GRACE_MS);
       return;
     }
     startRoaming("strong-start", strict.startedAt + STUDY_LAUNCH_GRACE_MS);
@@ -1345,9 +1402,8 @@ function restoreMovementAfterCheckIn(): void {
 function strongPatrolVoice(mode: Exclude<RoamingMode, "night">, now = new Date()): { key: string; pool: readonly VoiceVariant[]; tier: SupervisionTier } {
   const tier = supervisionTierForElapsed(now.getTime() - roamingEscalationStartedAt);
   if (mode === "strong-return") {
-    return tier === "angry" || tier === "final"
-      ? { key: "patrol-return-angry", pool: supervisionVoices.returningAngry, tier }
-      : { key: "patrol-return", pool: supervisionVoices.returning, tier };
+    const gentleTier: SupervisionTier = tier === "playful" ? "playful" : "firm";
+    return { key: "patrol-return", pool: supervisionVoices.returning, tier: gentleTier };
   }
   if (tier === "final") return { key: "patrol-final", pool: supervisionVoices.startFinal, tier };
   if (tier === "angry") return { key: "patrol-angry", pool: supervisionVoices.startAngry, tier };
@@ -1435,7 +1491,9 @@ function finishRoamingStep(kind: "patrol" | "stroll"): void {
     if (roamingMode === "night") return;
     const selection = strongPatrolVoice(roamingMode);
     emitVoiceVariant(selection.key, selection.pool);
-    scheduleRoamingStep(strongPatrolStepDelay(selection.tier));
+    scheduleRoamingStep(roamingMode === "strong-return"
+      ? randomBetween(45_000, 75_000)
+      : strongPatrolStepDelay(selection.tier));
   } else {
     if (Math.random() < 0.42) emitVoiceVariant("night-stroll", supervisionVoices.night);
     scheduleRoamingStep(randomBetween(35_000, 80_000));
@@ -1466,7 +1524,7 @@ async function maybeManageStudyLaunch(now: Date): Promise<void> {
   if (record.ritualStartedAt) {
     const elapsed = now.getTime() - new Date(record.ritualStartedAt).getTime();
     if (elapsed < STUDY_LAUNCH_RITUAL_MS) {
-      setStudyLaunchStatusBubble("我还在这儿。先完成第一题，后面就交给你的状态。");
+      setStudyLaunchStatusBubble("我还在这儿。打开一道题或一段教材，我们就算正式开始。");
       return;
     }
     if (!record.finalPromptedAt && activePromptType !== "check-in") {
@@ -1546,15 +1604,19 @@ function showStudyLaunchPrompt(
   const paired = !final && !repeated
     ? choosePaired(`studyLaunch-${period}`, lines.studyLaunchPrompt, voicePools.launchPrompt)
     : undefined;
+  const repeatedPaired = repeated
+    ? chooseVariant(`studyLaunchReturn-${period}`, functionalVoicePool("study-launch-return"))
+    : undefined;
+  const promptVoice = paired?.voice ?? repeatedPaired?.voice;
   petWindow?.webContents.send("xiaolu:prompt", {
     id: key,
     type: "study-launch",
     message: paired?.message ?? (repeated
-      ? chooseLine(`studyLaunchReturn-${period}`, lines.studyLaunchReturn)
+      ? repeatedPaired?.message ?? lines.studyLaunchReturn[0]
       : final
-        ? "我还在等你。现在做第一题，今天就不算被拖延带走。"
+        ? "我还在等你。现在打开一道题或一段教材，今天就不算被拖延带走。"
         : lines.studyLaunchPrompt[0]),
-    ...(paired ? { voice: paired.voice } : {}),
+    ...(promptVoice ? { voice: promptVoice } : {}),
     actions,
   });
   syncPetMousePassthrough();
@@ -1594,38 +1656,16 @@ function canSpeakStudyReminder(): boolean {
   return powerMonitor.getSystemIdleTime() <= 120 && activePromptType !== "check-in";
 }
 
-function maybeRemindYuQuizStall(snapshot: YuQuizSnapshot, now: Date): void {
-  if (!strictStudyPeriodAt(now)) {
-    lastYuQuizStallReminderAt = 0;
-    return;
-  }
-  const mode = snapshot.studyState ?? (snapshot.isLearning ? "learning" : "ready");
-  if (!snapshot.pageOpen || mode !== "paused" || snapshot.currentView === "home") {
-    lastYuQuizStallReminderAt = 0;
-    return;
-  }
-  const activityAt = snapshot.lastMeaningfulActivityAt ?? snapshot.lastActivityAt;
-  const activityTime = activityAt ? new Date(activityAt).getTime() : Number.NaN;
-  if (!Number.isFinite(activityTime) || now.getTime() - activityTime < YUQUIZ_STALL_REMINDER_MS) return;
-  if (!canSpeakStudyReminder() || activePromptType === "study-launch") return;
-  if (lastYuQuizStallReminderAt && now.getTime() - lastYuQuizStallReminderAt < YUQUIZ_STALL_REMINDER_MS) return;
-  lastYuQuizStallReminderAt = now.getTime();
-  const present = () => emitAction(
-      "review",
-      chooseLine("yuQuizStalled", lines.yuQuizStalled),
-      undefined,
-      2_800,
-    );
-  if (!requestCenterAttention(present)) present();
-}
-
-async function completeOrganicStudyLaunch(now: Date): Promise<void> {
+async function completeOrganicStudyLaunch(now: Date): Promise<boolean> {
   const period = studyLaunchPeriodAt(now);
-  if (!period) return;
+  if (!period) return false;
   const record = getDay(studyState, localDateKey(now)).studyLaunches[period];
-  if (record?.completedAt || record?.skippedAt || record?.ritualStartedAt) return;
-  studyState = completeStudyLaunch(studyState, period, "organic", now);
+  if (record?.completedAt || record?.skippedAt) return false;
+  studyState = completeStudyLaunch(studyState, period, record?.source ?? "organic", now);
+  if (activePromptType === "study-launch") clearActivePrompt();
+  setStudyLaunchStatusBubble("");
   await persistState();
+  return true;
 }
 
 async function completeActiveStudyLaunch(now: Date): Promise<boolean> {
@@ -1660,9 +1700,10 @@ function maybePromptIncompleteTasks(now: Date): void {
   const key = `${localDateKey(now)}:tasks:${reminderSlot}`;
   studyState = markTaskReminderShown(studyState, reminderSlot, now);
   void persistState();
-  const pool = reminderSlot === "21:00"
-    ? [`今天还有 ${incompleteCount} 件事没划掉，要一起看一眼吗？`, `还有 ${incompleteCount} 件小事留在今天，我们去看看吧。`, `收尾前，还有 ${incompleteCount} 项任务在等你。`]
-    : [`还有 ${incompleteCount} 件事没有完成，需要再确认一下吗？`, `睡前再看一眼吧，今天还留着 ${incompleteCount} 项任务。`, `我再轻轻提醒一次，还有 ${incompleteCount} 件事没划掉。`];
+  const paired = chooseVariant(
+    `taskReminder-${reminderSlot}`,
+    functionalVoicePool(reminderSlot === "21:00" ? "task-reminder-21" : "task-reminder-22"),
+  );
   activePromptKey = key;
   activePromptType = "task-reminder";
   activePromptExpiresAt = now.getTime() + 25 * 60_000;
@@ -1671,7 +1712,8 @@ function maybePromptIncompleteTasks(now: Date): void {
     id: key,
     type: "task-reminder",
     label: "看任务",
-    message: chooseLine(`taskReminder-${reminderSlot}`, pool),
+    message: paired.message,
+    voice: paired.voice,
     expiresAt: new Date(activePromptExpiresAt).toISOString(),
   });
 }
@@ -1728,13 +1770,29 @@ function scheduleNextSettlementAction(now = new Date()): void {
 
 function playSettlementAction(report: DailyReport, announce: boolean): void {
   if (report.selfCompleted && report.friendCompleted) {
-    emitAction("jumping", announce ? "我们都完成啦，这枚双人书签要好好收着。" : undefined, announce ? "✦" : undefined, 1_900, announce ? "settlement-together-1" : undefined);
+    if (announce) emitVoiceVariant("settlement-together", [
+      { voice: "settlement-together-1", message: "我们都完成啦，这枚双人书签要好好收着。", animation: "jumping" },
+      ...functionalVoicePool("settlement-extra").filter((entry) => entry.voice.startsWith("settlement-together-")),
+    ], "✦");
+    else emitAction("jumping", undefined, undefined, 1_900);
   } else if (report.selfCompleted && !report.friendCompleted) {
-    emitAction("review", announce ? "你的这份完成了，双人书签留给下一次一起赢。" : undefined, undefined, 1_750, announce ? "settlement-self-1" : undefined);
+    if (announce) emitVoiceVariant("settlement-self", [
+      { voice: "settlement-self-1", message: "你的这份完成了，双人书签留给下一次一起赢。", animation: "review" },
+      ...functionalVoicePool("settlement-extra").filter((entry) => entry.voice.startsWith("settlement-self-")),
+    ]);
+    else emitAction("review", undefined, undefined, 1_750);
   } else if (!report.selfCompleted && report.friendCompleted) {
-    emitAction("waiting", announce ? "她完成了今天的约定，明天继续一起走吧。" : undefined, undefined, 1_750, announce ? "settlement-friend-1" : undefined);
+    if (announce) emitVoiceVariant("settlement-friend", [
+      { voice: "settlement-friend-1", message: "她完成了今天的约定，明天继续一起走吧。", animation: "waiting" },
+      ...functionalVoicePool("settlement-extra").filter((entry) => entry.voice.startsWith("settlement-friend-")),
+    ]);
+    else emitAction("waiting", undefined, undefined, 1_750);
   } else {
-    emitAction("idle", announce ? "今天先好好留档，双人书签明天再一起争取。" : undefined, undefined, 1_750, announce ? "settlement-none-1" : undefined);
+    if (announce) emitVoiceVariant("settlement-none", [
+      { voice: "settlement-none-1", message: "今天先好好留档，双人书签明天再一起争取。", animation: "idle" },
+      ...functionalVoicePool("settlement-extra").filter((entry) => entry.voice.startsWith("settlement-none-")),
+    ]);
+    else emitAction("idle", undefined, undefined, 1_750);
   }
 }
 

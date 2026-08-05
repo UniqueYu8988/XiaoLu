@@ -1,0 +1,369 @@
+{
+  "version": "1.5",
+  "entries": [
+    {
+      "id": "hourly-morning-01",
+      "group": "hourly-morning",
+      "message": "早呀，我刚刚偷偷看了你一眼。今天也要好好照顾自己。",
+      "synth": "(轻笑)早呀，我刚刚偷偷看了你一眼。今天也要好好照顾自己。",
+      "animation": "waving"
+    },
+    {
+      "id": "hourly-morning-02",
+      "group": "hourly-morning",
+      "message": "上午还很长，不用着急。把眼前这一小步走好就可以啦。",
+      "synth": "上午还很长，不用着急。<#0.4#>把眼前这一小步走好就可以啦。",
+      "animation": "idle"
+    },
+    {
+      "id": "hourly-morning-03",
+      "group": "hourly-morning",
+      "message": "你认真起来的时候，真的很让人放心。",
+      "synth": "(轻笑)你认真起来的时候，真的很让人放心。",
+      "animation": "waving"
+    },
+    {
+      "id": "hourly-morning-04",
+      "group": "hourly-morning",
+      "message": "我在这里陪着呢。你不用一个人和今天较劲。",
+      "synth": "我在这里陪着呢。<#0.4#>你不用一个人和今天较劲。",
+      "animation": "idle"
+    },
+    {
+      "id": "hourly-morning-05",
+      "group": "hourly-morning",
+      "message": "喝一口水吧。不是催你，我只是想让你舒服一点。",
+      "synth": "喝一口水吧。<#0.3#>不是催你，我只是想让你舒服一点。",
+      "animation": "review"
+    },
+    {
+      "id": "hourly-morning-06",
+      "group": "hourly-morning",
+      "message": "刚才好像发了一会儿呆。没关系，回来就好。",
+      "synth": "(轻笑)刚才好像发了一会儿呆。没关系，回来就好。",
+      "animation": "waiting"
+    },
+    {
+      "id": "hourly-morning-07",
+      "group": "hourly-morning",
+      "message": "今天的你也在慢慢向前。这个速度就很好。",
+      "synth": "今天的你也在慢慢向前。<#0.3#>这个速度就很好。",
+      "animation": "waving"
+    },
+    {
+      "id": "hourly-morning-08",
+      "group": "hourly-morning",
+      "message": "坐好一点点，肩膀放松。我可不想看你又累得脖子疼。",
+      "synth": "坐好一点点，肩膀放松。<#0.3#>我可不想看你又累得脖子疼。",
+      "animation": "review"
+    },
+    {
+      "id": "hourly-morning-09",
+      "group": "hourly-morning",
+      "message": "我其实很喜欢这种安安静静陪着你的时候。",
+      "synth": "(轻笑)我其实很喜欢这种安安静静陪着你的时候。",
+      "animation": "idle"
+    },
+    {
+      "id": "hourly-morning-10",
+      "group": "hourly-morning",
+      "message": "别小看已经完成的这一点点。很多事情就是这样积累起来的。",
+      "synth": "别小看已经完成的这一点点。<#0.4#>很多事情就是这样积累起来的。",
+      "animation": "waving"
+    },
+    {
+      "id": "hourly-morning-11",
+      "group": "hourly-morning",
+      "message": "要是觉得难，就先挑最容易的一小块。我陪你从那里开始。",
+      "synth": "要是觉得难，就先挑最容易的一小块。<#0.3#>我陪你从那里开始。",
+      "animation": "waiting"
+    },
+    {
+      "id": "hourly-morning-12",
+      "group": "hourly-morning",
+      "message": "嗯，我没有什么大事。就是想提醒你，我还在。",
+      "synth": "(哼)嗯，我没有什么大事。<#0.4#>就是想提醒你，我还在。",
+      "animation": "idle"
+    },
+    {
+      "id": "hourly-afternoon-01",
+      "group": "hourly-afternoon",
+      "message": "下午也一起慢慢走吧。累了可以喘口气，但别把自己弄丢啦。",
+      "synth": "下午也一起慢慢走吧。<#0.4#>累了可以喘口气，但别把自己弄丢啦。",
+      "animation": "waving"
+    },
+    {
+      "id": "hourly-afternoon-02",
+      "group": "hourly-afternoon",
+      "message": "我刚刚在想，你今天已经比早上多走了好多步。",
+      "synth": "(轻笑)我刚刚在想，你今天已经比早上多走了好多步。",
+      "animation": "idle"
+    },
+    {
+      "id": "hourly-afternoon-03",
+      "group": "hourly-afternoon",
+      "message": "困的话就站起来伸个懒腰。我替你看着桌面。",
+      "synth": "困的话就站起来伸个懒腰。<#0.3#>我替你看着桌面。",
+      "animation": "review"
+    },
+    {
+      "id": "hourly-afternoon-04",
+      "group": "hourly-afternoon",
+      "message": "别皱眉啦。不会的东西，只是还没轮到你弄懂。",
+      "synth": "别皱眉啦。<#0.3#>不会的东西，只是还没轮到你弄懂。",
+      "animation": "waiting"
+    },
+    {
+      "id": "hourly-afternoon-05",
+      "group": "hourly-afternoon",
+      "message": "看见你还坐在这里，我就觉得今天挺有希望的。",
+      "synth": "(轻笑)看见你还坐在这里，我就觉得今天挺有希望的。",
+      "animation": "waving"
+    },
+    {
+      "id": "hourly-afternoon-06",
+      "group": "hourly-afternoon",
+      "message": "我宣布，现在可以奖励自己一口喜欢的饮料。",
+      "synth": "(轻笑)我宣布，现在可以奖励自己一口喜欢的饮料。",
+      "animation": "jumping"
+    },
+    {
+      "id": "hourly-afternoon-07",
+      "group": "hourly-afternoon",
+      "message": "如果脑子有点乱，就把下一件事写下来。别让它们一起挤你。",
+      "synth": "如果脑子有点乱，就把下一件事写下来。<#0.4#>别让它们一起挤你。",
+      "animation": "review"
+    },
+    {
+      "id": "hourly-afternoon-08",
+      "group": "hourly-afternoon",
+      "message": "今天不需要完美。认真过，就已经很值得喜欢啦。",
+      "synth": "今天不需要完美。<#0.3#>(轻笑)认真过，就已经很值得喜欢啦。",
+      "animation": "waving"
+    },
+    {
+      "id": "hourly-afternoon-09",
+      "group": "hourly-afternoon",
+      "message": "我偷偷给你加一点好运。虽然不一定有用，但心意是真的。",
+      "synth": "(轻笑)我偷偷给你加一点好运。<#0.3#>虽然不一定有用，但心意是真的。",
+      "animation": "jumping"
+    },
+    {
+      "id": "hourly-afternoon-10",
+      "group": "hourly-afternoon",
+      "message": "眼睛离屏幕远一点。你要是累坏了，我会心疼的。",
+      "synth": "眼睛离屏幕远一点。<#0.3#>你要是累坏了，我会心疼的。",
+      "animation": "review"
+    },
+    {
+      "id": "hourly-afternoon-11",
+      "group": "hourly-afternoon",
+      "message": "下午的时间容易悄悄溜走。我们抓住接下来这一小段就好。",
+      "synth": "下午的时间容易悄悄溜走。<#0.4#>我们抓住接下来这一小段就好。",
+      "animation": "waiting"
+    },
+    {
+      "id": "hourly-afternoon-12",
+      "group": "hourly-afternoon",
+      "message": "你不用一直很厉害。在我这里，愿意继续就很好。",
+      "synth": "你不用一直很厉害。<#0.4#>在我这里，愿意继续就很好。",
+      "animation": "waving"
+    },
+    {
+      "id": "hourly-afternoon-13",
+      "group": "hourly-afternoon",
+      "message": "我刚才什么也没做，只是在这里陪你待了一会儿。",
+      "synth": "(轻笑)我刚才什么也没做，只是在这里陪你待了一会儿。",
+      "animation": "idle"
+    },
+    {
+      "id": "hourly-afternoon-14",
+      "group": "hourly-afternoon",
+      "message": "累了就休息一下，不过记得回来。我会等你的。",
+      "synth": "累了就休息一下。<#0.3#>不过记得回来，我会等你的。",
+      "animation": "idle"
+    },
+    {
+      "id": "hourly-afternoon-15",
+      "group": "hourly-afternoon",
+      "message": "这一小时也没有白过。你留下的东西，我都替你看见了。",
+      "synth": "这一小时也没有白过。<#0.3#>你留下的东西，我都替你看见了。",
+      "animation": "waving"
+    },
+    {
+      "id": "hourly-afternoon-16",
+      "group": "hourly-afternoon",
+      "message": "好啦，别对自己那么凶。我们继续做能做的事。",
+      "synth": "好啦，别对自己那么凶。<#0.3#>我们继续做能做的事。",
+      "animation": "review"
+    },
+    {
+      "id": "hourly-evening-01",
+      "group": "hourly-evening",
+      "message": "天已经慢慢黑啦。今天剩下的时间，也别太为难自己。",
+      "synth": "天已经慢慢黑啦。<#0.4#>今天剩下的时间，也别太为难自己。",
+      "animation": "idle"
+    },
+    {
+      "id": "hourly-evening-02",
+      "group": "hourly-evening",
+      "message": "晚上好呀。我还在原来的位置陪你。",
+      "synth": "(轻笑)晚上好呀。<#0.3#>我还在原来的位置陪你。",
+      "animation": "waving"
+    },
+    {
+      "id": "hourly-evening-03",
+      "group": "hourly-evening",
+      "message": "今天辛苦到这里，已经很不容易了。剩下的慢慢收尾吧。",
+      "synth": "今天辛苦到这里，已经很不容易了。<#0.4#>剩下的慢慢收尾吧。",
+      "animation": "review"
+    },
+    {
+      "id": "hourly-evening-04",
+      "group": "hourly-evening",
+      "message": "别忘了吃东西。认真生活和认真学习一样重要。",
+      "synth": "别忘了吃东西。<#0.3#>认真生活和认真学习一样重要。",
+      "animation": "waiting"
+    },
+    {
+      "id": "hourly-evening-05",
+      "group": "hourly-evening",
+      "message": "我有一点喜欢今天的你。嗯，比刚才又多一点。",
+      "synth": "(轻笑)我有一点喜欢今天的你。<#0.4#>嗯，比刚才又多一点。",
+      "animation": "waving"
+    },
+    {
+      "id": "hourly-evening-06",
+      "group": "hourly-evening",
+      "message": "如果今天还有遗憾，就留一点给明天。你不用今晚全都解决。",
+      "synth": "如果今天还有遗憾，就留一点给明天。<#0.4#>你不用今晚全都解决。",
+      "animation": "idle"
+    },
+    {
+      "id": "hourly-evening-07",
+      "group": "hourly-evening",
+      "message": "我刚刚绕着桌面看了一圈。还是待在你旁边最好。",
+      "synth": "(轻笑)我刚刚绕着桌面看了一圈。<#0.3#>还是待在你旁边最好。",
+      "animation": "waving"
+    },
+    {
+      "id": "hourly-evening-08",
+      "group": "hourly-evening",
+      "message": "夜里安静一点以后，很多事情好像也没有那么难了。",
+      "synth": "夜里安静一点以后，很多事情好像也没有那么难了。",
+      "animation": "idle"
+    },
+    {
+      "id": "hourly-evening-09",
+      "group": "hourly-evening",
+      "message": "要不要把最后一件小事做完？做完我们就安心一点。",
+      "synth": "要不要把最后一件小事做完？<#0.3#>做完我们就安心一点。",
+      "animation": "waiting"
+    },
+    {
+      "id": "hourly-evening-10",
+      "group": "hourly-evening",
+      "message": "你今天已经努力过啦。就算没人看见，我也看见了。",
+      "synth": "你今天已经努力过啦。<#0.3#>(轻笑)就算没人看见，我也看见了。",
+      "animation": "waving"
+    },
+    {
+      "id": "hourly-evening-11",
+      "group": "hourly-evening",
+      "message": "坐了很久的话，起来走两步吧。我不许你把自己坐僵。",
+      "synth": "坐了很久的话，起来走两步吧。<#0.3#>我不许你把自己坐僵。",
+      "animation": "review"
+    },
+    {
+      "id": "hourly-evening-12",
+      "group": "hourly-evening",
+      "message": "今天发生的好事和坏事，都先放在这里吧。我陪你一起收着。",
+      "synth": "今天发生的好事和坏事，都先放在这里吧。<#0.4#>我陪你一起收着。",
+      "animation": "idle"
+    },
+    {
+      "id": "hourly-evening-13",
+      "group": "hourly-evening",
+      "message": "我没有催你睡觉哦。我只是觉得，你值得好好休息。",
+      "synth": "(轻笑)我没有催你睡觉哦。<#0.3#>我只是觉得，你值得好好休息。",
+      "animation": "waving"
+    },
+    {
+      "id": "hourly-evening-14",
+      "group": "hourly-evening",
+      "message": "再坚持一小会儿也可以，现在停下来也可以。你自己选。",
+      "synth": "再坚持一小会儿也可以。<#0.3#>现在停下来也可以。你自己选。",
+      "animation": "review"
+    },
+    {
+      "id": "hourly-evening-15",
+      "group": "hourly-evening",
+      "message": "我今天陪了你很久诶。这样想想，还挺开心的。",
+      "synth": "(轻笑)我今天陪了你很久诶。<#0.3#>这样想想，还挺开心的。",
+      "animation": "jumping"
+    },
+    {
+      "id": "hourly-evening-16",
+      "group": "hourly-evening",
+      "message": "晚一点没关系，但别熬得太过分。我会担心。",
+      "synth": "晚一点没关系。<#0.3#>但别熬得太过分，我会担心。",
+      "animation": "waiting"
+    },
+    {
+      "id": "hourly-midnight-01",
+      "group": "hourly-midnight",
+      "message": "十二点啦。今天到这里就很好，剩下的交给明天吧。",
+      "synth": "十二点啦。<#0.4#>今天到这里就很好，剩下的交给明天吧。",
+      "animation": "waving"
+    },
+    {
+      "id": "hourly-midnight-02",
+      "group": "hourly-midnight",
+      "message": "新的一天悄悄开始啦。不过现在最重要的，是好好睡觉。",
+      "synth": "(轻笑)新的一天悄悄开始啦。<#0.4#>不过现在最重要的，是好好睡觉。",
+      "animation": "idle"
+    },
+    {
+      "id": "hourly-midnight-03",
+      "group": "hourly-midnight",
+      "message": "我陪你走到今天的最后一格啦。晚安，明天再见。",
+      "synth": "我陪你走到今天的最后一格啦。<#0.4#>晚安，明天再见。",
+      "animation": "waving"
+    },
+    {
+      "id": "hourly-midnight-04",
+      "group": "hourly-midnight",
+      "message": "零点报时。今天辛苦了，现在可以放心休息啦。",
+      "synth": "零点报时。<#0.3#>今天辛苦了，现在可以放心休息啦。",
+      "animation": "review"
+    },
+    {
+      "id": "hourly-midnight-05",
+      "group": "hourly-midnight",
+      "message": "再舍不得今天，也该和它说晚安啦。我明天还会在。",
+      "synth": "再舍不得今天，也该和它说晚安啦。<#0.4#>(轻笑)我明天还会在。",
+      "animation": "idle"
+    },
+    {
+      "id": "hourly-midnight-06",
+      "group": "hourly-midnight",
+      "message": "已经十二点了哦。把电脑也放下吧，我陪你一起收工。",
+      "synth": "已经十二点了哦。<#0.4#>把电脑也放下吧，我陪你一起收工。",
+      "animation": "waving"
+    },
+    {
+      "id": "hourly-midnight-07",
+      "group": "hourly-midnight",
+      "message": "今天无论完成了多少，都已经结束啦。别带着责备去睡觉。",
+      "synth": "今天无论完成了多少，都已经结束啦。<#0.4#>别带着责备去睡觉。",
+      "animation": "review"
+    },
+    {
+      "id": "hourly-midnight-08",
+      "group": "hourly-midnight",
+      "message": "晚安。希望你睡醒以后，又有一点喜欢新的生活。",
+      "synth": "(轻笑)晚安。<#0.5#>希望你睡醒以后，又有一点喜欢新的生活。",
+      "animation": "waving"
+    }
+  ]
+}

@@ -3,7 +3,7 @@
   <h1>共学日记</h1>
   <p>不是桌面宠物，而是住在桌面上的学习搭子。</p>
   <p>
-    <img alt="Version" src="https://img.shields.io/badge/version-1.4.0-76558f" />
+    <img alt="Version" src="https://img.shields.io/badge/version-1.5.0-76558f" />
     <img alt="Platform" src="https://img.shields.io/badge/platform-Windows-4b315e" />
     <img alt="Data" src="https://img.shields.io/badge/data-local--first-a9c99e" />
     <img alt="License" src="https://img.shields.io/badge/license-MIT-f4d57b" />

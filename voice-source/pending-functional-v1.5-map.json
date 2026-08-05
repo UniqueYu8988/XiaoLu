@@ -1,0 +1,244 @@
+{
+  "version": "1.5",
+  "batch": "functional",
+  "entries": [
+    {
+      "id": "yuquiz-pause-gentle-1",
+      "group": "yuquiz-pause-gentle",
+      "message": "已经安静十分钟啦。资料看完的话，我们就回来接着学吧。",
+      "synth": "已经安静十分钟啦。<#0.4#>资料看完的话，我们就回来接着学吧。",
+      "animation": "review"
+    },
+    {
+      "id": "yuquiz-pause-gentle-2",
+      "group": "yuquiz-pause-gentle",
+      "message": "我先轻轻叫你一下。还在查资料就慢慢来，看完记得回来。",
+      "synth": "我先轻轻叫你一下。<#0.4#>还在查资料就慢慢来，看完记得回来。",
+      "animation": "review"
+    },
+    {
+      "id": "yuquiz-pause-gentle-3",
+      "group": "yuquiz-pause-gentle",
+      "message": "这一段先替你停好啦。准备好了，我们再从刚才那里继续。",
+      "synth": "这一段先替你停好啦。<#0.4#>准备好了，我们再从刚才那里继续。",
+      "animation": "waiting"
+    },
+    {
+      "id": "yuquiz-pause-gentle-4",
+      "group": "yuquiz-pause-gentle",
+      "message": "是不是遇到难懂的地方啦？不用急，我等你想清楚。",
+      "synth": "是不是遇到难懂的地方啦？<#0.4#>不用急，我等你想清楚。",
+      "animation": "waiting"
+    },
+    {
+      "id": "task-reminder-21-1",
+      "group": "task-reminder-21",
+      "message": "今天还有几件事没划掉，要一起看一眼吗？",
+      "synth": "今天还有几件事没划掉。<#0.3#>要一起看一眼吗？",
+      "animation": "waiting"
+    },
+    {
+      "id": "task-reminder-21-2",
+      "group": "task-reminder-21",
+      "message": "收尾以前，我们看看今天还留下了什么吧。",
+      "synth": "收尾以前，我们看看今天还留下了什么吧。",
+      "animation": "review"
+    },
+    {
+      "id": "task-reminder-21-3",
+      "group": "task-reminder-21",
+      "message": "任务栏里还有小尾巴哦。现在处理，还是认真留到明天？",
+      "synth": "(轻笑)任务栏里还有小尾巴哦。<#0.3#>现在处理，还是认真留到明天？",
+      "animation": "waiting"
+    },
+    {
+      "id": "task-reminder-21-4",
+      "group": "task-reminder-21",
+      "message": "我来提醒一次就好。今天没完成的事情，记得看一眼。",
+      "synth": "我来提醒一次就好。<#0.4#>今天没完成的事情，记得看一眼。",
+      "animation": "review"
+    },
+    {
+      "id": "task-reminder-22-1",
+      "group": "task-reminder-22",
+      "message": "睡前再看一眼任务吧。别让重要的事情悄悄漏掉。",
+      "synth": "睡前再看一眼任务吧。<#0.4#>别让重要的事情悄悄漏掉。",
+      "animation": "waiting"
+    },
+    {
+      "id": "task-reminder-22-2",
+      "group": "task-reminder-22",
+      "message": "今天还有没划掉的事情。要不要决定一下怎么安置它们？",
+      "synth": "今天还有没划掉的事情。<#0.4#>要不要决定一下怎么安置它们？",
+      "animation": "review"
+    },
+    {
+      "id": "task-reminder-22-3",
+      "group": "task-reminder-22",
+      "message": "我最后再轻轻提醒一次。任务栏还没有完全收好。",
+      "synth": "我最后再轻轻提醒一次。<#0.4#>任务栏还没有完全收好。",
+      "animation": "waiting"
+    },
+    {
+      "id": "task-reminder-22-4",
+      "group": "task-reminder-22",
+      "message": "没有做完也可以，但别假装没看见。我们去确认一下吧。",
+      "synth": "没有做完也可以。<#0.3#>但别假装没看见，我们去确认一下吧。",
+      "animation": "review"
+    },
+    {
+      "id": "study-launch-return-1",
+      "group": "study-launch-return",
+      "message": "学习台还在等你。打开一道题或一段教材，我就不再催啦。",
+      "synth": "学习台还在等你。<#0.4#>打开一道题或一段教材，我就不再催啦。",
+      "animation": "waiting"
+    },
+    {
+      "id": "study-launch-return-2",
+      "group": "study-launch-return",
+      "message": "别在门口停太久，我们进去学一点吧。",
+      "synth": "别在门口停太久。<#0.3#>我们进去学一点吧。",
+      "animation": "waiting"
+    },
+    {
+      "id": "study-launch-return-3",
+      "group": "study-launch-return",
+      "message": "再拉你一下。先进入具体内容，开始以后我就安静。",
+      "synth": "再拉你一下。<#0.4#>先进入具体内容，开始以后我就安静。",
+      "animation": "waiting"
+    },
+    {
+      "id": "study-launch-return-4",
+      "group": "study-launch-return",
+      "message": "不用先做好准备。把内容打开，我们就已经赢过拖延一点了。",
+      "synth": "不用先做好准备。<#0.4#>把内容打开，我们就已经赢过拖延一点了。",
+      "animation": "waving"
+    },
+    {
+      "id": "task-completed-3",
+      "group": "task-completed-extra",
+      "message": "又划掉一件。看吧，你一直都在往前走。",
+      "synth": "(轻笑)又划掉一件。<#0.3#>看吧，你一直都在往前走。",
+      "animation": "waving"
+    },
+    {
+      "id": "task-completed-4",
+      "group": "task-completed-extra",
+      "message": "这件也完成啦。我替你高兴一下。",
+      "synth": "这件也完成啦。<#0.3#>(轻笑)我替你高兴一下。",
+      "animation": "jumping"
+    },
+    {
+      "id": "task-completed-5",
+      "group": "task-completed-extra",
+      "message": "认真做完的事情，值得一个小小的对勾。",
+      "synth": "认真做完的事情，值得一个小小的对勾。",
+      "animation": "waving"
+    },
+    {
+      "id": "all-tasks-completed-2",
+      "group": "all-tasks-completed-extra",
+      "message": "今天列下的事情都完成啦。真的一件也没有落下。",
+      "synth": "(轻笑)今天列下的事情都完成啦。<#0.4#>真的一件也没有落下。",
+      "animation": "jumping"
+    },
+    {
+      "id": "all-tasks-completed-3",
+      "group": "all-tasks-completed-extra",
+      "message": "任务栏空空的啦。今天的你很可靠。",
+      "synth": "任务栏空空的啦。<#0.3#>(轻笑)今天的你很可靠。",
+      "animation": "jumping"
+    },
+    {
+      "id": "all-tasks-completed-4",
+      "group": "all-tasks-completed-extra",
+      "message": "全部完成！这一刻必须认真夸你一下。",
+      "synth": "(轻笑)全部完成！<#0.3#>这一刻必须认真夸你一下。",
+      "animation": "jumping"
+    },
+    {
+      "id": "all-tasks-completed-5",
+      "group": "all-tasks-completed-extra",
+      "message": "一件一件做完的感觉真好。我也跟着开心。",
+      "synth": "一件一件做完的感觉真好。<#0.3#>(轻笑)我也跟着开心。",
+      "animation": "waving"
+    },
+    {
+      "id": "yuquiz-set-complete-4",
+      "group": "yuquiz-set-complete-extra",
+      "message": "这一组也收好啦。你又多会了一点点。",
+      "synth": "这一组也收好啦。<#0.3#>你又多会了一点点。",
+      "animation": "waving"
+    },
+    {
+      "id": "yuquiz-set-complete-5",
+      "group": "yuquiz-set-complete-extra",
+      "message": "做完一整组啦。先看看成果，再决定下一步。",
+      "synth": "(轻笑)做完一整组啦。<#0.4#>先看看成果，再决定下一步。",
+      "animation": "jumping"
+    },
+    {
+      "id": "yuquiz-set-complete-6",
+      "group": "yuquiz-set-complete-extra",
+      "message": "不管对了多少，愿意把这一组走完就很棒。",
+      "synth": "不管对了多少。<#0.3#>愿意把这一组走完就很棒。",
+      "animation": "waving"
+    },
+    {
+      "id": "settlement-together-2",
+      "group": "settlement-extra",
+      "message": "我们都完成啦。今天这枚书签，是两个人一起赢下来的。",
+      "synth": "(轻笑)我们都完成啦。<#0.4#>今天这枚书签，是两个人一起赢下来的。",
+      "animation": "jumping"
+    },
+    {
+      "id": "settlement-together-3",
+      "group": "settlement-extra",
+      "message": "今天谁也没有掉队。把这枚双人书签好好收起来吧。",
+      "synth": "今天谁也没有掉队。<#0.4#>把这枚双人书签好好收起来吧。",
+      "animation": "jumping"
+    },
+    {
+      "id": "settlement-self-2",
+      "group": "settlement-extra",
+      "message": "你完成了今天的约定。双人书签，我们下次再一起赢。",
+      "synth": "你完成了今天的约定。<#0.4#>双人书签，我们下次再一起赢。",
+      "animation": "review"
+    },
+    {
+      "id": "settlement-self-3",
+      "group": "settlement-extra",
+      "message": "你的这一份已经认真完成啦。今天也值得被记住。",
+      "synth": "你的这一份已经认真完成啦。<#0.4#>今天也值得被记住。",
+      "animation": "waving"
+    },
+    {
+      "id": "settlement-friend-2",
+      "group": "settlement-extra",
+      "message": "她完成了今天的约定。你们明天再一起向前走。",
+      "synth": "她完成了今天的约定。<#0.4#>你们明天再一起向前走。",
+      "animation": "waiting"
+    },
+    {
+      "id": "settlement-friend-3",
+      "group": "settlement-extra",
+      "message": "她的这份努力已经记下来啦。你的下一次，也还来得及。",
+      "synth": "她的这份努力已经记下来啦。<#0.4#>你的下一次，也还来得及。",
+      "animation": "review"
+    },
+    {
+      "id": "settlement-none-2",
+      "group": "settlement-extra",
+      "message": "今天先好好留档。没赢到书签，也不代表这一天没有意义。",
+      "synth": "今天先好好留档。<#0.4#>没赢到书签，也不代表这一天没有意义。",
+      "animation": "idle"
+    },
+    {
+      "id": "settlement-none-3",
+      "group": "settlement-extra",
+      "message": "这枚书签先留给明天。今晚就别再责怪自己啦。",
+      "synth": "这枚书签先留给明天。<#0.4#>今晚就别再责怪自己啦。",
+      "animation": "review"
+    }
+  ]
+}

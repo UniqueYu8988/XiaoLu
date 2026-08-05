@@ -5,7 +5,12 @@ output/
 qa/
 tmp/
 .playwright-cli/
-voice-source/
+voice-source/*
+!voice-source/pending-voice-v1.5.json
+!voice-source/pending-hourly-v1.5.txt
+!voice-source/pending-hourly-v1.5-map.json
+!voice-source/pending-functional-v1.5.txt
+!voice-source/pending-functional-v1.5-map.json
 *.log
 __pycache__/
 *.pyc
