@@ -23,7 +23,7 @@ jobs:
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 9.15.9
+          version: 11.9.0
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -32,6 +32,8 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+        env:
+          PNPM_CONFIG_DANGEROUSLY_ALLOW_ALL_BUILDS: "true"
 
       - name: Verify project
         run: pnpm check
