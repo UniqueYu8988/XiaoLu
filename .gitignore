@@ -11,6 +11,8 @@ voice-source/*
 !voice-source/pending-hourly-v1.5-map.json
 !voice-source/pending-functional-v1.5.txt
 !voice-source/pending-functional-v1.5-map.json
+!voice-source/pending-goals-v1.6.txt
+!voice-source/pending-goals-v1.6-map.json
 *.log
 __pycache__/
 *.pyc

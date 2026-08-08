@@ -14,7 +14,7 @@ import {
   markStudyLaunchPrompted,
   normalizeStudyState,
   reconcileStudyState,
-  setBountyDefinition,
+  setAutomaticGoalTargets,
   setDailyTaskCompleted,
   setDailyTaskRecurring,
   setYuQuizIntegration,
@@ -24,6 +24,7 @@ import {
   setVoiceEnabled,
   setVoiceVolume,
   saveYuQuizSnapshot,
+  saveYuQuizNoteTotals,
   snoozeStudyLaunch,
   beginStudyLaunchRitual,
   completeStudyLaunch,
@@ -34,6 +35,7 @@ import {
   studyMsForDay,
   submitDailyReport,
   toggleStudy,
+  updateDailyReportNote,
 } from "../dist/game.js";
 
 const at = (hour, minute, day = 18) => new Date(2026, 6, day, hour, minute, 0, 0);
@@ -166,11 +168,17 @@ assert.equal(studyMsForDay(integratedState, date, at(15, 30)), 180 * 60_000);
 
 state = submitDailyReport(state, {
   problemCount: 42,
+  accuracy: 81.5,
+  noteEntries: 3,
+  noteCharacters: 426,
   note: "完成了一套练习",
   selfCompleted: true,
   friendCompleted: true,
 }, at(21, 2));
 assert.equal(state.days[date]?.report?.bookmark, "together");
+assert.equal(state.days[date]?.report?.accuracy, 81.5);
+assert.equal(state.days[date]?.report?.noteEntries, 3);
+assert.equal(state.days[date]?.report?.noteCharacters, 426);
 assert.equal(toggleStudy(state, at(21, 20)).messageKey, "day-closed");
 
 const summaries = daySummaries(state, at(21, 20));
@@ -179,6 +187,25 @@ assert.equal(summaries[0]?.report?.problemCount, 42);
 const stats = calculateStats(state, at(21, 20));
 assert.equal(stats.totalProblems, 42);
 assert.equal(stats.togetherBookmarks, 1);
+state = updateDailyReportNote(state, date, "后来补写的一句话", at(22, 0));
+assert.equal(state.days[date]?.report?.note, "后来补写的一句话");
+assert.equal(state.days[date]?.report?.problemCount, 42);
+
+const unknownTimeState = normalizeStudyState({
+  ...initialStudyState(at(8, 0)),
+  days: {
+    [date]: {
+      date,
+      studyTimeUnknown: true,
+      sessions: [],
+      checkIns: {},
+      tasks: [],
+      taskReminders: [],
+      studyLaunches: {},
+    },
+  },
+}, at(8, 0));
+assert.equal(daySummaries(unknownTimeState, at(8, 0))[0]?.studyTimeUnknown, true);
 
 const authoritativeYuQuizState = normalizeStudyState({
   version: 2,
@@ -194,6 +221,11 @@ const authoritativeYuQuizState = normalizeStudyState({
         todayQuestions: 84,
         todayCorrect: 53,
         todayAccuracy: 63.1,
+        todayNoteEntries: 4,
+        todayNoteCharacters: 518,
+        totalNoteEntries: 130,
+        totalNoteCharacters: 74880,
+        totalNoteFiles: 34,
         todayLearningSeconds: 5596,
         currentView: "home",
         isLearning: false,
@@ -222,11 +254,33 @@ const authoritativeYuQuizState = normalizeStudyState({
 }, at(23, 50));
 assert.equal(authoritativeYuQuizState.settings.yuQuizEventCursor, 47);
 assert.equal(authoritativeYuQuizState.days[date]?.yuQuiz?.todayQuestions, 84);
+assert.equal(authoritativeYuQuizState.days[date]?.yuQuiz?.todayNoteEntries, 4);
+assert.equal(authoritativeYuQuizState.days[date]?.yuQuiz?.todayNoteCharacters, 518);
+assert.equal(authoritativeYuQuizState.days[date]?.yuQuiz?.totalNoteEntries, 130);
+assert.equal(authoritativeYuQuizState.days[date]?.yuQuiz?.totalNoteCharacters, 74880);
+assert.equal(authoritativeYuQuizState.days[date]?.yuQuiz?.totalNoteFiles, 34);
 assert.equal(authoritativeYuQuizState.days[date]?.yuQuiz?.studyState, "ready");
 assert.equal(authoritativeYuQuizState.days[date]?.yuQuiz?.lastMeaningfulActivityAt, at(23, 35).toISOString());
 assert.equal(authoritativeYuQuizState.days[date]?.report?.problemCount, 84);
+assert.equal(authoritativeYuQuizState.days[date]?.report?.accuracy, 63.1);
+assert.equal(authoritativeYuQuizState.days[date]?.report?.noteEntries, 4);
+assert.equal(authoritativeYuQuizState.days[date]?.report?.noteCharacters, 518);
 assert.equal(daySummaries(authoritativeYuQuizState, at(23, 50))[0]?.problemCount, 84);
 assert.equal(calculateStats(authoritativeYuQuizState, at(23, 50)).totalProblems, 84);
+assert.equal(calculateStats(authoritativeYuQuizState, at(23, 50)).totalNoteEntries, 130);
+assert.equal(calculateStats(authoritativeYuQuizState, at(23, 50)).totalNoteCharacters, 74880);
+assert.equal(calculateStats(authoritativeYuQuizState, at(23, 50)).totalNoteFiles, 34);
+const noteTotalsState = saveYuQuizNoteTotals({
+  ...authoritativeYuQuizState,
+  settings: { ...authoritativeYuQuizState.settings, yuQuizIntegration: false },
+}, authoritativeYuQuizState.days[date].yuQuiz, at(23, 51));
+assert.deepEqual(noteTotalsState.noteTotals, {
+  entries: 130,
+  characters: 74880,
+  files: 34,
+  syncedAt: at(23, 40).toISOString(),
+});
+assert.equal(calculateStats(noteTotalsState, at(23, 51)).totalNoteCharacters, 74880);
 
 let taskState = initialStudyState(at(8, 0, 19));
 taskState = addDailyTask(taskState, "task-1", " 完成 第一章  ", at(8, 1, 19));
@@ -267,43 +321,75 @@ assert.equal(recurringState.recurringTasks.length, 0);
 recurringState = reconcileStudyState(recurringState, at(8, 0, 22)).state;
 assert.equal(recurringState.days[localDateKey(at(8, 0, 22))]?.tasks.length, 0);
 
-let bountyState = initialStudyState(at(8, 0, 19));
-bountyState = setBountyDefinition(bountyState, "self", "晨读二十分钟", at(8, 1, 19));
-const bountyDay19 = bountyState.days[localDateKey(at(8, 1, 19))]?.tasks.find((task) => task.bountySlot === "self");
-assert.equal(bountyDay19?.title, "晨读二十分钟");
-bountyState = setDailyTaskCompleted(bountyState, bountyDay19.id, true, at(8, 30, 19));
-bountyState = submitDailyReport(bountyState, {
-  problemCount: 0,
-  note: "",
-  selfCompleted: true,
-  friendCompleted: false,
-}, at(21, 0, 19));
-assert.equal(bountyState.days[localDateKey(at(21, 0, 19))]?.report?.bookmark, undefined);
-bountyState = reconcileStudyState(bountyState, at(8, 0, 20)).state;
-const bountyDay20 = bountyState.days[localDateKey(at(8, 0, 20))]?.tasks.find((task) => task.bountySlot === "self");
-assert.equal(bountyDay20?.title, "晨读二十分钟");
-assert.equal(bountyDay20?.completedAt, undefined);
-bountyState = editDailyTask(bountyState, bountyDay20.id, "晨读三十分钟", at(8, 1, 20));
-assert.equal(bountyState.bounties.self?.title, "晨读三十分钟");
-bountyState = setBountyDefinition(bountyState, "gift", "完成一篇阅读训练", at(8, 2, 20));
-const giftDay20 = bountyState.days[localDateKey(at(8, 2, 20))]?.tasks.find((task) => task.bountySlot === "gift");
-bountyState = setDailyTaskCompleted(bountyState, giftDay20.id, true, at(18, 0, 20));
-let bountyStats = calculateStats(bountyState, at(18, 1, 20));
-assert.equal(bountyStats.selfBountyBookmarks, 1);
-assert.equal(bountyStats.giftBountyBookmarks, 1);
-assert.equal(bountyStats.completedBounties, 2);
-bountyState = reconcileStudyState(bountyState, at(8, 0, 21)).state;
-const bountyDay21 = bountyState.days[localDateKey(at(8, 0, 21))]?.tasks.find((task) => task.bountySlot === "self");
-assert.equal(bountyDay21?.title, "晨读三十分钟");
-assert.equal(bountyState.days[localDateKey(at(8, 0, 21))]?.tasks.filter((task) => task.bountySlot).length, 2);
+let goalState = initialStudyState(at(8, 0, 19));
+goalState = setAutomaticGoalTargets(goalState, 60, 10, at(8, 1, 19));
+goalState = toggleStudy(goalState, at(8, 2, 19)).state;
+goalState = toggleStudy(goalState, at(9, 2, 19)).state;
+goalState = reconcileStudyState(goalState, at(9, 2, 19)).state;
+const goalDate19 = localDateKey(at(9, 2, 19));
+assert.ok(goalState.days[goalDate19]?.goals?.studyCompletedAt);
+assert.equal(goalState.days[goalDate19]?.goals?.questionsCompletedAt, undefined);
+goalState = setYuQuizIntegration(goalState, true, at(9, 3, 19));
+goalState = saveYuQuizSnapshot(goalState, {
+  date: goalDate19,
+  todayQuestions: 10,
+  todayCorrect: 8,
+  todayAccuracy: 80,
+  todayLearningSeconds: 0,
+  currentView: "quiz",
+  isLearning: true,
+  activeSession: true,
+  syncedAt: at(9, 4, 19).toISOString(),
+}, at(9, 4, 19));
+goalState = reconcileStudyState(goalState, at(9, 4, 19)).state;
+assert.ok(goalState.days[goalDate19]?.goals?.questionsCompletedAt);
+assert.ok(goalState.days[goalDate19]?.goals?.togetherCompletedAt);
+let goalStats = calculateStats(goalState, at(9, 4, 19));
+assert.equal(goalStats.selfBountyBookmarks, 1);
+assert.equal(goalStats.giftBountyBookmarks, 1);
+assert.equal(goalStats.togetherBookmarks, 1);
+assert.equal(goalStats.completedBounties, 2);
+assert.equal(goalStats.completedTasks, 2);
 
-let clearedBountyState = initialStudyState(at(9, 0, 19));
-clearedBountyState = setBountyDefinition(clearedBountyState, "gift", "今日挑战", at(9, 1, 19));
-clearedBountyState = setBountyDefinition(clearedBountyState, "gift", "", at(9, 2, 19));
-assert.equal(clearedBountyState.bounties.gift, undefined);
-assert.equal(clearedBountyState.days[localDateKey(at(9, 2, 19))]?.tasks.some((task) => task.bountySlot === "gift"), false);
-clearedBountyState = reconcileStudyState(clearedBountyState, at(9, 0, 20)).state;
-assert.equal(clearedBountyState.days[localDateKey(at(9, 0, 20))]?.tasks.some((task) => task.bountySlot === "gift"), false);
+goalState = reconcileStudyState(goalState, at(8, 0, 20)).state;
+const goalDate20 = localDateKey(at(8, 0, 20));
+assert.equal(goalState.days[goalDate20]?.goals?.studyMinutesTarget, 60);
+assert.equal(goalState.days[goalDate20]?.goals?.questionsTarget, 10);
+assert.equal(goalState.days[goalDate20]?.goals?.studyCompletedAt, undefined);
+goalState = setAutomaticGoalTargets(goalState, 120, 20, at(8, 1, 20));
+assert.equal(goalState.automaticGoals.studyMinutes, 120);
+assert.equal(goalState.automaticGoals.questions, 20);
+assert.equal(goalState.days[goalDate20]?.goals?.studyMinutesTarget, 120);
+assert.equal(goalState.days[goalDate19]?.goals?.studyMinutesTarget, 60);
+
+let migratedGoalState = normalizeStudyState({
+  version: 2,
+  days: {
+    [goalDate20]: {
+      date: goalDate20,
+      sessions: [],
+      checkIns: {},
+      tasks: [{
+        id: `bounty:self:${goalDate20}`,
+        title: "旧版手动悬赏",
+        createdAt: at(8, 0, 20).toISOString(),
+        completedAt: at(9, 0, 20).toISOString(),
+        bountySlot: "self",
+      }],
+      taskReminders: [],
+      studyLaunches: {},
+    },
+  },
+  recurringTasks: [],
+  bounties: {},
+  settings: {},
+  lastEvaluatedAt: at(9, 0, 20).toISOString(),
+}, at(9, 1, 20));
+assert.equal(migratedGoalState.automaticGoals.studyMinutes, 180);
+assert.equal(migratedGoalState.automaticGoals.questions, 80);
+migratedGoalState = reconcileStudyState(migratedGoalState, at(9, 1, 20)).state;
+assert.equal(migratedGoalState.days[goalDate20]?.goals?.questionsCompletedAt, at(9, 0, 20).toISOString());
+assert.equal(calculateStats(migratedGoalState, at(9, 1, 20)).selfBountyBookmarks, 1);
 
 let overnight = initialStudyState(at(23, 50));
 overnight = toggleStudy(overnight, at(23, 50)).state;

@@ -299,7 +299,10 @@ def add_interface_page(doc: Document, english: str, title: str, intro: str, imag
     set_cell_margins(cell, 100, 100, 100, 100)
     p = cell.paragraphs[0]
     set_para(p, align=WD_ALIGN_PARAGRAPH.CENTER)
-    p.add_run().add_picture(str(image), width=Cm(9.2))
+    # The live panel is deliberately tall. Keep the screenshot, heading and
+    # explanation together on one A5 page instead of letting Word push the
+    # unsplittable image table onto the following page.
+    p.add_run().add_picture(str(image), width=Cm(6.5))
 
     doc.add_paragraph().paragraph_format.space_after = Pt(0)
     add_note_box(doc, note_title, note_body, CREAM, PURPLE)
@@ -357,7 +360,7 @@ def build_document() -> None:
     add_text(p, "她是住在桌面上的学习搭子，\n替现实里的你来陪我、提醒我，也见证我们一起认真过的每一天。", 9, False, INK)
     p = doc.add_paragraph()
     set_para(p, before=8, align=WD_ALIGN_PARAGRAPH.CENTER)
-    add_text(p, "VERSION 1.4.0  ·  2026", 6.8, True, PURPLE, "Consolas")
+    add_text(p, "VERSION 1.6.0  ·  2026", 6.8, True, PURPLE, "Consolas")
     add_footer(section, "00")
 
     # Page 1: identity and controls
@@ -405,17 +408,17 @@ def build_document() -> None:
         "右键小鹿后，首页把当天最重要的事情放在同一屏：当前累计时间、五次在场确认、今日成果，以及保存学习驻守点的按钮。",
         SCREENSHOTS / "manual-today.png",
         "这是一份演示日记",
-        "截图由当前 1.3.0 界面直接渲染，日期、题量、任务和累计数字均为虚构演示数据，不来自任何真实使用记录。",
+        "截图由 1.6.0 界面直接渲染，日期、题量、任务和累计数字均为虚构演示数据，不来自任何真实使用记录。",
     )
 
     add_interface_page(
         doc,
         "TASKS",
-        "真实界面 · 悬赏与今日清单",
-        "任务页先展示两枚固定悬赏书签，再放普通清单。目标直接写在书签和任务框里；完成、撤回、每日重复都不需要进入二级菜单。",
+        "真实界面 · 自动目标与今日清单",
+        "任务页先展示两枚自动目标书签，再放普通清单。学习时长与做题数量达标后自动收下书签；普通任务仍可直接编辑、撤回与每日重复。",
         SCREENSHOTS / "manual-tasks.png",
-        "悬赏和任务各做一件事",
-        "悬赏奖励想长期坚持的挑战；普通任务收下今天要完成的小事。清单固定每页三项，内容再多也不会挤出滚动条。",
+        "目标和任务各做一件事",
+        "目标长期守住学习时长与题量；普通任务收下今天要完成的小事。清单固定每页三项，内容再多也不会挤出滚动条。",
     )
 
     add_page(doc, "")
@@ -437,12 +440,12 @@ def build_document() -> None:
         set_cell_margins(cell, 70, 70, 70, 70)
         p = cell.paragraphs[0]
         set_para(p, after=2, align=WD_ALIGN_PARAGRAPH.CENTER)
-        p.add_run().add_picture(str(image), width=Cm(5.25))
+        p.add_run().add_picture(str(image), width=Cm(4.7))
         p = cell.add_paragraph()
         set_para(p, align=WD_ALIGN_PARAGRAPH.CENTER)
         add_text(p, caption, 7.2, True, PURPLE_DARK)
     doc.add_paragraph().paragraph_format.space_after = Pt(0)
-    add_note_box(doc, "只留下摘要，不复制生活", "每条记录只显示日期、学习时长、打卡、悬赏、任务、题量和一句成果。页面截图使用虚构数字，仓库与说明书都不包含真实日记。", CREAM, PURPLE)
+    add_note_box(doc, "只留下摘要，不复制生活", "每条记录只显示日期、学习时长、打卡、合并后的任务、笔记条数、题量和一句话。双击一句话即可补写；页面截图使用虚构数据。", CREAM, PURPLE)
 
     add_interface_page(
         doc,
@@ -451,7 +454,7 @@ def build_document() -> None:
         "书签入口独立放在右上角。收藏页不做密集格子，而是完整展示三种书签图案，再用 × 数量记录它们被赢得了多少次。",
         SCREENSHOTS / "manual-bookmarks.png",
         "三种认真，各自累计",
-        "两枚单人书签来自每日悬赏；中间的双人书签只来自两个人共同完成约定的一天。它们不会消费，也不会因为中断而失去。",
+        "学习时长与做题数量分别赢得两枚单人书签；同一天完成两个目标，再收下一枚双人书签。它们不会消费，也不会因为中断而失去。",
     )
 
     # Page 2: schedule and check-in rules
@@ -538,8 +541,8 @@ def build_document() -> None:
         (sprites["waiting"], "等你回应", "打卡窗口已打开", LILAC),
         (sprites["wave"], "挥挥手", "打卡成功 / 开始计时", PEACH),
         (sprites["review"], "回顾一下", "结束一段 / 填今日结算", CREAM),
-        (sprites["failed"], "有点失落", "错过打卡 / 约定未完成", "FCE7E8"),
-        (sprites["jump"], "开心跳起", "两个人都完成约定", "E8F1E5"),
+        (sprites["failed"], "有点失落", "错过打卡 / 答题出错", "FCE7E8"),
+        (sprites["jump"], "开心跳起", "目标达成 / 整组完成", "E8F1E5"),
         (sprites["run_left"], "向左小跑", "拖动 / 自动赶路", LILAC),
         (sprites["run_right"], "向右小跑", "拖动 / 自动赶路", PEACH),
     ]
@@ -552,15 +555,15 @@ def build_document() -> None:
     add_page(doc, "05")
     add_label(doc, "DAILY LOG", "21 点，一起把今天收进日记")
     p = doc.add_paragraph(); set_para(p, after=5, line=1.25)
-    add_text(p, "结束打卡后，会打开一张很短的今日表单。系统自动填入学习时长和五次打卡；只需要补几项真正有意义的内容。", 8.2)
+    add_text(p, "结束打卡后，会打开一张很短的今日表单。学习时长、题量、正确率和笔记统计自动填入，只需要给今天留下一句话。", 8.2)
 
     fields = doc.add_table(rows=2, cols=2)
     fields.alignment = WD_TABLE_ALIGNMENT.CENTER
     field_items = [
-        ("自动记录", "今日学习时长 · 五次打卡结果", LILAC),
-        ("我来填写", "一句成果；题量可由 YuQuiz 自动同步", CREAM),
-        ("我的约定", "我今天是否完成：对勾 / 叉", "E8F1E5"),
-        ("你的约定", "现实里的你是否完成：对勾 / 叉", PEACH),
+        ("学习数据", "学习时长 · 做题数量 · 正确率", LILAC),
+        ("笔记数据", "修改条数 · 净新增可读正文字符", CREAM),
+        ("我来填写", "给今天留下一句话", "E8F1E5"),
+        ("自动保存", "结算后仍可在记录页双击补写", PEACH),
     ]
     for cell, (title, body, fill) in zip((c for row in fields.rows for c in row.cells), field_items):
         clear_cell(cell); set_cell_shading(cell, fill); set_cell_border(cell, PURPLE_DARK, 10)
@@ -570,12 +573,12 @@ def build_document() -> None:
         add_text(p, body, 7.4, False, INK)
 
     p = doc.add_paragraph(); set_para(p, before=7, after=3)
-    add_text(p, "结算只决定双人书签", 10.7, True, PURPLE_DARK)
+    add_text(p, "书签由目标自动决定", 10.7, True, PURPLE_DARK)
     rewards = doc.add_table(rows=2, cols=2)
     rewards.alignment = WD_TABLE_ALIGNMENT.CENTER
     reward_items = [
-        ("我们都完成", "获得一枚双人书签", GREEN),
-        ("一人或两人未完成", "当天留档，不生成失败书签", "FCE7E8"),
+        ("学习或题量达标", "自动获得对应单人书签", GREEN),
+        ("两个目标都达标", "额外获得一枚双人书签", "E8F1E5"),
     ]
     for row, (condition, result, fill) in zip(rewards.rows, reward_items):
         no_split(row)
@@ -584,19 +587,19 @@ def build_document() -> None:
             p = cell.paragraphs[0]; set_para(p, align=WD_ALIGN_PARAGRAPH.CENTER)
             add_text(p, text, 7.8, idx == 1, PURPLE_DARK if idx == 1 else INK)
 
-    add_note_box(doc, "由我们亲自判断", "软件不会用学习时长替我们裁定结果。现实里是否守住约定，由我在结算时分别选择；两项都完成，才把共同的一天收成双人书签。", CREAM, PURPLE)
+    add_note_box(doc, "结算不会打断学习", "目标达成时，小鹿会播放对应动作与离线语音；提交结算后再从三句收尾语中随机选择一句。几分钟后的回顾动作保持安静。", CREAM, PURPLE)
 
-    # Page 6: daily bounties
+    # Page 6: automatic goals
     add_page(doc, "06")
-    add_label(doc, "BOUNTY", "把想坚持的事写进两枚书签")
+    add_label(doc, "GOALS", "让两枚书签自动记住今天的目标")
     p = doc.add_paragraph(); set_para(p, after=5, line=1.3)
-    add_text(p, "任务页最上方的“今日悬赏”有两份固定目标。它们每天重新等待完成，但目标文字会保留，可以长期守住同一件事，也可以随时改写。", 8.3)
+    add_text(p, "任务页最上方有两份固定数值目标：上面的书签记录学习时长，下面的书签记录做题数量。每天重新计算，达标后自动发放奖励。", 8.3)
 
     bounty = doc.add_table(rows=2, cols=1)
     bounty.alignment = WD_TABLE_ALIGNMENT.CENTER
     bounty_items = [
-        (BOOKMARKS / "bookmark-friend-bounty.png", "今日挑战", "为她赢下一枚书签：选择一件有挑战、但值得长期努力的事。", PEACH, 9.1),
-        (BOOKMARKS / "bookmark-self-bounty.png", "今日坚持", "为自己赢下一枚书签：选择一件总想坚持、却容易放下的事。", LILAC, 8.3),
+        (BOOKMARKS / "bookmark-friend-bounty.png", "今日 3 小时学习", "达到设定时长，自动收下一枚学习书签。", PEACH, 9.1),
+        (BOOKMARKS / "bookmark-self-bounty.png", "今日做题 80 题", "达到设定题量，自动收下一枚做题书签。", LILAC, 8.3),
     ]
     for row, (image, title, body, fill, width) in zip(bounty.rows, bounty_items):
         cell = row.cells[0]; clear_cell(cell); set_cell_shading(cell, fill); set_cell_border(cell, PURPLE_DARK, 10)
@@ -608,17 +611,17 @@ def build_document() -> None:
         no_split(row)
 
     p = doc.add_paragraph(); set_para(p, before=6, after=3)
-    add_text(p, "直接在书签上完成它", 10.7, True, PURPLE_DARK)
-    add_bullet(doc, "单击书签", "直接输入或修改目标；把文字清空，就会恢复成“尚未填写”。", PURPLE)
-    add_bullet(doc, "双击书签", "完成后书签会晃一晃并收起，右上角出现 +1，收藏数量随之增加。", GREEN)
-    add_bullet(doc, "想要撤回", "完成寄语右侧有一个回转箭头，点一下即可恢复今天的悬赏。", PEACH)
-    add_note_box(doc, "没有失败书签", "没完成不会扣除任何东西，也不会留下刺眼的失败标记。悬赏只负责奖励主动赢下的一天。", CREAM, PURPLE)
+    add_text(p, "只改数字，不增加操作负担", 10.7, True, PURPLE_DARK)
+    add_bullet(doc, "修改目标", "直接点击书签中央的数字；学习目标按半小时、题量按整数调整。", PURPLE)
+    add_bullet(doc, "自动完成", "共学日记持续读取当天累计时间与 YuQuiz 今日题量，不需要手动确认。", GREEN)
+    add_bullet(doc, "双目标奖励", "两项都达标时自动增加双人书签，并播放更开心的动作与语音。", PEACH)
+    add_note_box(doc, "没有失败书签", "没完成不会扣除任何东西，也不会留下刺眼的失败标记。书签只负责保存真正达成的目标。", CREAM, PURPLE)
 
     # Page 7: tasks and diary navigation
     add_page(doc, "07")
     add_label(doc, "TASKS", "今日清单，够用就好")
     p = doc.add_paragraph(); set_para(p, after=5, line=1.3)
-    add_text(p, "悬赏下面是普通任务。它适合收下今天要做的小事，不承担复杂的项目管理，也不要求把一天塞得很满。", 8.3)
+    add_text(p, "自动目标下面是普通任务。它适合收下今天要做的小事，不承担复杂的项目管理，也不要求把一天塞得很满。", 8.3)
 
     task_table = doc.add_table(rows=3, cols=2)
     task_table.alignment = WD_TABLE_ALIGNMENT.CENTER
@@ -643,7 +646,7 @@ def build_document() -> None:
     pages.alignment = WD_TABLE_ALIGNMENT.CENTER
     for cell, (title, body, fill) in zip(pages.rows[0].cells, [
         ("今日", "计时、打卡与结算", CREAM),
-        ("任务", "悬赏与今日清单", PEACH),
+        ("任务", "自动目标与今日清单", PEACH),
         ("记录", "每天的学习留档", LILAC),
         ("统计", "长期累计成果", "E8F1E5"),
     ]):
@@ -662,9 +665,9 @@ def build_document() -> None:
     gallery = doc.add_table(rows=1, cols=3)
     gallery.alignment = WD_TABLE_ALIGNMENT.CENTER
     gallery_items = [
-        (BOOKMARKS / "bookmark-self.png", "为自己赢得", "完成“今日坚持”", LILAC, 6.5),
-        (BOOKMARKS / "bookmark-together.png", "双人书签", "21 点两人都履约", CREAM, 7.4),
-        (BOOKMARKS / "bookmark-friend.png", "为她赢得", "完成“今日挑战”", PEACH, 6.7),
+        (BOOKMARKS / "bookmark-self.png", "做题书签", "达到今日题量", LILAC, 6.5),
+        (BOOKMARKS / "bookmark-together.png", "双人书签", "两项目标同日达成", CREAM, 7.4),
+        (BOOKMARKS / "bookmark-friend.png", "学习书签", "达到今日时长", PEACH, 6.7),
     ]
     for cell, (image, title, body, fill, height) in zip(gallery.rows[0].cells, gallery_items):
         clear_cell(cell); set_cell_shading(cell, fill); set_cell_border(cell, PURPLE_DARK, 10)
@@ -675,7 +678,7 @@ def build_document() -> None:
         p = cell.add_paragraph(); set_para(p, line=1.16, align=WD_ALIGN_PARAGRAPH.CENTER)
         add_text(p, body, 6.8, False, MUTED)
 
-    add_note_box(doc, "收藏的规则", "两枚单人书签现在都是悬赏奖励，不再代表“另一个人失败”。双人书签只记录共同完成。它们不会消费，也没有连续天数压力。", CREAM, PURPLE)
+    add_note_box(doc, "收藏的规则", "两枚单人书签分别证明学习时长与做题数量达标，不再代表任何人的失败。双人书签记录两个目标在同一天完成。它们不会消费，也没有连续天数压力。", CREAM, PURPLE)
 
     # Page 9: getting started and offline voice
     add_page(doc, "09")
@@ -764,7 +767,7 @@ def build_document() -> None:
             add_text(p, text_value, 7.2 if col else 7.5, col == 0, PURPLE_DARK if col == 0 else INK, "Consolas" if col == 0 else "Microsoft YaHei")
 
     add_note_box(doc, "题量只认今日总数", "“今日做题数量”读取 YuQuiz 状态接口里的 today_questions。事件编号只是动作游标；整组完成事件不会被误算成一道题。", "E8F1E5", GREEN)
-    add_note_box(doc, "需要查资料也没关系", "普通鼠标移动不会虚假启动学习。复制题目后可进入查询宽限；若长时间没有恢复，小鹿才会来到屏幕中央轻轻提醒。", CREAM, PURPLE)
+    add_note_box(doc, "笔记只读统计数字", "今日结算读取 today_note_entries 与 today_note_characters；累计统计读取 total_note_entries、total_note_characters 与 total_note_files。正文字符采用 YuQuiz 的可读正文口径，共学日记不会扫描 Obsidian 文件。", CREAM, PURPLE)
 
     # Page 11: movement and positions
     add_page(doc, "11")
@@ -806,7 +809,7 @@ def build_document() -> None:
         ("按时打卡", "五个时间点的到场记录", PEACH),
         ("双人书签", "只统计共同履约的书签", "E8F1E5"),
         ("累计完成任务", "普通任务与每日任务", LILAC),
-        ("累计完成悬赏", "两份书签悬赏的总数", CREAM),
+        ("累计笔记字数", "YuQuiz 可读正文字符", CREAM),
     ]
     for cell, (title, body, fill) in zip((c for row in stats.rows for c in row.cells), stat_items):
         clear_cell(cell); set_cell_shading(cell, fill); set_cell_border(cell, PURPLE_DARK, 9)

@@ -5,15 +5,16 @@ import { fileURLToPath } from "node:url";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const batch = process.argv[2];
-if (batch !== "hourly" && batch !== "functional") {
-  throw new Error("Usage: node scripts/split-pending-voice.mjs <hourly|functional> <master.mp3>");
+if (batch !== "hourly" && batch !== "functional" && batch !== "goals") {
+  throw new Error("Usage: node scripts/split-pending-voice.mjs <hourly|functional|goals> <master.mp3>");
 }
 
-const input = resolve(process.argv[3] ?? join(root, "voice-source", `xiaolu-${batch}-v1.5-master.mp3`));
-const map = JSON.parse(readFileSync(join(root, "voice-source", `pending-${batch}-v1.5-map.json`), "utf8"));
+const release = batch === "goals" ? "v1.6" : "v1.5";
+const input = resolve(process.argv[3] ?? join(root, "voice-source", `xiaolu-${batch}-${release}-master.mp3`));
+const map = JSON.parse(readFileSync(join(root, "voice-source", `pending-${batch}-${release}-map.json`), "utf8"));
 const clipNames = map.entries.map((entry) => entry.id);
 const output = join(root, "assets", "voice");
-const temporary = join(root, "tmp", `${batch}-v1.5-normalized.wav`);
+const temporary = join(root, "tmp", `${batch}-${release}-normalized.wav`);
 
 function run(program, args, options = {}) {
   return execFileSync(program, args, {

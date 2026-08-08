@@ -9,6 +9,7 @@ let portraitPersistent = "idle";
 let historyPage = 0;
 let taskPage = 0;
 let taskRenderKey = null;
+let bookmarkCounts = null;
 const HISTORY_PAGE_SIZE = 4;
 const TASK_PAGE_SIZE = 3;
 
@@ -126,8 +127,8 @@ function render(state) {
   byId("check-in-now").hidden = !state.pendingCheckIn;
   byId("check-in-now").textContent = state.pendingCheckIn ? `${state.pendingCheckIn.slot} · 我在` : "我在";
 
-  renderReport(state.today.report, yuQuiz);
-  renderTasks(state.today.tasks ?? [], state.bounties ?? {});
+  renderReport(state.today, yuQuiz);
+  renderTasks(state.today.tasks ?? [], state.today, state.automaticGoals);
   renderHistory(state.history);
   renderBookmarkCollection(state.stats);
   renderStats(state.stats);
@@ -141,24 +142,23 @@ function render(state) {
   if (state.message) showFeedback(state.message);
 }
 
-function renderReport(report, yuQuiz = { enabled: false }) {
+function renderReport(today, yuQuiz = { enabled: false }) {
+  const report = today.report;
   const key = report ? report.submittedAt : "empty";
   if (loadedReportKey !== key) {
     loadedReportKey = key;
-    byId("problem-count").value = report?.problemCount ?? 0;
     byId("note").value = report?.note ?? "";
-    document.querySelectorAll('[data-choice-group="self-completed"] .choice').forEach((choice) => {
-      choice.classList.toggle("active", report ? choice.dataset.value === (report.selfCompleted ? "yes" : "no") : false);
-    });
-    document.querySelectorAll('[data-choice-group="friend-completed"] .choice').forEach((choice) => {
-      choice.classList.toggle("active", report ? choice.dataset.value === (report.friendCompleted ? "yes" : "no") : false);
-    });
   }
-  const input = byId("problem-count");
-  const snapshot = yuQuiz.snapshot;
-  input.readOnly = Boolean(snapshot);
-  input.title = snapshot ? "由 YuQuiz 今日统计自动读取" : "可以手动填写";
-  if (snapshot) input.value = snapshot.todayQuestions;
+  const snapshot = yuQuiz.snapshot ?? today.yuQuiz;
+  const questions = snapshot?.todayQuestions ?? report?.problemCount ?? 0;
+  const accuracy = snapshot?.todayAccuracy ?? report?.accuracy ?? null;
+  const noteEntries = snapshot?.todayNoteEntries ?? report?.noteEntries ?? 0;
+  const noteCharacters = snapshot?.todayNoteCharacters ?? report?.noteCharacters ?? 0;
+  byId("report-study-time").textContent = formatDuration(today.studyMs ?? 0);
+  byId("report-questions").textContent = `${questions} 题`;
+  byId("report-accuracy").textContent = accuracy === null ? "—" : `${Number(accuracy.toFixed(1))}%`;
+  byId("report-note-entries").textContent = `${noteEntries} 条`;
+  byId("report-note-characters").textContent = noteCharacters > 0 ? `+${noteCharacters} 字` : "0 字";
   const result = byId("report-result");
   result.hidden = !report;
   if (report) result.textContent = `已结算 · ${bookmarkName(report.bookmark)}`;
@@ -167,8 +167,9 @@ function renderReport(report, yuQuiz = { enabled: false }) {
 
 function renderHistory(history) {
   const list = byId("history-list");
+  if (list.querySelector(".history-note-input")) return;
   list.classList.toggle("empty", history.length === 0);
-  byId("history-total").textContent = `累计 ${history.length} 条`;
+  byId("history-total").textContent = String(history.length);
   if (history.length === 0) {
     list.replaceChildren(emptyMessage("这里还空着，今天会成为第一页。"));
     byId("history-pager").hidden = true;
@@ -185,40 +186,92 @@ function renderHistory(history) {
     const date = document.createElement("strong");
     date.textContent = displayDate(day.date);
     const time = document.createElement("span");
-    time.textContent = compactDuration(day.studyMs);
+    time.textContent = day.studyTimeUnknown ? "不详" : compactDuration(day.studyMs);
     top.append(date, time);
     const meta = document.createElement("p");
-    const bountyMeta = day.bountyCount ? ` · 悬赏 ${day.completedBountyCount ?? 0}/${day.bountyCount}` : "";
-    meta.textContent = `打卡 ${day.checkedCount}/5${bountyMeta} · 任务 ${day.completedTaskCount ?? 0}/${day.taskCount ?? 0} · 做题 ${day.problemCount ?? 0}`;
+    const completedTasks = (day.completedTaskCount ?? 0) + (day.completedBountyCount ?? 0);
+    const taskCount = (day.taskCount ?? 0) + (day.bountyCount ?? 0);
+    const noteEntries = day.yuQuiz?.todayNoteEntries ?? day.report?.noteEntries ?? 0;
+    meta.textContent = `打卡 ${day.checkedCount}/5 · 任务 ${completedTasks}/${taskCount} · 笔记 ${noteEntries} · 做题 ${day.problemCount ?? 0}`;
     item.append(top, meta);
-    if (day.report?.note) {
-      const note = document.createElement("blockquote");
-      note.textContent = day.report.note;
-      note.tabIndex = 0;
-      note.title = "点击查看完整记录";
-      note.setAttribute("aria-label", `学习成果：${day.report.note}。点击查看完整内容`);
-      note.addEventListener("click", () => showFeedback(day.report.note));
-      note.addEventListener("keydown", (event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          showFeedback(day.report.note);
-        }
-      });
-      item.append(note);
-    }
+    const note = document.createElement("blockquote");
+    note.textContent = day.report?.note || "双击给今天留一句话";
+    note.classList.toggle("empty", !day.report?.note);
+    note.tabIndex = 0;
+    note.title = "双击编辑这一天的一句话";
+    note.setAttribute("aria-label", `${day.report?.note || "还没有写下一句话"}。双击编辑`);
+    note.addEventListener("dblclick", () => beginHistoryNoteEdit(item, note, day));
+    note.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        beginHistoryNoteEdit(item, note, day);
+      }
+    });
+    item.append(note);
     return item;
   }));
   renderPager("history", historyPage, pageCount, true);
 }
 
-function renderTasks(tasks, bounties) {
+function beginHistoryNoteEdit(item, noteNode, day) {
+  if (item.querySelector(".history-note-input")) return;
+  const input = document.createElement("input");
+  input.className = "history-note-input";
+  input.type = "text";
+  input.maxLength = 120;
+  input.value = day.report?.note ?? "";
+  input.placeholder = "给今天留一句话";
+  input.setAttribute("aria-label", `${displayDate(day.date)} 的一句话总结`);
+  let finished = false;
+  const cancel = () => {
+    if (finished) return;
+    finished = true;
+    input.replaceWith(noteNode);
+  };
+  const save = async () => {
+    if (finished) return;
+    const value = input.value.trim();
+    if (value === (day.report?.note ?? "")) {
+      cancel();
+      return;
+    }
+    finished = true;
+    input.disabled = true;
+    try {
+      const state = await api.updateHistoryNote(day.date, value);
+      input.remove();
+      render(state);
+    } catch (error) {
+      input.disabled = false;
+      finished = false;
+      showFeedback(String(error?.message || error));
+      input.focus();
+    }
+  };
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") { event.preventDefault(); void save(); }
+    if (event.key === "Escape") { event.preventDefault(); cancel(); }
+  });
+  input.addEventListener("blur", () => void save());
+  noteNode.replaceWith(input);
+  input.focus();
+  input.select();
+}
+
+function renderTasks(tasks, today, automaticGoals) {
   const ordered = tasks.filter((task) => !task.bountySlot).sort((a, b) => Number(Boolean(a.completedAt)) - Number(Boolean(b.completedAt)) || Number(Boolean(b.recurringTaskId)) - Number(Boolean(a.recurringTaskId)) || a.createdAt.localeCompare(b.createdAt));
   const pageCount = Math.max(1, Math.ceil(ordered.length / TASK_PAGE_SIZE));
   taskPage = Math.min(taskPage, pageCount - 1);
-  const renderKey = JSON.stringify([tasks, bounties, taskPage]);
+  const goals = today?.goals ?? {
+    studyMinutesTarget: automaticGoals?.studyMinutes ?? 180,
+    questionsTarget: automaticGoals?.questions ?? 80,
+  };
+  const studyMinutes = Math.floor((today?.studyMs ?? 0) / 60_000);
+  const questions = today?.yuQuiz?.todayQuestions ?? 0;
+  const renderKey = JSON.stringify([tasks, goals, studyMinutes, questions, taskPage]);
   if (taskRenderKey === renderKey) return;
   taskRenderKey = renderKey;
-  renderBountyBoard(tasks, bounties);
+  renderGoalBoard(goals, studyMinutes, questions);
   const completed = ordered.filter((task) => task.completedAt).length;
   byId("task-progress").textContent = `${completed} / ${ordered.length}`;
   const list = byId("task-list");
@@ -232,32 +285,25 @@ function renderTasks(tasks, bounties) {
   renderPager("task", taskPage, pageCount);
 }
 
-function renderBountyBoard(tasks, bounties) {
+function renderGoalBoard(goals, studyMinutes, questions) {
   const slots = [
-    { slot: "gift", ariaLabel: "给她的悬赏", hint: "今日挑战", success: "今天，你成功为她赢下了一份努力。", image: "../assets/bookmarks/bookmark-friend-bounty.png" },
-    { slot: "self", ariaLabel: "给自己的悬赏", hint: "今日坚持", success: "今天，你成功为自己赢下了一次坚持。", image: "../assets/bookmarks/bookmark-self-bounty.png" },
+    {
+      slot: "gift", kind: "study", label: "今日", unit: "小时学习", image: "../assets/bookmarks/bookmark-friend-bounty.png",
+      target: goals.studyMinutesTarget, value: studyMinutes, completed: Boolean(goals.studyCompletedAt),
+    },
+    {
+      slot: "self", kind: "questions", label: "今日做题", unit: "题", image: "../assets/bookmarks/bookmark-self-bounty.png",
+      target: goals.questionsTarget, value: questions, completed: Boolean(goals.questionsCompletedAt),
+    },
   ];
-  byId("bounty-board").replaceChildren(...slots.map((config) => bountyCard(config, tasks.find((task) => task.bountySlot === config.slot), bounties[config.slot])));
+  const completedGoals = Number(Boolean(goals.studyCompletedAt)) + Number(Boolean(goals.questionsCompletedAt));
+  byId("goal-overall-progress").textContent = `${completedGoals * 50}%`;
+  byId("bounty-board").replaceChildren(...slots.map((config) => goalCard(config, goals)));
 }
 
-function bountyCard(config, task, definition) {
-  const completed = Boolean(task?.completedAt);
-  if (completed) {
-    const result = document.createElement("article");
-    result.className = `bounty-result bounty-${config.slot}`;
-    const message = document.createElement("span");
-    message.textContent = config.success;
-    const undo = document.createElement("button");
-    undo.className = "bounty-undo";
-    undo.type = "button";
-    undo.textContent = "↩";
-    undo.setAttribute("aria-label", `撤回${config.ariaLabel}`);
-    undo.addEventListener("click", () => void runTaskAction(() => api.setTaskCompleted(task.id, false)));
-    result.append(message, undo);
-    return result;
-  }
+function goalCard(config, goals) {
   const card = document.createElement("article");
-  card.className = `bounty-card bounty-${config.slot}${task ? " configured" : " empty"}`;
+  card.className = `bounty-card bounty-${config.slot}${config.completed ? " completed" : ""}`;
   const art = document.createElement("div");
   art.className = "bounty-mini-art";
   const image = document.createElement("img");
@@ -267,55 +313,38 @@ function bountyCard(config, task, definition) {
 
   const copy = document.createElement("div");
   copy.className = "bounty-copy";
+  const editor = document.createElement("label");
+  editor.className = "goal-editor";
+  const label = document.createElement("span");
+  label.textContent = config.label;
   const input = document.createElement("input");
-  input.className = "bounty-title-input";
-  input.type = "text";
-  input.maxLength = 60;
-  input.value = task?.title ?? definition?.title ?? "";
-  input.placeholder = config.hint;
-  input.setAttribute("aria-label", `${config.ariaLabel}内容`);
+  input.className = "goal-target-input";
+  input.type = "number";
+  input.value = config.kind === "study" ? String(config.target / 60) : String(config.target);
+  input.min = config.kind === "study" ? "0.5" : "1";
+  input.max = config.kind === "study" ? "16" : "10000";
+  input.step = config.kind === "study" ? "0.5" : "1";
+  input.setAttribute("aria-label", `${config.label}目标`);
+  const unit = document.createElement("span");
+  unit.className = "goal-unit";
+  unit.textContent = config.unit;
   input.addEventListener("keydown", (event) => {
     if (event.key === "Enter") { event.preventDefault(); input.blur(); }
-    if (event.key === "Escape") { input.value = task?.title ?? definition?.title ?? ""; input.blur(); }
+    if (event.key === "Escape") { input.value = config.kind === "study" ? String(config.target / 60) : String(config.target); input.blur(); }
   });
   input.addEventListener("change", () => {
-    const value = input.value.trim();
-    const previous = task?.title ?? definition?.title ?? "";
-    if (!value) {
-      if (previous) void runTaskAction(() => api.setBounty(config.slot, ""));
+    const raw = Number(input.value);
+    const studyMinutesTarget = config.kind === "study" ? Math.round(raw * 60) : goals.studyMinutesTarget;
+    const questionsTarget = config.kind === "questions" ? Math.round(raw) : goals.questionsTarget;
+    if (!Number.isFinite(raw) || studyMinutesTarget < 30 || questionsTarget < 1) {
+      showFeedback("目标要写成一个有效数字哦。");
+      input.value = config.kind === "study" ? String(config.target / 60) : String(config.target);
       return;
     }
-    if (value === previous) return;
-    void runTaskAction(() => api.setBounty(config.slot, value));
+    void runTaskAction(() => api.setAutomaticGoals(studyMinutesTarget, questionsTarget));
   });
-  copy.append(input);
-
-  card.setAttribute("aria-label", task ? "双击书签赢得书签" : "先单击书签写下悬赏");
-  card.addEventListener("mousedown", (event) => {
-    if (event.detail > 1) event.preventDefault();
-  });
-  card.addEventListener("dblclick", (event) => {
-    event.preventDefault();
-    const previous = task?.title ?? definition?.title ?? "";
-    if (input.value.trim() !== previous) {
-      input.blur();
-      window.getSelection()?.removeAllRanges();
-      return;
-    }
-    input.blur();
-    window.getSelection()?.removeAllRanges();
-    if (!task) {
-      input.focus();
-      showFeedback("先把今天想赢下的目标写进书签吧。");
-      return;
-    }
-    if (card.classList.contains("claiming")) return;
-    card.classList.add("claiming");
-    window.setTimeout(async () => {
-      const earned = await runTaskAction(() => api.setTaskCompleted(task.id, true));
-      if (earned) playBookmarkGain();
-    }, 520);
-  });
+  editor.append(label, input, unit);
+  copy.append(editor);
   card.append(art, copy);
   return card;
 }
@@ -384,15 +413,18 @@ function playBookmarkGain() {
 }
 
 function renderBookmarkCollection(stats) {
+  const nextCounts = [stats.selfBountyBookmarks, stats.giftBountyBookmarks, stats.togetherBookmarks];
+  if (bookmarkCounts && nextCounts.some((value, index) => value > bookmarkCounts[index])) playBookmarkGain();
+  bookmarkCounts = nextCounts;
   byId("bookmark-self-count").textContent = stats.selfBountyBookmarks;
   byId("bookmark-friend-count").textContent = stats.giftBountyBookmarks;
   byId("bookmark-together-count").textContent = stats.togetherBookmarks;
   const total = stats.selfBountyBookmarks + stats.giftBountyBookmarks + stats.togetherBookmarks;
   byId("bookmark-summary").textContent = total === 0
-    ? "第一份悬赏和下一枚双人书签，都在等认真完成的一天。"
+    ? "第一枚学习书签、做题书签和双人书签，都在等认真完成的一天。"
     : stats.togetherBookmarks > 0
-      ? `已经为自己赢得 ${stats.selfBountyBookmarks} 枚、为她赢得 ${stats.giftBountyBookmarks} 枚，也一起完成了 ${stats.togetherBookmarks} 天。`
-      : `两份悬赏已经赢下 ${stats.selfBountyBookmarks + stats.giftBountyBookmarks} 枚书签，双人书签还在等你们一起完成。`;
+      ? `做题书签 ${stats.selfBountyBookmarks} 枚、学习书签 ${stats.giftBountyBookmarks} 枚，双目标完成 ${stats.togetherBookmarks} 天。`
+      : `两项目标已经赢下 ${stats.selfBountyBookmarks + stats.giftBountyBookmarks} 枚书签，双人书签还在等同一天全部完成。`;
 }
 
 function renderPager(name, page, pageCount, alwaysVisible = false) {
@@ -410,7 +442,7 @@ function renderStats(stats) {
     ["按时打卡", `${stats.checkedCount} 次`],
     ["双人书签", `${stats.togetherBookmarks} 枚`],
     ["累计完成任务", `${stats.completedTasks} 项`],
-    ["累计完成悬赏", `${stats.completedBounties} 项`],
+    ["累计笔记字数", `${stats.totalNoteCharacters} 字`],
   ];
   byId("stats-grid").replaceChildren(...entries.map(([label, value]) => {
     const card = document.createElement("article");
@@ -450,8 +482,8 @@ document.querySelectorAll(".choice-grid .choice").forEach((choice) => {
 });
 byId("history-prev").addEventListener("click", () => { historyPage = Math.max(0, historyPage - 1); renderHistory(latestState?.history ?? []); });
 byId("history-next").addEventListener("click", () => { historyPage += 1; renderHistory(latestState?.history ?? []); });
-byId("task-prev").addEventListener("click", () => { taskPage = Math.max(0, taskPage - 1); taskRenderKey = null; renderTasks(latestState?.today.tasks ?? [], latestState?.bounties ?? {}); });
-byId("task-next").addEventListener("click", () => { taskPage += 1; taskRenderKey = null; renderTasks(latestState?.today.tasks ?? [], latestState?.bounties ?? {}); });
+byId("task-prev").addEventListener("click", () => { taskPage = Math.max(0, taskPage - 1); taskRenderKey = null; renderTasks(latestState?.today.tasks ?? [], latestState?.today, latestState?.automaticGoals); });
+byId("task-next").addEventListener("click", () => { taskPage += 1; taskRenderKey = null; renderTasks(latestState?.today.tasks ?? [], latestState?.today, latestState?.automaticGoals); });
 byId("open-bookmarks").addEventListener("click", () => switchTab("bookmarks"));
 byId("close").addEventListener("click", () => api.hide());
 byId("toggle-study").addEventListener("click", async () => {
@@ -489,19 +521,10 @@ byId("task-form").addEventListener("submit", async (event) => {
 });
 byId("report-form").addEventListener("submit", async (event) => {
   event.preventDefault();
-  const self = document.querySelector('[data-choice-group="self-completed"] .choice.active');
-  const friend = document.querySelector('[data-choice-group="friend-completed"] .choice.active');
-  if (!self || !friend) {
-    showFeedback("你和她今天的约定，还要一起确认一下哦。");
-    return;
-  }
   byId("submit-report").disabled = true;
   try {
     const state = await api.submitReport({
-      problemCount: Number(byId("problem-count").value || 0),
       note: byId("note").value,
-      selfCompleted: self.dataset.value === "yes",
-      friendCompleted: friend.dataset.value === "yes",
     });
     render(state);
     showFeedback("今天已经好好收进日记啦。");

@@ -34,6 +34,7 @@ import {
   markStudyLaunchPrompted,
   normalizeStudyState,
   reconcileStudyState,
+  setAutomaticGoalTargets,
   setBountyDefinition,
   setDailyTaskCompleted,
   setDailyTaskRecurring,
@@ -46,6 +47,7 @@ import {
   setYuQuizIntegration,
   setYuQuizEventCursor,
   saveYuQuizSnapshot,
+  saveYuQuizNoteTotals,
   skipStudyLaunch,
   snoozeStudyLaunch,
   beginStudyLaunchRitual,
@@ -55,6 +57,7 @@ import {
   supervisionTierForElapsed,
   studyMsForDay,
   submitDailyReport,
+  updateDailyReportNote,
   toggleStudy,
   type CheckInSlot,
   type BountySlot,
@@ -173,6 +176,10 @@ const voicePools = {
   allTasksCompleted: ["all-tasks-completed-1"],
   bountySelf: ["bounty-self-1", "bounty-self-2"],
   bountyGift: ["bounty-gift-1", "bounty-gift-2"],
+  automaticStudy: ["automatic-study-1", "automatic-study-2", "automatic-study-3"],
+  automaticQuestions: ["automatic-questions-1", "automatic-questions-2", "automatic-questions-3"],
+  automaticTogether: ["automatic-together-1", "automatic-together-2", "automatic-together-3"],
+  settlementSummary: ["settlement-summary-1", "settlement-summary-2", "settlement-summary-3"],
   studyStarted: ["study-started-1", "study-started-2", "study-started-3"],
   studyStopped: ["study-stopped-1", "study-stopped-2", "study-stopped-3"],
 } as const;
@@ -195,8 +202,28 @@ const lines = {
   allTasksCompleted: ["今天列下的事情都完成啦！", "一件也没有落下，真棒。", "今日任务全部点亮啦。"],
   taskFixed: ["固定好啦，明天我会再放进任务栏。", "记住啦，这件事每天都会回来。", "以后每天，我都替你准备好这一项。"],
   taskUnfixed: ["好，只留在今天，不再每天重复。", "已经取消固定，明天不会自动出现啦。"],
-  bountySelf: ["这枚是你替自己赢下的，收好啦。", "今天守住了这份坚持，书签归你。", "第一份悬赏完成，认真有了新的证明。"],
-  bountyGift: ["这枚书签替她收好啦。", "你愿意多走的这一步，我替她记住了。", "第二份悬赏完成，这是今天送给她的努力。"],
+  bountySelf: ["做题目标达成啦，这枚书签是你一道道赢回来的。", "今天的题量攒够啦，你的书签收好。", "做题目标完成，认真做过的每一道都算数。"],
+  bountyGift: ["学习时间达标啦，她的书签也被你认真赢回来啦。", "今天的学习时间攒够啦，我替她把书签收好。", "时长目标完成，这份坚持替她好好记下来了。"],
+  automaticStudy: [
+    "刚好，学习时间达标啦。这枚书签是你认真坐下来的证明。",
+    "看吧，只要开始，你就能做得很好。第一枚书签，我替你收好啦。",
+    "今天的时长目标完成。辛苦啦，我就知道你可以。",
+  ],
+  automaticQuestions: [
+    "做题目标达成啦。这一枚，是你一道一道赢回来的。",
+    "今天的题量攒够啦。第二枚书签也被你拿下了。",
+    "你认真做过的每一道都算数。这枚书签，收好哦。",
+  ],
+  automaticTogether: [
+    "两个目标都完成啦。今天的双人书签，要好好收着。",
+    "今天的时长和题量都达标了。你又把想做的事，真的做到了。",
+    "双目标完成。嗯，我现在真的很为你开心。",
+  ],
+  settlementSummary: [
+    "今天的数据和这句话，我都替你好好收起来啦。",
+    "今天走过的每一步，都在这里。晚安之前，记得夸夸自己。",
+    "这一天已经写进日记了。无论结果怎样，我都陪你走到这里啦。",
+  ],
   yuQuizSetCompleted: ["这一组收好啦，今天又向前走了一小步。", "这组题完成啦，认真留下了新的痕迹。", "题目一组组做完，今天的努力也亮起来啦。"],
   studyLaunchPrompt: ["先不想学多久。打开第一题，我陪你把开头走过去。", "不用先决定学多久，我们只把第一题打开。", "先迈最小的一步吧，我陪你从第一题开始。"],
   studyLaunchSuccess: ["好啦，已经开始了。最难的那一步过去了。", "第一题完成啦，接下来交给状态。", "你已经走进学习里了，我就不再催你啦。"],
@@ -319,6 +346,7 @@ let isQuitting = false;
 let persistQueue = Promise.resolve();
 let nextSettlementActionAt = 0;
 let settlementDate = "";
+let pendingAutomaticGoalAwards: Array<"study" | "questions" | "together"> = [];
 let yuQuizRuntime: { connected: boolean; statusAvailable: boolean; error?: string; snapshot?: YuQuizSnapshot } = { connected: false, statusAvailable: false };
 let yuQuizEventsInitialized = false;
 let yuQuizAutoSuppressed = false;
@@ -572,6 +600,14 @@ function installIpc(): void {
     assertTrustedSender(event);
     return performReport(value);
   });
+  ipcMain.handle("xiaolu:update-history-note", async (event, date: unknown, note: unknown) => {
+    assertTrustedSender(event);
+    if (typeof date !== "string" || typeof note !== "string") throw new Error("日记内容格式不正确。");
+    studyState = updateDailyReportNote(studyState, date, note, new Date());
+    await persistState();
+    sendState();
+    return publicState("这句话已经替你收好了。");
+  });
   ipcMain.handle("xiaolu:add-task", async (event, title: unknown) => {
     assertTrustedSender(event);
     if (typeof title !== "string") throw new Error("任务内容格式不正确。");
@@ -581,6 +617,15 @@ function installIpc(): void {
     assertTrustedSender(event);
     if ((slot !== "self" && slot !== "gift") || typeof title !== "string") throw new Error("悬赏内容格式不正确。");
     return performSetBounty(slot, title);
+  });
+  ipcMain.handle("xiaolu:set-automatic-goals", async (event, studyMinutes: unknown, questions: unknown) => {
+    assertTrustedSender(event);
+    if (typeof studyMinutes !== "number" || typeof questions !== "number") throw new Error("目标数值格式不正确。");
+    studyState = setAutomaticGoalTargets(studyState, studyMinutes, questions, new Date());
+    await persistState();
+    sendState();
+    emitAction("review", "目标记好啦。达到以后，我会自动把书签收进收藏。", "◆", 1_650);
+    return publicState();
   });
   ipcMain.handle("xiaolu:edit-task", async (event, id: unknown, title: unknown) => {
     assertTrustedSender(event);
@@ -858,13 +903,17 @@ async function performCheckIn(requested?: CheckInSlot): Promise<Record<string, u
 async function performReport(value: unknown): Promise<Record<string, unknown>> {
   if (!isRecord(value)) throw new Error("今日结算内容格式不正确。");
   const date = localDateKey();
-  const runtimeQuestions = yuQuizRuntime.snapshot?.date === date ? yuQuizRuntime.snapshot.todayQuestions : undefined;
-  const syncedQuestions = runtimeQuestions ?? getDay(studyState, date).yuQuiz?.todayQuestions;
+  const day = getDay(studyState, date);
+  const runtimeSnapshot = yuQuizRuntime.snapshot?.date === date ? yuQuizRuntime.snapshot : undefined;
+  const syncedSnapshot = runtimeSnapshot ?? day.yuQuiz;
   const input: ReportInput = {
-    problemCount: syncedQuestions ?? (typeof value.problemCount === "number" ? value.problemCount : Number(value.problemCount)),
+    problemCount: syncedSnapshot?.todayQuestions ?? 0,
+    accuracy: syncedSnapshot?.todayAccuracy ?? null,
+    noteEntries: syncedSnapshot?.todayNoteEntries ?? 0,
+    noteCharacters: syncedSnapshot?.todayNoteCharacters ?? 0,
     note: typeof value.note === "string" ? value.note : "",
-    selfCompleted: value.selfCompleted === true,
-    friendCompleted: value.friendCompleted === true,
+    selfCompleted: Boolean(day.goals?.questionsCompletedAt),
+    friendCompleted: Boolean(day.goals?.studyCompletedAt),
   };
   studyState = submitDailyReport(studyState, input, new Date());
   await persistState();
@@ -912,7 +961,7 @@ async function performSetTaskCompleted(id: string, completed: boolean): Promise<
     const pool = taskBeforeUpdate.bountySlot === "self" ? lines.bountySelf : lines.bountyGift;
     const bountyVoice = taskBeforeUpdate.bountySlot === "self" ? voicePools.bountySelf : voicePools.bountyGift;
     emitPairedAction(`bounty-${taskBeforeUpdate.bountySlot}`, "jumping", pool, bountyVoice, "✦", 1_900);
-  } else if (completed && tasks.length > 0 && tasks.every((task) => task.completedAt)) {
+  } else if (completed && tasks.some((task) => !task.bountySlot) && tasks.filter((task) => !task.bountySlot).every((task) => task.completedAt)) {
     if (activePromptType === "task-reminder") clearActivePrompt();
     emitVoiceVariant("allTasksCompleted", [
       ...pairedVoiceVariants(lines.allTasksCompleted, voicePools.allTasksCompleted, "jumping"),
@@ -1032,6 +1081,11 @@ async function syncYuQuiz(announce: boolean): Promise<void> {
       todayQuestions: clampExternalInteger(statusRecord.today_questions),
       todayCorrect: clampExternalInteger(statusRecord.today_correct),
       todayAccuracy: externalAccuracy(statusRecord.today_accuracy),
+      todayNoteEntries: clampExternalInteger(statusRecord.today_note_entries),
+      todayNoteCharacters: clampExternalInteger(statusRecord.today_note_characters, 100_000_000),
+      totalNoteEntries: clampExternalInteger(statusRecord.total_note_entries),
+      totalNoteCharacters: clampExternalInteger(statusRecord.total_note_characters, 100_000_000),
+      totalNoteFiles: clampExternalInteger(statusRecord.total_note_files),
       todayLearningSeconds: clampExternalInteger(statusRecord.today_learning_seconds, 86_400 * 366),
       currentView: typeof statusRecord.current_view === "string" ? statusRecord.current_view : "home",
       isLearning: statusRecord.is_learning === true,
@@ -1050,6 +1104,7 @@ async function syncYuQuiz(announce: boolean): Promise<void> {
         : {}),
       syncedAt: now.toISOString(),
     };
+    studyState = saveYuQuizNoteTotals(studyState, snapshot, now);
     if (!snapshot.isLearning) yuQuizAutoSuppressed = false;
     const studyMode = snapshot.studyState ?? (snapshot.isLearning ? "learning" : "ready");
     const shouldEnable = (studyMode === "learning" || studyMode === "consulting") && !yuQuizAutoSuppressed;
@@ -1682,9 +1737,19 @@ async function completeActiveStudyLaunch(now: Date): Promise<boolean> {
 }
 
 function maybePromptIncompleteTasks(now: Date): void {
-  const tasks = getDay(studyState, localDateKey(now)).tasks;
-  const incompleteCount = tasks.filter((task) => !task.completedAt).length;
-  if (incompleteCount === 0) {
+  const date = localDateKey(now);
+  const day = getDay(studyState, date);
+  const incompleteCount = day.tasks.filter((task) => !task.bountySlot && !task.completedAt).length;
+  const goals = day.goals;
+  const remainingStudyMinutes = goals?.studyCompletedAt
+    ? 0
+    : Math.max(0, goals ? Math.ceil(goals.studyMinutesTarget - studyMsForDay(studyState, date, now) / 60_000) : 0);
+  const remainingQuestions = goals?.questionsCompletedAt
+    ? 0
+    : Math.max(0, goals ? goals.questionsTarget - (day.yuQuiz?.todayQuestions ?? 0) : 0);
+  const studyIsClose = remainingStudyMinutes > 0 && remainingStudyMinutes <= 30;
+  const questionsAreClose = remainingQuestions > 0 && remainingQuestions <= 10;
+  if (incompleteCount === 0 && !studyIsClose && !questionsAreClose) {
     if (activePromptType === "task-reminder") clearActivePrompt();
     return;
   }
@@ -1695,12 +1760,18 @@ function maybePromptIncompleteTasks(now: Date): void {
   const minutes = now.getHours() * 60 + now.getMinutes();
   const reminderSlot = minutes >= 22 * 60 ? "22:00" : minutes >= 21 * 60 + 6 ? "21:00" : undefined;
   if (!reminderSlot) return;
-  const day = getDay(studyState, localDateKey(now));
   if (day.taskReminders.includes(reminderSlot)) return;
-  const key = `${localDateKey(now)}:tasks:${reminderSlot}`;
+  const key = `${date}:tasks:${reminderSlot}`;
   studyState = markTaskReminderShown(studyState, reminderSlot, now);
   void persistState();
-  const paired = chooseVariant(
+  const goalMessage = studyIsClose && questionsAreClose
+    ? `今天还差 ${remainingStudyMinutes} 分钟和 ${remainingQuestions} 题，两枚书签都已经很近啦。`
+    : studyIsClose
+      ? `再认真 ${remainingStudyMinutes} 分钟，今天的学习书签就能收好啦。`
+      : questionsAreClose
+        ? `只差 ${remainingQuestions} 题了，要不要把今天的做题书签带回来？`
+        : undefined;
+  const paired = goalMessage ? undefined : chooseVariant(
     `taskReminder-${reminderSlot}`,
     functionalVoicePool(reminderSlot === "21:00" ? "task-reminder-21" : "task-reminder-22"),
   );
@@ -1711,9 +1782,9 @@ function maybePromptIncompleteTasks(now: Date): void {
   petWindow?.webContents.send("xiaolu:prompt", {
     id: key,
     type: "task-reminder",
-    label: "看任务",
-    message: paired.message,
-    voice: paired.voice,
+    label: goalMessage ? "看目标" : "看任务",
+    message: goalMessage ?? paired?.message ?? "今天还有一件事没有收好，来看看吧。",
+    ...(paired?.voice ? { voice: paired.voice } : {}),
     expiresAt: new Date(activePromptExpiresAt).toISOString(),
   });
 }
@@ -1768,40 +1839,22 @@ function scheduleNextSettlementAction(now = new Date()): void {
   nextSettlementActionAt = now.getTime() + randomBetween(4 * 60_000, 7 * 60_000);
 }
 
-function playSettlementAction(report: DailyReport, announce: boolean): void {
-  if (report.selfCompleted && report.friendCompleted) {
-    if (announce) emitVoiceVariant("settlement-together", [
-      { voice: "settlement-together-1", message: "我们都完成啦，这枚双人书签要好好收着。", animation: "jumping" },
-      ...functionalVoicePool("settlement-extra").filter((entry) => entry.voice.startsWith("settlement-together-")),
-    ], "✦");
-    else emitAction("jumping", undefined, undefined, 1_900);
-  } else if (report.selfCompleted && !report.friendCompleted) {
-    if (announce) emitVoiceVariant("settlement-self", [
-      { voice: "settlement-self-1", message: "你的这份完成了，双人书签留给下一次一起赢。", animation: "review" },
-      ...functionalVoicePool("settlement-extra").filter((entry) => entry.voice.startsWith("settlement-self-")),
-    ]);
-    else emitAction("review", undefined, undefined, 1_750);
-  } else if (!report.selfCompleted && report.friendCompleted) {
-    if (announce) emitVoiceVariant("settlement-friend", [
-      { voice: "settlement-friend-1", message: "她完成了今天的约定，明天继续一起走吧。", animation: "waiting" },
-      ...functionalVoicePool("settlement-extra").filter((entry) => entry.voice.startsWith("settlement-friend-")),
-    ]);
-    else emitAction("waiting", undefined, undefined, 1_750);
-  } else {
-    if (announce) emitVoiceVariant("settlement-none", [
-      { voice: "settlement-none-1", message: "今天先好好留档，双人书签明天再一起争取。", animation: "idle" },
-      ...functionalVoicePool("settlement-extra").filter((entry) => entry.voice.startsWith("settlement-none-")),
-    ]);
-    else emitAction("idle", undefined, undefined, 1_750);
+function playSettlementAction(_report: DailyReport, announce: boolean): void {
+  if (announce) {
+    emitPairedAction("settlement-summary", "review", lines.settlementSummary, voicePools.settlementSummary, undefined, 2_800);
+    return;
   }
+  emitAction("review", undefined, undefined, 1_850);
 }
 
 function publicState(message?: string): Record<string, unknown> {
   const now = new Date();
+  const date = localDateKey(now);
+  const previousGoals = getDay(studyState, date).goals;
   const reconciled = reconcileStudyState(studyState, now);
   studyState = reconciled.state;
-  const date = localDateKey(now);
   const today = getDay(studyState, date);
+  captureAutomaticGoalAwards(previousGoals, today.goals);
   const pending = reconciled.pendingCheckIn;
   const checkIns = CHECK_IN_SLOTS.map((slot) => {
     const record = today.checkIns[slot];
@@ -1829,12 +1882,14 @@ function publicState(message?: string): Record<string, unknown> {
       studyMs: studyMsForDay(studyState, date, now),
       checkIns,
       tasks: today.tasks,
+      goals: today.goals ?? null,
       report: today.report ?? null,
       yuQuiz: yuQuizSnapshot ?? null,
     },
     bounties: studyState.bounties,
+    automaticGoals: studyState.automaticGoals,
     history: daySummaries(studyState, now),
-    stats: calculateStats(studyState, now),
+    stats: calculateStats(studyState, now, yuQuizSnapshot),
     settings: studyState.settings,
     yuQuiz: {
       enabled: yuQuizEnabled,
@@ -1852,6 +1907,34 @@ function sendState(): void {
   const snapshot = publicState();
   if (petWindow && !petWindow.isDestroyed()) petWindow.webContents.send("xiaolu:state", snapshot);
   if (panelWindow && !panelWindow.isDestroyed()) panelWindow.webContents.send("xiaolu:state", snapshot);
+  flushAutomaticGoalAwards();
+}
+
+function captureAutomaticGoalAwards(
+  previous: ReturnType<typeof getDay>["goals"],
+  current: ReturnType<typeof getDay>["goals"],
+): void {
+  if (!current) return;
+  if (!previous?.studyCompletedAt && current.studyCompletedAt) pendingAutomaticGoalAwards.push("study");
+  if (!previous?.questionsCompletedAt && current.questionsCompletedAt) pendingAutomaticGoalAwards.push("questions");
+  if (!previous?.togetherCompletedAt && current.togetherCompletedAt) pendingAutomaticGoalAwards.push("together");
+}
+
+function flushAutomaticGoalAwards(): void {
+  if (pendingAutomaticGoalAwards.length === 0) return;
+  const awards = [...new Set(pendingAutomaticGoalAwards)];
+  pendingAutomaticGoalAwards = [];
+  if (awards.includes("together")) {
+    emitPairedAction("automatic-together", "jumping", lines.automaticTogether, voicePools.automaticTogether, "✦", 2_800);
+    return;
+  }
+  if (awards.includes("study")) {
+    emitPairedAction("automatic-study", "jumping", lines.automaticStudy, voicePools.automaticStudy, "✦", 2_800);
+    return;
+  }
+  if (awards.includes("questions")) {
+    emitPairedAction("automatic-questions", "jumping", lines.automaticQuestions, voicePools.automaticQuestions, "✦", 2_800);
+  }
 }
 
 function emitAction(animation: string, message?: string, effect?: string, lockMs = 1_700, voice?: string): void {
