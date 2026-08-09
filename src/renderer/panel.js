@@ -266,12 +266,14 @@ function renderTasks(tasks, today, automaticGoals) {
     studyMinutesTarget: automaticGoals?.studyMinutes ?? 180,
     questionsTarget: automaticGoals?.questions ?? 80,
   };
-  const studyMinutes = Math.floor((today?.studyMs ?? 0) / 60_000);
+  const studyMs = Math.max(0, Number(today?.studyMs) || 0);
+  const studyMinutes = Math.floor(studyMs / 60_000);
   const questions = today?.yuQuiz?.todayQuestions ?? 0;
-  const renderKey = JSON.stringify([tasks, goals, studyMinutes, questions, taskPage]);
+  const goalProgressPercent = calculateGoalProgressPercent(goals, studyMs, questions);
+  const renderKey = JSON.stringify([tasks, goals, studyMinutes, questions, goalProgressPercent, taskPage]);
   if (taskRenderKey === renderKey) return;
   taskRenderKey = renderKey;
-  renderGoalBoard(goals, studyMinutes, questions);
+  renderGoalBoard(goals, studyMinutes, questions, goalProgressPercent);
   const completed = ordered.filter((task) => task.completedAt).length;
   byId("task-progress").textContent = `${completed} / ${ordered.length}`;
   const list = byId("task-list");
@@ -285,7 +287,16 @@ function renderTasks(tasks, today, automaticGoals) {
   renderPager("task", taskPage, pageCount);
 }
 
-function renderGoalBoard(goals, studyMinutes, questions) {
+function calculateGoalProgressPercent(goals, studyMs, questions) {
+  const studyTargetMs = Math.max(1, Number(goals.studyMinutesTarget) || 0) * 60_000;
+  const questionsTarget = Math.max(1, Number(goals.questionsTarget) || 0);
+  const questionCount = Math.max(0, Number(questions) || 0);
+  const studyProgress = Math.min(1, Math.max(0, studyMs / studyTargetMs));
+  const questionsProgress = Math.min(1, questionCount / questionsTarget);
+  return Math.round((studyProgress + questionsProgress) * 50);
+}
+
+function renderGoalBoard(goals, studyMinutes, questions, goalProgressPercent) {
   const slots = [
     {
       slot: "gift", kind: "study", label: "今日", unit: "小时学习", image: "../assets/bookmarks/bookmark-friend-bounty.png",
@@ -296,8 +307,7 @@ function renderGoalBoard(goals, studyMinutes, questions) {
       target: goals.questionsTarget, value: questions, completed: Boolean(goals.questionsCompletedAt),
     },
   ];
-  const completedGoals = Number(Boolean(goals.studyCompletedAt)) + Number(Boolean(goals.questionsCompletedAt));
-  byId("goal-overall-progress").textContent = `${completedGoals * 50}%`;
+  byId("goal-overall-progress").textContent = `${goalProgressPercent}%`;
   byId("bounty-board").replaceChildren(...slots.map((config) => goalCard(config, goals)));
 }
 
