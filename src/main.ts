@@ -48,6 +48,7 @@ import {
   setYuQuizEventCursor,
   saveYuQuizSnapshot,
   saveYuQuizNoteTotals,
+  syncExternalDiaryTitles,
   skipStudyLaunch,
   snoozeStudyLaunch,
   beginStudyLaunchRitual,
@@ -68,6 +69,7 @@ import {
   type SupervisionTier,
   type YuQuizSnapshot,
 } from "./game.js";
+import { scanExternalDiaryDirectory } from "./external-diary.js";
 import { createYuQuizWakeServer } from "./yuquiz-wakeup.js";
 
 const PET_WINDOW = { width: 128, height: 208 } as const;
@@ -304,6 +306,9 @@ let panelWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let studyState: StudyState = initialStudyState();
 let stateFile = "";
+let externalDiaryDirectory = "";
+let externalDiarySyncInFlight = false;
+let lastExternalDiaryScheduledDate = "";
 let cursorTimer: NodeJS.Timeout | null = null;
 let scheduleTimer: NodeJS.Timeout | null = null;
 let stateTimer: NodeJS.Timeout | null = null;
@@ -383,6 +388,8 @@ app.whenReady().then(async () => {
   app.setAppUserModelId("dev.xiaolu.study-mate");
   stateFile = join(app.getPath("userData"), "xiaolu-study-state.json");
   studyState = await loadState();
+  externalDiaryDirectory = await loadExternalDiaryDirectory();
+  await syncExternalDiaryFromDisk(false);
   studyState = reconcileStudyState(studyState).state;
   applyLoginSetting();
   installIpc();
@@ -1289,6 +1296,7 @@ function isValidDateString(value: unknown): value is string {
 
 async function evaluateSchedule(announceMissed: boolean): Promise<void> {
   const now = new Date();
+  await maybeSyncExternalDiary(now);
   const result = reconcileStudyState(studyState, now);
   const changed = JSON.stringify(result.state) !== JSON.stringify(studyState);
   studyState = result.state;
@@ -1329,6 +1337,14 @@ async function evaluateSchedule(announceMissed: boolean): Promise<void> {
   }
   maybePlaySettlementAction(now);
   sendState();
+}
+
+async function maybeSyncExternalDiary(now: Date): Promise<void> {
+  if (!externalDiaryDirectory || now.getHours() !== 21) return;
+  const date = localDateKey(now);
+  if (lastExternalDiaryScheduledDate === date) return;
+  lastExternalDiaryScheduledDate = date;
+  await syncExternalDiaryFromDisk(true);
 }
 
 function maybePlayHourlyChatter(now: Date): void {
@@ -1884,6 +1900,7 @@ function publicState(message?: string): Record<string, unknown> {
       tasks: today.tasks,
       goals: today.goals ?? null,
       report: today.report ?? null,
+      externalDiary: today.externalDiary ?? null,
       yuQuiz: yuQuizSnapshot ?? null,
     },
     bounties: studyState.bounties,
@@ -2019,6 +2036,37 @@ async function loadState(): Promise<StudyState> {
   } catch (error) {
     if (isNodeError(error) && error.code !== "ENOENT") console.error("Failed to load Xiaolu study state", error);
     return initialStudyState();
+  }
+}
+
+async function loadExternalDiaryDirectory(): Promise<string> {
+  const configFile = join(app.getPath("userData"), "xiaolu-local-integrations.json");
+  try {
+    const value = JSON.parse(await readFile(configFile, "utf8")) as unknown;
+    if (!isRecord(value) || !isRecord(value.externalDiary) || value.externalDiary.enabled === false) return "";
+    return typeof value.externalDiary.directory === "string" ? value.externalDiary.directory.trim() : "";
+  } catch (error) {
+    if (isNodeError(error) && error.code !== "ENOENT") console.error("Failed to load local integration settings", error);
+    return "";
+  }
+}
+
+async function syncExternalDiaryFromDisk(persist: boolean): Promise<void> {
+  if (!externalDiaryDirectory || externalDiarySyncInFlight) return;
+  externalDiarySyncInFlight = true;
+  try {
+    const entries = await scanExternalDiaryDirectory(externalDiaryDirectory);
+    const next = syncExternalDiaryTitles(studyState, entries, new Date());
+    const changed = JSON.stringify(next) !== JSON.stringify(studyState);
+    studyState = next;
+    if (changed && persist) await persistState();
+    if (changed) sendState();
+  } catch (error) {
+    // A missing or temporarily offline OneDrive directory must never erase
+    // existing titles. Clearing only happens after a successful full scan.
+    console.error("Failed to sync external diary titles", error);
+  } finally {
+    externalDiarySyncInFlight = false;
   }
 }
 

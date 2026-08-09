@@ -144,11 +144,15 @@ function render(state) {
 
 function renderReport(today, yuQuiz = { enabled: false }) {
   const report = today.report;
-  const key = report ? report.submittedAt : "empty";
+  const externalDiary = today.externalDiary;
+  const key = `${report?.submittedAt ?? "empty"}:${externalDiary?.modifiedAt ?? "none"}:${externalDiary?.title ?? ""}`;
   if (loadedReportKey !== key) {
     loadedReportKey = key;
-    byId("note").value = report?.note ?? "";
+    byId("note").value = externalDiary?.title ?? report?.note ?? "";
   }
+  byId("note").readOnly = Boolean(externalDiary);
+  byId("note").title = externalDiary ? "这句话来自外部 Markdown 日记标题" : "";
+  byId("report-note-label-text").textContent = externalDiary ? "已从每日日记同步" : "给今天留一句话";
   const snapshot = yuQuiz.snapshot ?? today.yuQuiz;
   const questions = snapshot?.todayQuestions ?? report?.problemCount ?? 0;
   const accuracy = snapshot?.todayAccuracy ?? report?.accuracy ?? null;
@@ -195,18 +199,25 @@ function renderHistory(history) {
     meta.textContent = `打卡 ${day.checkedCount}/5 · 任务 ${completedTasks}/${taskCount} · 笔记 ${noteEntries} · 做题 ${day.problemCount ?? 0}`;
     item.append(top, meta);
     const note = document.createElement("blockquote");
-    note.textContent = day.report?.note || "双击给今天留一句话";
-    note.classList.toggle("empty", !day.report?.note);
-    note.tabIndex = 0;
-    note.title = "双击编辑这一天的一句话";
-    note.setAttribute("aria-label", `${day.report?.note || "还没有写下一句话"}。双击编辑`);
-    note.addEventListener("dblclick", () => beginHistoryNoteEdit(item, note, day));
-    note.addEventListener("keydown", (event) => {
-      if (event.key === "Enter") {
-        event.preventDefault();
-        beginHistoryNoteEdit(item, note, day);
-      }
-    });
+    const displayedNote = day.externalDiary?.title || day.report?.note || "";
+    note.textContent = displayedNote || "双击给今天留一句话";
+    note.classList.toggle("empty", !displayedNote);
+    if (day.externalDiary) {
+      note.classList.add("synced");
+      note.title = "来自外部 Markdown 日记标题";
+      note.setAttribute("aria-label", `${displayedNote}。来自外部日记`);
+    } else {
+      note.tabIndex = 0;
+      note.title = "双击编辑这一天的一句话";
+      note.setAttribute("aria-label", `${displayedNote || "还没有写下一句话"}。双击编辑`);
+      note.addEventListener("dblclick", () => beginHistoryNoteEdit(item, note, day));
+      note.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          beginHistoryNoteEdit(item, note, day);
+        }
+      });
+    }
     item.append(note);
     return item;
   }));

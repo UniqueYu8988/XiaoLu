@@ -47,6 +47,11 @@ const demoState = {
       friendCompleted: true,
       bookmark: "together",
     },
+    externalDiary: {
+      title: "把今天的认真整理成了一句值得留下的话",
+      sourceName: "2026-08-10｜把今天的认真整理成了一句值得留下的话.md",
+      modifiedAt: "2026-08-10T20:58:00+08:00",
+    },
     yuQuiz: { todayQuestions: 48, todayAccuracy: 87.5, todayNoteEntries: 3, todayNoteCharacters: 426 },
   },
   automaticGoals: { studyMinutes: 180, questions: 80, updatedAt: "2026-08-01T09:00:00+08:00" },
@@ -55,7 +60,7 @@ const demoState = {
     self: { slot: "self", title: "背诵二十个知识点", updatedAt: "2026-08-01T09:00:00+08:00" },
   },
   history: [
-    { date: "2026-08-10", studyMs: 9360000, checkedCount: 5, bountyCount: 2, completedBountyCount: 0, taskCount: 3, completedTaskCount: 1, problemCount: 48, yuQuiz: { todayNoteEntries: 3 }, report: { noteEntries: 3, note: "完成了两章复习，也把今天的错题整理好了。" } },
+    { date: "2026-08-10", studyMs: 9360000, checkedCount: 5, bountyCount: 2, completedBountyCount: 0, taskCount: 3, completedTaskCount: 1, problemCount: 48, yuQuiz: { todayNoteEntries: 3 }, report: { noteEntries: 3, note: "完成了两章复习，也把今天的错题整理好了。" }, externalDiary: { title: "把今天的认真整理成了一句值得留下的话", sourceName: "2026-08-10｜把今天的认真整理成了一句值得留下的话.md", modifiedAt: "2026-08-10T20:58:00+08:00" } },
     { date: "2026-08-09", studyMs: 11460000, checkedCount: 5, bountyCount: 2, completedBountyCount: 2, taskCount: 4, completedTaskCount: 4, problemCount: 62, yuQuiz: { todayNoteEntries: 2 }, report: { noteEntries: 2, note: "今天按计划完成了复习，明天继续。" } },
     { date: "2026-08-08", studyMs: 7740000, checkedCount: 4, bountyCount: 2, completedBountyCount: 1, taskCount: 3, completedTaskCount: 2, problemCount: 35, yuQuiz: { todayNoteEntries: 1 }, report: { noteEntries: 1, note: "把最难开始的一部分做完了。" } },
     { date: "2026-08-07", studyMs: 10200000, checkedCount: 5, bountyCount: 2, completedBountyCount: 2, taskCount: 3, completedTaskCount: 3, problemCount: 51, yuQuiz: { todayNoteEntries: 2 }, report: { noteEntries: 2, note: "把计划里的事情稳稳做完了。" } },

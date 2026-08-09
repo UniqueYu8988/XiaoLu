@@ -32,6 +32,19 @@ export interface DailyReport {
   readonly bookmark?: BookmarkType;
 }
 
+export interface ExternalDiaryReference {
+  readonly title: string;
+  readonly sourceName: string;
+  readonly modifiedAt: string;
+}
+
+export interface ExternalDiaryTitleInput {
+  readonly date: string;
+  readonly title: string;
+  readonly sourceName: string;
+  readonly modifiedAt: string;
+}
+
 export interface DailyTask {
   readonly id: string;
   readonly title: string;
@@ -116,6 +129,7 @@ export interface DayRecord {
   readonly yuQuiz?: YuQuizSnapshot;
   readonly goals?: DailyAutomaticGoals;
   readonly report?: DailyReport;
+  readonly externalDiary?: ExternalDiaryReference;
 }
 
 export interface StudySettings {
@@ -202,6 +216,7 @@ export interface PublicDaySummary {
   readonly yuQuiz?: YuQuizSnapshot;
   readonly goals?: DailyAutomaticGoals;
   readonly report?: DailyReport;
+  readonly externalDiary?: ExternalDiaryReference;
 }
 
 export interface StudyStats {
@@ -373,6 +388,9 @@ export function reconcileStudyState(current: StudyState, now = new Date()): Reco
     const shouldCreate = date === today || Boolean(days[date]);
     if (!shouldCreate) continue;
     const day = days[date] ?? emptyDay(date);
+    // Imported historical diary titles carry no reliable attendance data.
+    // Keep those days visible without retroactively turning every slot into a miss.
+    if (day.studyTimeUnknown && date !== today) continue;
     const checkIns = { ...day.checkIns };
     let changed = !days[date];
     for (const slot of CHECK_IN_SLOTS) {
@@ -494,6 +512,50 @@ export function updateDailyReportNote(current: StudyState, date: string, value: 
   const days = cloneDays(state.days);
   days[date] = { ...day, report };
   return { ...state, days, lastEvaluatedAt: now.toISOString() };
+}
+
+export function syncExternalDiaryTitles(
+  current: StudyState,
+  entries: readonly ExternalDiaryTitleInput[],
+  now = new Date(),
+): StudyState {
+  const state = normalizeStudyState(current, now);
+  const latestByDate = new Map<string, ExternalDiaryReference>();
+  for (const entry of entries) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(entry.date) || !isDateString(entry.modifiedAt)) continue;
+    const title = normalizeExternalDiaryTitle(entry.title);
+    const sourceName = normalizeExternalDiarySourceName(entry.sourceName);
+    if (!title || !sourceName) continue;
+    const candidate = { title, sourceName, modifiedAt: entry.modifiedAt };
+    const existing = latestByDate.get(entry.date);
+    if (!existing || candidate.modifiedAt > existing.modifiedAt
+      || (candidate.modifiedAt === existing.modifiedAt && candidate.sourceName > existing.sourceName)) {
+      latestByDate.set(entry.date, candidate);
+    }
+  }
+
+  const days = cloneDays(state.days);
+  let changed = false;
+  for (const [date, day] of Object.entries(days)) {
+    if (!day.externalDiary || latestByDate.has(date)) continue;
+    const { externalDiary: _removed, ...withoutExternalDiary } = day;
+    days[date] = withoutExternalDiary;
+    changed = true;
+  }
+
+  const today = localDateKey(now);
+  for (const [date, externalDiary] of latestByDate) {
+    const existing = days[date];
+    const day = existing ?? {
+      ...emptyDay(date),
+      ...(date === today ? {} : { studyTimeUnknown: true }),
+    };
+    if (JSON.stringify(day.externalDiary) === JSON.stringify(externalDiary)) continue;
+    days[date] = { ...day, externalDiary };
+    changed = true;
+  }
+
+  return changed ? { ...state, days, lastEvaluatedAt: now.toISOString() } : state;
 }
 
 export function addDailyTask(current: StudyState, id: string, title: string, now = new Date()): StudyState {
@@ -920,6 +982,7 @@ export function daySummaries(state: StudyState, now = new Date(), limit = 120): 
         ...(day.yuQuiz ? { yuQuiz: day.yuQuiz } : {}),
         ...(day.goals ? { goals: day.goals } : {}),
         ...(day.report ? { report: day.report } : {}),
+        ...(day.externalDiary ? { externalDiary: day.externalDiary } : {}),
       };
     });
 }
@@ -1068,6 +1131,7 @@ function normalizeDay(value: Record<string, unknown>, date: string): DayRecord {
   }
   const yuQuiz = normalizeYuQuizSnapshot(value.yuQuiz, date);
   const goals = normalizeDailyAutomaticGoals(value.goals);
+  const externalDiary = normalizeExternalDiaryReference(value.externalDiary);
   const authoritativeReport = report && yuQuiz
     ? {
         ...report,
@@ -1077,7 +1141,14 @@ function normalizeDay(value: Record<string, unknown>, date: string): DayRecord {
         noteCharacters: yuQuiz.todayNoteCharacters,
       }
     : report;
-  return { date, ...(value.studyTimeUnknown === true ? { studyTimeUnknown: true } : {}), sessions, checkIns, tasks, taskReminders: [...new Set(taskReminders)], studyLaunches, ...(yuQuiz ? { yuQuiz } : {}), ...(goals ? { goals } : {}), ...(authoritativeReport ? { report: authoritativeReport } : {}) };
+  return { date, ...(value.studyTimeUnknown === true ? { studyTimeUnknown: true } : {}), sessions, checkIns, tasks, taskReminders: [...new Set(taskReminders)], studyLaunches, ...(yuQuiz ? { yuQuiz } : {}), ...(goals ? { goals } : {}), ...(authoritativeReport ? { report: authoritativeReport } : {}), ...(externalDiary ? { externalDiary } : {}) };
+}
+
+function normalizeExternalDiaryReference(value: unknown): ExternalDiaryReference | undefined {
+  if (!isRecord(value) || !isDateString(value.modifiedAt)) return undefined;
+  const title = normalizeExternalDiaryTitle(value.title);
+  const sourceName = normalizeExternalDiarySourceName(value.sourceName);
+  return title && sourceName ? { title, sourceName, modifiedAt: value.modifiedAt } : undefined;
 }
 
 function normalizeDailyAutomaticGoals(value: unknown): DailyAutomaticGoals | undefined {
@@ -1243,6 +1314,18 @@ function normalizeTaskTitle(value: unknown): string | undefined {
   if (typeof value !== "string") return undefined;
   const title = value.trim().replace(/\s+/g, " ").slice(0, 60);
   return title || undefined;
+}
+
+function normalizeExternalDiaryTitle(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const title = value.trim().replace(/\s+/g, " ").slice(0, 120);
+  return title || undefined;
+}
+
+function normalizeExternalDiarySourceName(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const sourceName = value.trim().slice(0, 255);
+  return sourceName || undefined;
 }
 
 function dateAtLocalMidnight(date: string): Date {

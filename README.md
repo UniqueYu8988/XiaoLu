@@ -3,7 +3,7 @@
   <h1>共学日记</h1>
   <p>不是桌面宠物，而是住在桌面上的学习搭子。</p>
   <p>
-    <img alt="Version" src="https://img.shields.io/badge/version-1.6.0-76558f" />
+    <img alt="Version" src="https://img.shields.io/badge/version-1.7.1-76558f" />
     <img alt="Platform" src="https://img.shields.io/badge/platform-Windows-4b315e" />
     <img alt="Data" src="https://img.shields.io/badge/data-local--first-a9c99e" />
     <img alt="License" src="https://img.shields.io/badge/license-MIT-f4d57b" />
@@ -148,6 +148,19 @@ AI 很擅长查代码、补状态、写测试和机械调整，却不知道哪�
 ```
 
 应用没有账号、排行榜或云同步。可选的 YuQuiz 联动只读取本机 `http://127.0.0.1:8765` 提供的学习状态、题量、正确率和笔记统计数字；不会读取题目、答案、API Key 或笔记正文，也不会把数据上传到外部服务器。卸载前如需保留日记，请备份上面的状态文件。
+
+1.7.1 起可以选择从本机 Markdown 日记目录同步每日标题。应用启动时与每天 21:00 扫描目录，从 `YYYY-MM-DD｜标题.md` 和文件内第一个一级标题识别日期与标题；只把标题保存到学习记录，不复制正文，也不会因此创建虚假的今日结算。路径保存在本机私有配置：
+
+```json
+{
+  "externalDiary": {
+    "enabled": true,
+    "directory": "D:\\Diary\\2026"
+  }
+}
+```
+
+配置文件位置为 `%APPDATA%\xiaolu-desktop-pet\xiaolu-local-integrations.json`。具体私人路径不应提交到仓库。
 
 仓库不会收录使用者的日记、任务、打卡、位置、数据库、日志、密钥或备份。原始肖像、源录音和私人制作文件也不随项目发布；常见的本地数据路径已经加入 `.gitignore`。
 

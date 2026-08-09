@@ -34,6 +34,7 @@ import {
   supervisionTierForElapsed,
   studyMsForDay,
   submitDailyReport,
+  syncExternalDiaryTitles,
   toggleStudy,
   updateDailyReportNote,
 } from "../dist/game.js";
@@ -396,5 +397,38 @@ overnight = toggleStudy(overnight, at(23, 50)).state;
 const rolled = reconcileStudyState(overnight, at(0, 10, 19)).state;
 assert.equal(studyMsForDay(rolled, localDateKey(at(23, 50)), at(0, 10, 19)), 10 * 60_000);
 assert.equal(studyMsForDay(rolled, localDateKey(at(0, 10, 19)), at(0, 10, 19)), 10 * 60_000);
+
+const diarySyncNow = new Date(2026, 7, 9, 16, 0, 0);
+let diaryState = syncExternalDiaryTitles(initialStudyState(diarySyncNow), [{
+  date: "2026-08-08",
+  title: "文件里的新标题",
+  sourceName: "2026-08-08｜文件名标题.md",
+  modifiedAt: new Date(2026, 7, 9, 0, 0, 0).toISOString(),
+}, {
+  date: "2026-07-04",
+  title: "后来补写的旧日记",
+  sourceName: "2026-07-04｜后来补写的旧日记.md",
+  modifiedAt: new Date(2026, 7, 8, 23, 0, 0).toISOString(),
+}], diarySyncNow);
+assert.equal(diaryState.days["2026-08-08"]?.report, undefined);
+assert.equal(diaryState.days["2026-08-08"]?.externalDiary?.title, "文件里的新标题");
+assert.equal(diaryState.days["2026-07-04"]?.studyTimeUnknown, true);
+diaryState = reconcileStudyState(diaryState, diarySyncNow).state;
+assert.equal(Object.keys(diaryState.days["2026-07-04"]?.checkIns ?? {}).length, 0);
+assert.equal(daySummaries(diaryState, diarySyncNow).find((day) => day.date === "2026-07-04")?.externalDiary?.title, "后来补写的旧日记");
+
+diaryState = syncExternalDiaryTitles(diaryState, [{
+  date: "2026-08-08",
+  title: "较早的同日日记",
+  sourceName: "2026-08-08｜较早.md",
+  modifiedAt: new Date(2026, 7, 8, 20, 0, 0).toISOString(),
+}, {
+  date: "2026-08-08",
+  title: "最后修改的同日日记",
+  sourceName: "2026-08-08｜最后修改.md",
+  modifiedAt: new Date(2026, 7, 9, 1, 0, 0).toISOString(),
+}], diarySyncNow);
+assert.equal(diaryState.days["2026-08-08"]?.externalDiary?.title, "最后修改的同日日记");
+assert.equal(diaryState.days["2026-07-04"]?.externalDiary, undefined);
 
 console.log("Xiaolu study-state tests passed.");
