@@ -32,11 +32,17 @@ if (-not $tab) { exit 2 }
 $pattern = $tab.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern)
 $pattern.Select()
 $element = $tab
-while ($element -and $element.Current.NativeWindowHandle -eq 0) {
+$window = $null
+while ($element) {
+  if ($element.Current.ControlType -eq [System.Windows.Automation.ControlType]::Window -and
+      $element.Current.NativeWindowHandle -ne 0) {
+    $window = $element
+    break
+  }
   $element = [System.Windows.Automation.TreeWalker]::ControlViewWalker.GetParent($element)
 }
-if (-not $element) { exit 3 }
-$hwnd = [IntPtr]$element.Current.NativeWindowHandle
+if (-not $window) { exit 3 }
+$hwnd = [IntPtr]$window.Current.NativeWindowHandle
 [XiaoluForeground]::ShowWindowAsync($hwnd, 9) | Out-Null
 Start-Sleep -Milliseconds 80
 [XiaoluForeground]::SetForegroundWindow($hwnd) | Out-Null

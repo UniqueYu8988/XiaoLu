@@ -6,7 +6,7 @@ on:
       tag:
         description: Existing release tag to build and update
         required: true
-        default: v1.8.1
+        default: v1.8.2
 
 permissions:
   contents: write

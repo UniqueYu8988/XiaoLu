@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-import { STUDY_FOREGROUND_GRACE_MS, strongSupervisionBlocksPanel, studyForegroundDecision } from "../dist/study-enforcement.js";
+import { STUDY_FOREGROUND_GRACE_MS, shouldRepeatStudyForeground, strongSupervisionBlocksPanel, studyForegroundDecision } from "../dist/study-enforcement.js";
 
 const strictStartedAt = new Date(2026, 7, 11, 9, 0, 0).getTime();
 const base = {
@@ -48,5 +48,10 @@ assert.equal(strongSupervisionBlocksPanel("strong-start"), true);
 assert.equal(strongSupervisionBlocksPanel("strong-return"), true);
 assert.equal(strongSupervisionBlocksPanel("night"), false);
 assert.equal(strongSupervisionBlocksPanel(null), false);
+
+assert.equal(shouldRepeatStudyForeground({ key: "morning:start:1", lastKey: "", now: 1_000, lastAt: 0, pageOpen: true, pageVisible: true, repeatMs: 4_000 }), true);
+assert.equal(shouldRepeatStudyForeground({ key: "morning:start:1", lastKey: "morning:start:1", now: 5_000, lastAt: 0, pageOpen: true, pageVisible: false, repeatMs: 4_000 }), true);
+assert.equal(shouldRepeatStudyForeground({ key: "morning:start:1", lastKey: "morning:start:1", now: 3_999, lastAt: 0, pageOpen: true, pageVisible: false, repeatMs: 4_000 }), false);
+assert.equal(shouldRepeatStudyForeground({ key: "morning:start:1", lastKey: "morning:start:1", now: 8_000, lastAt: 0, pageOpen: true, pageVisible: true, repeatMs: 4_000 }), false);
 
 console.log("Xiaolu study-enforcement tests passed.");

@@ -20,6 +20,21 @@ export function strongSupervisionBlocksPanel(mode: string | null | undefined): b
   return mode === "strong-start" || mode === "strong-return";
 }
 
+export function shouldRepeatStudyForeground(input: {
+  readonly key: string;
+  readonly lastKey: string;
+  readonly now: number;
+  readonly lastAt: number;
+  readonly pageOpen: boolean;
+  readonly pageVisible: boolean;
+  readonly repeatMs: number;
+}): boolean {
+  if (input.key !== input.lastKey) return true;
+  return input.pageOpen
+    && !input.pageVisible
+    && input.now - input.lastAt >= input.repeatMs;
+}
+
 export function studyForegroundDecision(input: StudyForegroundDecisionInput): StudyForegroundDecision | undefined {
   if (input.effectiveStudy || input.suppressed) return undefined;
   const kind = input.hasStudiedThisPeriod ? "return" : "start";
