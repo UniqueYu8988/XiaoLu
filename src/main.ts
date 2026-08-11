@@ -70,6 +70,8 @@ import {
   type YuQuizSnapshot,
 } from "./game.js";
 import { scanExternalDiaryDirectory } from "./external-diary.js";
+import { strongSupervisionBlocksPanel, studyForegroundDecision, type StudyForegroundDecision } from "./study-enforcement.js";
+import { activateExistingYuQuizTab } from "./windows-browser.js";
 import { createYuQuizWakeServer } from "./yuquiz-wakeup.js";
 
 const PET_WINDOW = { width: 128, height: 208 } as const;
@@ -86,7 +88,6 @@ const STUDY_LAUNCH_SNOOZE_MS = 10 * 60_000;
 const STUDY_LAUNCH_RITUAL_MS = 5 * 60_000;
 const STUDY_LAUNCH_REPEAT_MS = 10 * 60_000;
 const YUQUIZ_ACTIVITY_TIMEOUT_MS = 10 * 60_000;
-const STUDY_PAUSE_PATROL_GRACE_MS = 15 * 60_000;
 const NIGHT_STROLL_RESUME_MS = 2 * 60_000;
 const STUDY_ANCHOR = { x: 0.03125, y: 0.2875 } as const;
 const PET_TRAVEL_SPEED = 230;
@@ -359,6 +360,7 @@ let yuQuizStatusBubble = "";
 let studyLaunchStatusBubble = "";
 let lastEffectiveStudyAt = 0;
 let wasEffectivelyStudying = false;
+let lastForcedYuQuizInterventionKey = "";
 let roamingMode: RoamingMode | null = null;
 let roamingTimer: NodeJS.Timeout | null = null;
 let lastHourlyChatterKey = "";
@@ -522,6 +524,12 @@ function createPanelWindow(): BrowserWindow {
 }
 
 function showPanel(view = "today"): void {
+  if (strongSupervisionBlocksPanel(roamingMode)) {
+    panelWindow?.hide();
+    petWindow?.showInactive();
+    emitAction("waiting", "现在不能躲进菜单哦。先回到学习，我会继续陪着你。", undefined, 2_400);
+    return;
+  }
   const window = createPanelWindow();
   if (roamingMode) stopRoaming(false, false);
   petWindow?.hide();
@@ -1427,14 +1435,36 @@ function manageRoaming(now: Date): void {
     if (studied) {
       studiedStrictPeriods.add(strict.key);
       const inactiveSince = Math.max(lastEffectiveStudyAt, activityAt, strict.startedAt);
-      if (now.getTime() - inactiveSince < STUDY_PAUSE_PATROL_GRACE_MS) {
+      const intervention = studyForegroundDecision({
+        now: now.getTime(),
+        strictKey: strict.key,
+        strictStartedAt: strict.startedAt,
+        effectiveStudy,
+        hasStudiedThisPeriod: true,
+        inactiveSince,
+        suppressed: false,
+      });
+      if (!intervention) {
         if (roamingMode?.startsWith("strong")) stopRoaming(false);
         return;
       }
-      startRoaming("strong-return", inactiveSince + STUDY_PAUSE_PATROL_GRACE_MS);
+      startRoaming("strong-return", intervention.dueAt);
+      forceYuQuizToForeground(intervention);
       return;
     }
-    startRoaming("strong-start", strict.startedAt + STUDY_LAUNCH_GRACE_MS);
+    const patrolDueAt = strict.startedAt + STUDY_LAUNCH_GRACE_MS;
+    if (now.getTime() >= patrolDueAt) startRoaming("strong-start", patrolDueAt);
+    else if (strongSupervisionBlocksPanel(roamingMode)) stopRoaming(false);
+    const intervention = studyForegroundDecision({
+      now: now.getTime(),
+      strictKey: strict.key,
+      strictStartedAt: strict.startedAt,
+      effectiveStudy,
+      hasStudiedThisPeriod: false,
+      inactiveSince: strict.startedAt,
+      suppressed: false,
+    });
+    if (intervention) forceYuQuizToForeground(intervention);
     return;
   }
 
@@ -1445,6 +1475,34 @@ function manageRoaming(now: Date): void {
     && (!lastEffectiveStudyAt || now.getTime() - lastEffectiveStudyAt >= NIGHT_STROLL_RESUME_MS);
   if (mayStroll) startRoaming("night");
   else if (roamingMode === "night") stopRoaming(false);
+}
+
+function forceYuQuizToForeground(intervention: StudyForegroundDecision): void {
+  if (lastForcedYuQuizInterventionKey === intervention.key) return;
+  lastForcedYuQuizInterventionKey = intervention.key;
+  panelWindow?.hide();
+  petWindow?.showInactive();
+  emitAction(
+    "waiting",
+    intervention.kind === "return"
+      ? "已经离开十五分钟啦。先回到学习台，我们从刚才那里继续。"
+      : "十五分钟到了。学习台已经替你打开，先从眼前这一题开始。",
+    "▶",
+    3_200,
+  );
+  const pageAlreadyOpen = yuQuizRuntime.snapshot?.pageOpen === true;
+  const foreground = pageAlreadyOpen
+    ? activateExistingYuQuizTab()
+    : shell.openExternal(YUQUIZ_BASE_URL).then(() => true);
+  void foreground.then((activated) => {
+    if (!activated && pageAlreadyOpen) {
+      emitAction("waiting", "学习台已经开着啦，回到浏览器里的那个标签页吧。", "▶", 3_200);
+    }
+    scheduleYuQuizSync(100);
+  }).catch((error) => {
+    lastForcedYuQuizInterventionKey = "";
+    console.error("Failed to bring YuQuiz to the foreground", error);
+  });
 }
 
 function pauseRoamingForCheckIn(): void {
@@ -1490,7 +1548,11 @@ function strongPatrolStepDelay(tier: SupervisionTier): number {
 }
 
 function startRoaming(mode: RoamingMode, escalationStartedAt = Date.now()): void {
-  if (!petReady || !petWindow || petWindow.isDestroyed() || panelWindow?.isVisible()) return;
+  if (strongSupervisionBlocksPanel(mode) && panelWindow?.isVisible()) {
+    panelWindow.hide();
+    petWindow?.showInactive();
+  }
+  if (!petReady || !petWindow || petWindow.isDestroyed() || (mode === "night" && panelWindow?.isVisible())) return;
   if (roamingMode === mode) return;
   if (roamingMode) stopRoaming(false, false);
   if (centerAttentionActive || petTravel?.kind === "attention" || petTravel?.kind.startsWith("attention-return")) {
@@ -1540,7 +1602,12 @@ function scheduleRoamingStep(delay: number): void {
   if (roamingTimer) clearTimeout(roamingTimer);
   roamingTimer = setTimeout(() => {
     roamingTimer = null;
-    if (!roamingMode || !petWindow || petWindow.isDestroyed() || dragging || panelWindow?.isVisible()) return;
+    if (!roamingMode || !petWindow || petWindow.isDestroyed() || dragging) return;
+    if (panelWindow?.isVisible()) {
+      if (!strongSupervisionBlocksPanel(roamingMode)) return;
+      panelWindow.hide();
+      petWindow.showInactive();
+    }
     const work = screen.getPrimaryDisplay().workArea;
     const marginX = roamingMode === "night" ? work.width * 0.12 : work.width * 0.04;
     const marginY = roamingMode === "night" ? work.height * 0.18 : work.height * 0.08;

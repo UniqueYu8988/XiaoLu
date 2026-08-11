@@ -3,7 +3,7 @@
   <h1>共学日记</h1>
   <p>不是桌面宠物，而是住在桌面上的学习搭子。</p>
   <p>
-    <img alt="Version" src="https://img.shields.io/badge/version-1.7.1-76558f" />
+    <img alt="Version" src="https://img.shields.io/badge/version-1.8.1-76558f" />
     <img alt="Platform" src="https://img.shields.io/badge/platform-Windows-4b315e" />
     <img alt="Data" src="https://img.shields.io/badge/data-local--first-a9c99e" />
     <img alt="License" src="https://img.shields.io/badge/license-MIT-f4d57b" />
@@ -69,6 +69,8 @@
 ```
 
 把它写成明确状态后，才不会出现动作互相覆盖、网页关闭后无法返程、重复计时或提醒无限触发等问题。
+
+强监督时段内，打开日记菜单不再暂停小鹿的巡逻：菜单会自动收起，小鹿继续提醒。超过 15 分钟仍未开始或回到有效学习时，应用会把 YuQuiz 学习台带到前台；页面已打开时复用并选中原标签页，只有确实未打开时才创建页面。同一次离开只触发一次，避免反复打扰。
 
 ### 5. 用本机 API 联动其他学习工具
 
