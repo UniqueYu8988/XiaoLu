@@ -30,6 +30,7 @@ const completedMessageKeys = new Set();
 let dragging = false;
 let pointerHeld = false;
 let dragStart = null;
+let activePointerId = null;
 let dragDirection = "right";
 let autoRunning = false;
 let autoRunDirection = "right";
@@ -305,10 +306,15 @@ card.addEventListener("pointerdown", (event) => {
   pointerHeld = true;
   dragging = false;
   dragStart = { x: event.screenX, y: event.screenY };
+  activePointerId = event.pointerId;
   card.setPointerCapture(event.pointerId);
 });
 
 card.addEventListener("pointermove", (event) => {
+  if (pointerHeld && (event.buttons & 1) === 0) {
+    finishDrag(event);
+    return;
+  }
   if (!pointerHeld || !dragStart || dragging) return;
   if (Math.hypot(event.screenX - dragStart.x, event.screenY - dragStart.y) <= 4) return;
   dragging = true;
@@ -316,14 +322,18 @@ card.addEventListener("pointermove", (event) => {
   api.dragStart({ screenX: dragStart.x, screenY: dragStart.y });
 });
 
-function finishDrag(event) {
+function finishDrag(event = {}) {
   if (!pointerHeld) return;
   const wasDragging = dragging;
+  const pointerId = Number.isInteger(event.pointerId) ? event.pointerId : activePointerId;
   pointerHeld = false;
   dragging = false;
   dragStart = null;
+  activePointerId = null;
   if (wasDragging) api.dragEnd();
-  try { card.releasePointerCapture(event.pointerId); } catch {}
+  if (pointerId !== null) {
+    try { card.releasePointerCapture(pointerId); } catch {}
+  }
   if (wasDragging && queuedAction) {
     const action = queuedAction;
     queuedAction = null;
@@ -338,6 +348,13 @@ function finishDrag(event) {
 
 card.addEventListener("pointerup", finishDrag);
 card.addEventListener("pointercancel", finishDrag);
+card.addEventListener("lostpointercapture", finishDrag);
+window.addEventListener("pointerup", finishDrag, true);
+window.addEventListener("pointercancel", finishDrag, true);
+window.addEventListener("blur", finishDrag);
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) finishDrag();
+});
 card.addEventListener("dblclick", () => void api.petDoubleClick());
 card.addEventListener("contextmenu", (event) => { event.preventDefault(); api.openPanel(); });
 card.addEventListener("keydown", (event) => {
@@ -353,6 +370,7 @@ api.onDragDirection((direction) => {
   dragDirection = direction;
   if (dragging) applyAnimation(`running-${dragDirection}`, true);
 });
+api.onDragReset(() => finishDrag());
 api.onAutoRun((state) => {
   autoRunning = state?.active === true;
   if (state?.direction === "left" || state?.direction === "right") autoRunDirection = state.direction;

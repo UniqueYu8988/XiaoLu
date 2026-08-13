@@ -95,6 +95,7 @@ const PET_TRAVEL_SPEED = 230;
 const PATROL_TRAVEL_SPEED = 115;
 const NIGHT_STROLL_SPEED = 72;
 const CENTER_ATTENTION_MS = 15_000;
+const DRAG_FAILSAFE_MS = 30_000;
 const HOURLY_CHATTER_WINDOW_MS = 90_000;
 const HOURLY_CHATTER_HOURS = new Map<number, string>([
   [0, "hourly-midnight"],
@@ -320,7 +321,7 @@ let yuQuizSyncInFlight = false;
 let yuQuizSyncQueued = false;
 let dragTimer: NodeJS.Timeout | null = null;
 let petTravelTimer: NodeJS.Timeout | null = null;
-let dragging: { startX: number; startY: number; windowX: number; windowY: number; lastCursorX: number } | null = null;
+let dragging: { startX: number; startY: number; windowX: number; windowY: number; lastCursorX: number; startedAt: number } | null = null;
 let persistDraggedPositionAsHome = true;
 type PetTravelKind = "outbound" | "return" | "attention" | "attention-return-dock" | "attention-return-home" | "patrol" | "stroll" | "roaming-return";
 type RoamingMode = "strong-start" | "strong-return" | "night";
@@ -475,6 +476,9 @@ function createPetWindow(): void {
     petReady = false;
     petWindow = null;
     isPetIgnoringMouse = false;
+  });
+  petWindow.on("blur", () => {
+    if (dragging) stopDragging(true);
   });
   petWindow.webContents.on("did-finish-load", () => {
     if (!petWindow || petWindow.isDestroyed()) return;
@@ -772,12 +776,16 @@ function installIpc(): void {
     const bounds = petWindow.getContentBounds();
     const cursor = screen.getCursorScreenPoint();
     stopDragging();
-    dragging = { startX: cursor.x, startY: cursor.y, windowX: bounds.x, windowY: bounds.y, lastCursorX: cursor.x };
+    dragging = { startX: cursor.x, startY: cursor.y, windowX: bounds.x, windowY: bounds.y, lastCursorX: cursor.x, startedAt: Date.now() };
     setPetMousePassthrough(false);
     petWindow.webContents.send("xiaolu:drag-direction", lastDragDirection);
     dragTimer = setInterval(() => {
       if (!petWindow || petWindow.isDestroyed() || !dragging) {
         stopDragging();
+        return;
+      }
+      if (Date.now() - dragging.startedAt >= DRAG_FAILSAFE_MS) {
+        stopDragging(true);
         return;
       }
       const current = screen.getCursorScreenPoint();
@@ -2179,10 +2187,14 @@ function persistState(): Promise<void> {
   return persistQueue;
 }
 
-function stopDragging(): void {
+function stopDragging(notifyRenderer = false): void {
   dragging = null;
   if (dragTimer) clearInterval(dragTimer);
   dragTimer = null;
+  if (notifyRenderer && petWindow && !petWindow.isDestroyed()) {
+    petWindow.webContents.send("xiaolu:drag-reset");
+  }
+  syncPetMousePassthrough();
 }
 
 function handleYuQuizDocking(snapshot?: YuQuizSnapshot): void {

@@ -19,5 +19,6 @@ contextBridge.exposeInMainWorld("xiaoluPet", {
   onStatusBubble: (callback) => ipcRenderer.on("xiaolu:status-bubble", (_event, message) => callback(message)),
   onClearStatusBubble: (callback) => ipcRenderer.on("xiaolu:clear-status-bubble", () => callback()),
   onDragDirection: (callback) => ipcRenderer.on("xiaolu:drag-direction", (_event, direction) => callback(direction)),
+  onDragReset: (callback) => ipcRenderer.on("xiaolu:drag-reset", () => callback()),
   onAutoRun: (callback) => ipcRenderer.on("xiaolu:auto-run", (_event, state) => callback(state)),
 });
