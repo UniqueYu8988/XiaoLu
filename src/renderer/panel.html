@@ -16,6 +16,7 @@
         <div class="title-actions">
           <span id="bookmark-gain" class="bookmark-gain" aria-hidden="true">+1</span>
           <button id="open-bookmarks" class="icon-button bookmark-button" type="button" aria-label="打开书签收藏" title="书签收藏"><span class="bookmark-symbol" aria-hidden="true"></span></button>
+          <button id="open-history" class="icon-button history-button" type="button" aria-label="打开学习记录" title="学习记录"><span class="history-symbol" aria-hidden="true"></span></button>
           <button id="close" class="icon-button" type="button" aria-label="关闭">×</button>
         </div>
       </header>
@@ -36,7 +37,7 @@
       <nav class="tabs" aria-label="共学日记页面">
         <button class="tab active" data-tab="today" type="button">今日</button>
         <button class="tab" data-tab="tasks" type="button">任务</button>
-        <button class="tab" data-tab="history" type="button">记录</button>
+        <button class="tab" data-tab="todos" type="button">待办</button>
         <button class="tab" data-tab="stats" type="button">统计</button>
       </nav>
 
@@ -50,16 +51,19 @@
             <div class="section-title"><span>02</span><h2>今日结算</h2></div>
             <p class="helper">今天留下的学习痕迹，我已经替你整理好啦。</p>
             <form id="report-form">
-              <div class="settlement-stats" aria-label="今日 YuQuiz 学习统计">
+              <div class="settlement-stats" aria-label="今日学习统计">
                 <div class="settlement-stat settlement-stat-wide stat-time"><img class="settlement-stat-icon" src="../assets/ui/settlement/study-time.png" alt="" /><span>学习时间</span><strong id="report-study-time">0 分钟</strong></div>
-                <div class="settlement-stat settlement-stat-wide stat-questions"><img class="settlement-stat-icon" src="../assets/ui/settlement/questions.png" alt="" /><span>做题数量</span><strong id="report-questions">0 题</strong></div>
-                <div class="settlement-stat stat-accuracy"><img class="settlement-stat-icon" src="../assets/ui/settlement/accuracy.png" alt="" /><span>正确率</span><strong id="report-accuracy">—</strong></div>
-                <div class="settlement-stat stat-notes"><img class="settlement-stat-icon" src="../assets/ui/settlement/notes.png" alt="" /><span>笔记</span><strong id="report-note-entries">0 条</strong></div>
-                <div class="settlement-stat stat-characters"><img class="settlement-stat-icon" src="../assets/ui/settlement/note-characters.png" alt="" /><span>净新增</span><strong id="report-note-characters">0 字</strong></div>
+                <div class="settlement-stat settlement-stat-wide stat-questions"><img class="settlement-stat-icon" src="../assets/ui/settlement/questions.png" alt="" /><span>综合完成</span><strong id="report-questions">0%</strong></div>
+                <div class="settlement-stat stat-accuracy"><img class="settlement-stat-icon" src="../assets/ui/settlement/accuracy.png" alt="" /><span>错题攻坚</span><strong id="report-accuracy">待完成</strong></div>
+                <div class="settlement-stat stat-notes"><img class="settlement-stat-icon" src="../assets/ui/settlement/notes.png" alt="" /><span>口腔背诵</span><strong id="report-note-entries">待完成</strong></div>
+                <div class="settlement-stat stat-characters"><img class="settlement-stat-icon" src="../assets/ui/settlement/note-characters.png" alt="" /><span>在场打卡</span><strong id="report-note-characters">0/5</strong></div>
+                <div class="settlement-stat stat-subject stat-subject-oral"><img class="settlement-stat-icon" src="../assets/ui/settlement/subject-oral.png" alt="" /><span>口腔</span><strong id="report-subject-oral">0%</strong></div>
+                <div class="settlement-stat stat-subject stat-subject-english"><img class="settlement-stat-icon" src="../assets/ui/settlement/subject-english.png" alt="" /><span>英语</span><strong id="report-subject-english">0%</strong></div>
+                <div class="settlement-stat stat-subject stat-subject-politics"><img class="settlement-stat-icon" src="../assets/ui/settlement/subject-politics.png" alt="" /><span>政治</span><strong id="report-subject-politics">0%</strong></div>
               </div>
-              <label class="field report-note-field">
-                <span><img src="../assets/ui/settlement/daily-summary.png" alt="" /><span id="report-note-label-text">给今天留一句话</span></span>
-                <input id="note" type="text" maxlength="120" placeholder="今天，我想记住……" />
+              <label class="field report-note-field vocabulary-field">
+                <span><img src="../assets/ui/settlement/daily-summary.png" alt="" /><span id="report-note-label-text">今日背诵单词</span></span>
+                <input id="vocabulary-count" type="number" min="0" max="5000" step="1" inputmode="numeric" placeholder="填写今天背过的单词数量" />
               </label>
               <button id="submit-report" class="pixel-button primary wide" type="submit">收进今天的日记</button>
             </form>
@@ -69,18 +73,21 @@
         </section>
 
         <section id="view-tasks" class="view">
-          <div class="section-title goal-section-title"><span>GOAL</span><h2>今日目标</h2><strong id="goal-overall-progress">0%</strong></div>
-          <p class="helper">达到目标后自动收下书签；两项都完成，再获得一枚双人书签。</p>
+          <div class="section-title goal-section-title"><span>GOAL</span><h2>今日任务</h2><strong id="goal-overall-progress">0%</strong></div>
+          <p id="goal-helper" class="helper">书签会跟着进度一点点亮起来，完成后就正式收入收藏。</p>
           <div id="bounty-board" class="bounty-board"></div>
+        </section>
+
+        <section id="view-todos" class="view">
           <div class="task-list-heading">
             <div class="task-list-title">
-              <span>今日清单</span>
+              <span>待办清单</span>
               <strong id="task-progress">0 / 0</strong>
             </div>
             <div id="task-pager" class="pager pager-inline" aria-label="任务翻页" hidden><button id="task-prev" type="button" aria-label="上一页">‹</button><span id="task-page">1 / 1</span><button id="task-next" type="button" aria-label="下一页">›</button></div>
           </div>
           <form id="task-form" class="task-form">
-            <input id="task-title" type="text" maxlength="60" autocomplete="off" placeholder="写下一件今天要做的事" aria-label="新任务" />
+            <input id="task-title" type="text" maxlength="60" autocomplete="off" placeholder="记下一件以后想做的事" aria-label="新任务" />
             <button class="pixel-button primary" type="submit">加入</button>
           </form>
           <div id="task-list" class="task-list"></div>
@@ -95,11 +102,11 @@
 
         <section id="view-bookmarks" class="view">
           <div class="section-title"><span>COL</span><h2>我们的书签</h2></div>
-          <p class="helper">学习与做题各留下一枚证明，两项目标都完成时再收下双人书签。</p>
+          <p class="helper">阅读与做题各留下一枚证明，综合进度达标时再收下双人书签。</p>
           <div class="bookmark-showcase">
             <figure class="showcase-item self">
-              <div class="showcase-art"><img src="../assets/bookmarks/bookmark-self.png" alt="做题达标书签" /><span class="bookmark-count">× <strong id="bookmark-self-count">0</strong></span></div>
-              <figcaption>做题书签</figcaption>
+              <div class="showcase-art"><img src="../assets/bookmarks/bookmark-self.png" alt="我的学习书签" /><span class="bookmark-count">× <strong id="bookmark-self-count">0</strong></span></div>
+              <figcaption>我的书签</figcaption>
             </figure>
             <figure class="showcase-item together">
               <div class="showcase-art"><img src="../assets/bookmarks/bookmark-together.png" alt="双人书签" /><span class="bookmark-count">× <strong id="bookmark-together-count">0</strong></span></div>
@@ -107,7 +114,7 @@
             </figure>
             <figure class="showcase-item friend">
               <div class="showcase-art"><img src="../assets/bookmarks/bookmark-friend.png" alt="学习达标书签" /><span class="bookmark-count">× <strong id="bookmark-friend-count">0</strong></span></div>
-              <figcaption>学习书签</figcaption>
+              <figcaption>她的书签</figcaption>
             </figure>
           </div>
           <p id="bookmark-summary" class="bookmark-summary">我们的第一枚书签，还在等一个认真完成的日子。</p>
@@ -123,7 +130,7 @@
           </label>
           <label class="setting-row">
             <img class="setting-icon" src="../assets/ui/settings/yuquiz.png" alt="" />
-            <span><strong>小鹿做题</strong><small>连接 YuQuiz，自动记录做题</small></span>
+            <span><strong>小鹿学习</strong><small>连接 YuReader，同步阅读与做题进度</small></span>
             <input id="yuquiz-integration" type="checkbox" />
           </label>
           <label class="setting-row">
@@ -144,6 +151,7 @@
 
       <p id="feedback" class="feedback" aria-live="polite" hidden></p>
     </div>
+    <script src="../assets/vendor/canvas-confetti.browser.js"></script>
     <script src="panel.js"></script>
   </body>
 </html>

@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 
-export const YUQUIZ_TAB_TITLE_PATTERN = /口腔执业|学习台|YuQuiz/i;
+export const YUQUIZ_TAB_TITLE_PATTERN = /YuReader|本地阅读空间/i;
 
 export function yuQuizTabTitleMatches(title: string): boolean {
   return YUQUIZ_TAB_TITLE_PATTERN.test(title);
@@ -26,7 +26,7 @@ $tabs = [System.Windows.Automation.AutomationElement]::RootElement.FindAll(
   $condition
 )
 $tab = $tabs |
-  Where-Object { $_.Current.Name -match '口腔执业|学习台|YuQuiz' } |
+  Where-Object { $_.Current.Name -match 'YuReader|本地阅读空间' } |
   Select-Object -First 1
 if (-not $tab) { exit 2 }
 $pattern = $tab.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern)

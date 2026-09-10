@@ -10,6 +10,7 @@ let historyPage = 0;
 let taskPage = 0;
 let taskRenderKey = null;
 let bookmarkCounts = null;
+let goalParticleTimer = null;
 const HISTORY_PAGE_SIZE = 4;
 const TASK_PAGE_SIZE = 3;
 
@@ -82,11 +83,26 @@ function displayDate(date) {
   return date.replaceAll("-", ".");
 }
 
+function formatPercent(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return "0";
+  return Number.isInteger(number) ? String(number) : number.toFixed(1);
+}
+
 function statusLabel(status) {
-  if (status === "checked") return "已到";
-  if (status === "missed") return "错过";
+  if (status === "checked") return "✓";
+  if (status === "missed") return "×";
   if (status === "pending") return "现在";
-  return "待定";
+  return "·";
+}
+
+function setCompletionMark(id, completed, detail) {
+  const node = byId(id);
+  node.textContent = completed ? "✓" : "×";
+  node.classList.toggle("completion-yes", completed);
+  node.classList.toggle("completion-no", !completed);
+  node.title = detail ?? (completed ? "已完成" : "未完成");
+  node.setAttribute("aria-label", node.title);
 }
 
 function bookmarkName(type) {
@@ -98,18 +114,12 @@ function render(state) {
   latestState = state;
   byId("today-date").textContent = displayDate(state.date);
   byId("timer").textContent = formatDuration(state.today.studyMs);
-  const yuQuiz = state.yuQuiz ?? { enabled: false };
-  if (yuQuiz.enabled) {
-    byId("timer-status").textContent = "小鹿在 YuQuiz 旁边坐好啦，安心做题吧。";
-    byId("toggle-study").textContent = "YuQuiz 自动记录";
-    byId("toggle-study").disabled = true;
-  } else {
-    byId("timer-status").textContent = yuQuiz.connected
-      ? "小鹿找到 YuQuiz 啦，等你翻开下一道题。"
-      : state.isStudying ? "这一段，我陪你一起认真。" : state.today.report ? "今天的认真，已经收进日记了。" : "准备好时，叫我一起开始吧。";
-    byId("toggle-study").textContent = state.isStudying ? "学习中" : state.today.report ? "今日已收好" : "开始学习";
-    byId("toggle-study").disabled = Boolean(state.today.report && !state.isStudying);
-  }
+  const yuReader = state.yuReader ?? { enabled: false, connected: false };
+  byId("timer-status").textContent = yuReader.enabled && yuReader.snapshot?.studyState === "learning"
+    ? "YuReader 正在记录，我会安静陪着你。"
+    : state.isStudying ? "这一段，我陪你一起认真。" : state.today.report ? "今天的认真，已经收进日记了。" : "准备好时，叫我一起开始吧。";
+  byId("toggle-study").textContent = state.isStudying ? "学习中" : state.today.report ? "今日已收好" : "开始学习";
+  byId("toggle-study").disabled = Boolean(state.today.report && !state.isStudying);
   portraitPersistent = portraitAnimations[state.persistentAnimation] ? state.persistentAnimation : "idle";
   if (!portraitLocked) setPortraitAnimation(portraitPersistent, true);
 
@@ -127,13 +137,14 @@ function render(state) {
   byId("check-in-now").hidden = !state.pendingCheckIn;
   byId("check-in-now").textContent = state.pendingCheckIn ? `${state.pendingCheckIn.slot} · 我在` : "我在";
 
-  renderReport(state.today, yuQuiz);
-  renderTasks(state.today.tasks ?? [], state.today, state.automaticGoals);
+  renderReport(state.today, yuReader);
+  renderTasks(state.today.tasks ?? [], state.today, yuReader);
   renderHistory(state.history);
   renderBookmarkCollection(state.stats);
   renderStats(state.stats);
   byId("launch-at-login").checked = state.settings.launchAtLogin;
-  byId("yuquiz-integration").checked = Boolean(yuQuiz.enabled);
+  byId("yuquiz-integration").checked = Boolean(yuReader.enabled);
+  byId("yuquiz-integration").disabled = false;
   byId("patrol-enabled").checked = state.settings.patrolEnabled !== false;
   byId("voice-enabled").checked = state.settings.voiceEnabled !== false;
   byId("voice-volume").value = Number.isFinite(state.settings.voiceVolume) ? state.settings.voiceVolume : 0.82;
@@ -142,27 +153,29 @@ function render(state) {
   if (state.message) showFeedback(state.message);
 }
 
-function renderReport(today, yuQuiz = { enabled: false }) {
+function renderReport(today, yuReader = { enabled: false }) {
   const report = today.report;
-  const externalDiary = today.externalDiary;
-  const key = `${report?.submittedAt ?? "empty"}:${externalDiary?.modifiedAt ?? "none"}:${externalDiary?.title ?? ""}`;
+  const snapshot = yuReader.snapshot ?? today.yuReader;
+  const key = `${report?.submittedAt ?? "empty"}:${snapshot?.vocabularyCount ?? 0}`;
   if (loadedReportKey !== key) {
     loadedReportKey = key;
-    byId("note").value = externalDiary?.title ?? report?.note ?? "";
+    byId("vocabulary-count").value = String(snapshot?.vocabularyCount ?? report?.vocabularyCount ?? 0);
   }
-  byId("note").readOnly = Boolean(externalDiary);
-  byId("note").title = externalDiary ? "这句话来自外部 Markdown 日记标题" : "";
-  byId("report-note-label-text").textContent = externalDiary ? "已从每日日记同步" : "给今天留一句话";
-  const snapshot = yuQuiz.snapshot ?? today.yuQuiz;
-  const questions = snapshot?.todayQuestions ?? report?.problemCount ?? 0;
-  const accuracy = snapshot?.todayAccuracy ?? report?.accuracy ?? null;
-  const noteEntries = snapshot?.todayNoteEntries ?? report?.noteEntries ?? 0;
-  const noteCharacters = snapshot?.todayNoteCharacters ?? report?.noteCharacters ?? 0;
+  const checkedCount = (today.checkIns ?? []).filter((item) => item.status === "checked").length;
   byId("report-study-time").textContent = formatDuration(today.studyMs ?? 0);
-  byId("report-questions").textContent = `${questions} 题`;
-  byId("report-accuracy").textContent = accuracy === null ? "—" : `${Number(accuracy.toFixed(1))}%`;
-  byId("report-note-entries").textContent = `${noteEntries} 条`;
-  byId("report-note-characters").textContent = noteCharacters > 0 ? `+${noteCharacters} 字` : "0 字";
+  byId("report-questions").textContent = `${formatPercent(today.goals?.overallPercent ?? report?.overallProgress ?? 0)}%`;
+  const mistakeCompleted = Boolean(snapshot?.mistakeReviewCompleted ?? report?.mistakeReviewCompleted);
+  const oralCompleted = Boolean(snapshot?.oralReviewCompleted ?? report?.oralReviewCompleted);
+  setCompletionMark("report-accuracy", mistakeCompleted, mistakeCompleted ? "错题攻坚已完成" : "错题攻坚未完成");
+  setCompletionMark("report-note-entries", oralCompleted, oralCompleted ? "口腔背诵已完成" : "口腔背诵未完成");
+  const checkInSummary = byId("report-note-characters");
+  checkInSummary.classList.remove("completion-yes", "completion-no");
+  checkInSummary.textContent = `${checkedCount}/5`;
+  checkInSummary.title = `今日在场 ${checkedCount}/5`;
+  const subjects = snapshot?.subjects ?? {};
+  byId("report-subject-oral").textContent = `${formatPercent(subjects.medicine?.percent ?? 0)}%`;
+  byId("report-subject-english").textContent = `${formatPercent(subjects.english?.percent ?? 0)}%`;
+  byId("report-subject-politics").textContent = `${formatPercent(subjects.politics?.percent ?? 0)}%`;
   const result = byId("report-result");
   result.hidden = !report;
   if (report) result.textContent = `已结算 · ${bookmarkName(report.bookmark)}`;
@@ -193,10 +206,14 @@ function renderHistory(history) {
     time.textContent = day.studyTimeUnknown ? "不详" : compactDuration(day.studyMs);
     top.append(date, time);
     const meta = document.createElement("p");
-    const completedTasks = (day.completedTaskCount ?? 0) + (day.completedBountyCount ?? 0);
-    const taskCount = (day.taskCount ?? 0) + (day.bountyCount ?? 0);
-    const noteEntries = day.yuQuiz?.todayNoteEntries ?? day.report?.noteEntries ?? 0;
-    meta.textContent = `打卡 ${day.checkedCount}/5 · 任务 ${completedTasks}/${taskCount} · 笔记 ${noteEntries} · 做题 ${day.problemCount ?? 0}`;
+    if (day.report?.overallProgress !== undefined || day.yuReader) {
+      const reading = day.report?.readingPercent ?? day.goals?.readingPercent ?? 0;
+      const questions = day.report?.questionsPercent ?? day.goals?.questionsPercent ?? 0;
+      const vocabulary = day.report?.vocabularyCount ?? day.yuReader?.vocabularyCount ?? 0;
+      meta.textContent = `阅读 ${formatPercent(reading)}% · 做题 ${formatPercent(questions)}% · 单词 ${vocabulary}`;
+    } else {
+      meta.textContent = `打卡 ${day.checkedCount}/5 · 任务 ${day.completedTaskCount ?? 0}/${day.taskCount ?? 0} · 目标 ${day.completedBountyCount ?? 0}/2`;
+    }
     item.append(top, meta);
     const note = document.createElement("blockquote");
     const displayedNote = day.externalDiary?.title || day.report?.note || "";
@@ -269,27 +286,25 @@ function beginHistoryNoteEdit(item, noteNode, day) {
   input.select();
 }
 
-function renderTasks(tasks, today, automaticGoals) {
+function renderTasks(tasks, today, yuReader) {
   const ordered = tasks.filter((task) => !task.bountySlot).sort((a, b) => Number(Boolean(a.completedAt)) - Number(Boolean(b.completedAt)) || Number(Boolean(b.recurringTaskId)) - Number(Boolean(a.recurringTaskId)) || a.createdAt.localeCompare(b.createdAt));
   const pageCount = Math.max(1, Math.ceil(ordered.length / TASK_PAGE_SIZE));
   taskPage = Math.min(taskPage, pageCount - 1);
-  const goals = today?.goals ?? {
-    studyMinutesTarget: automaticGoals?.studyMinutes ?? 180,
-    questionsTarget: automaticGoals?.questions ?? 80,
-  };
-  const studyMs = Math.max(0, Number(today?.studyMs) || 0);
-  const studyMinutes = Math.floor(studyMs / 60_000);
-  const questions = today?.yuQuiz?.todayQuestions ?? 0;
-  const goalProgressPercent = calculateGoalProgressPercent(goals, studyMs, questions);
-  const renderKey = JSON.stringify([tasks, goals, studyMinutes, questions, goalProgressPercent, taskPage]);
+  const goals = today?.goals ?? {};
+  const snapshot = yuReader?.snapshot ?? today?.yuReader;
+  const goalProgressPercent = Number(goals.overallPercent) || 0;
+  const renderKey = JSON.stringify([tasks, goals, snapshot, taskPage]);
   if (taskRenderKey === renderKey) return;
   taskRenderKey = renderKey;
-  renderGoalBoard(goals, studyMinutes, questions, goalProgressPercent);
-  const completed = ordered.filter((task) => task.completedAt).length;
-  byId("task-progress").textContent = `${completed} / ${ordered.length}`;
+  renderGoalBoard(goals, snapshot, goalProgressPercent);
+  byId("goal-helper").textContent = yuReader?.connected
+    ? "书签会跟着 YuReader 的进度一点点亮起来，完成后正式收入收藏。"
+    : "暂时没有连接到 YuReader，书签会替你保留上一次的进度。";
+  const recurring = ordered.filter((task) => task.recurringTaskId);
+  byId("task-progress").textContent = `每日 ${recurring.filter((task) => task.completedAt).length} / ${recurring.length}`;
   const list = byId("task-list");
   if (ordered.length === 0) {
-    list.replaceChildren(emptyMessage("今天还没有任务。想做什么，就从一件开始吧。"));
+    list.replaceChildren(emptyMessage("这里还空着。记下一件以后想做的事吧。"));
     byId("task-pager").hidden = true;
     return;
   }
@@ -298,75 +313,87 @@ function renderTasks(tasks, today, automaticGoals) {
   renderPager("task", taskPage, pageCount);
 }
 
-function calculateGoalProgressPercent(goals, studyMs, questions) {
-  const studyTargetMs = Math.max(1, Number(goals.studyMinutesTarget) || 0) * 60_000;
-  const questionsTarget = Math.max(1, Number(goals.questionsTarget) || 0);
-  const questionCount = Math.max(0, Number(questions) || 0);
-  const studyProgress = Math.min(1, Math.max(0, studyMs / studyTargetMs));
-  const questionsProgress = Math.min(1, questionCount / questionsTarget);
-  return Math.round((studyProgress + questionsProgress) * 50);
-}
-
-function renderGoalBoard(goals, studyMinutes, questions, goalProgressPercent) {
+function renderGoalBoard(goals, snapshot, goalProgressPercent) {
   const slots = [
     {
-      slot: "gift", kind: "study", label: "今日", unit: "小时学习", image: "../assets/bookmarks/bookmark-friend-bounty.png",
-      target: goals.studyMinutesTarget, value: studyMinutes, completed: Boolean(goals.studyCompletedAt),
+      slot: "self", label: "做题达成", percent: goals.questionsPercent ?? snapshot?.questions?.percent ?? 0, image: "../assets/bookmarks/bookmark-self.png",
+      completed: Number(goals.questionsPercent ?? snapshot?.questions?.percent ?? 0) >= 100,
     },
     {
-      slot: "self", kind: "questions", label: "今日做题", unit: "题", image: "../assets/bookmarks/bookmark-self-bounty.png",
-      target: goals.questionsTarget, value: questions, completed: Boolean(goals.questionsCompletedAt),
+      slot: "together", label: "综合达成", percent: goalProgressPercent, image: "../assets/bookmarks/bookmark-together.png",
+      completed: goalProgressPercent >= 100,
+    },
+    {
+      slot: "gift", label: "阅读达成", percent: goals.readingPercent ?? snapshot?.reading?.percent ?? 0, image: "../assets/bookmarks/bookmark-friend.png",
+      completed: Number(goals.readingPercent ?? snapshot?.reading?.percent ?? 0) >= 100,
     },
   ];
-  byId("goal-overall-progress").textContent = `${goalProgressPercent}%`;
-  byId("bounty-board").replaceChildren(...slots.map((config) => goalCard(config, goals)));
+  byId("goal-overall-progress").textContent = `${formatPercent(goalProgressPercent)}%`;
+  byId("bounty-board").replaceChildren(...slots.map(goalCard));
+  startGoalParticles();
 }
 
-function goalCard(config, goals) {
+function startGoalParticles() {
+  clearInterval(goalParticleTimer);
+  goalParticleTimer = null;
+  if (!byId("view-tasks").classList.contains("active")) return;
+  if (typeof window.confetti !== "function" || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const emitters = [...document.querySelectorAll(".bounty-card.completed .goal-particles")]
+    .map((canvas) => window.confetti.create(canvas, { resize: true, useWorker: false }));
+  if (emitters.length === 0) return;
+  const emit = () => emitters.forEach((launch, index) => launch({
+    particleCount: 5,
+    angle: 90,
+    spread: 95,
+    startVelocity: 7,
+    decay: 0.9,
+    gravity: 0.12,
+    drift: index % 2 ? 0.15 : -0.15,
+    ticks: 48,
+    scalar: 0.42,
+    shapes: ["square"],
+    colors: ["#f4d57b", "#fff7b2", "#d8bfe8", "#ffffff"],
+    origin: { x: 0.5, y: 0.46 },
+    disableForReducedMotion: true,
+  }));
+  emit();
+  goalParticleTimer = setInterval(emit, 1_250);
+}
+
+function goalCard(config) {
   const card = document.createElement("article");
   card.className = `bounty-card bounty-${config.slot}${config.completed ? " completed" : ""}`;
+  const fillPercent = Math.max(0, Math.min(100, Number(config.percent) || 0));
+  card.style.setProperty("--goal-fill", `${fillPercent}%`);
   const art = document.createElement("div");
   art.className = "bounty-mini-art";
-  const image = document.createElement("img");
-  image.src = config.image;
-  image.alt = "";
-  art.append(image);
+  const mutedImage = document.createElement("img");
+  mutedImage.className = "goal-image-muted";
+  mutedImage.src = config.image;
+  mutedImage.alt = "";
+  const colorFill = document.createElement("div");
+  colorFill.className = "goal-color-fill";
+  const colorImage = document.createElement("img");
+  colorImage.src = config.image;
+  colorImage.alt = "";
+  colorFill.append(colorImage);
+  art.append(mutedImage, colorFill);
+
+  const particles = document.createElement("canvas");
+  particles.className = "goal-particles";
+  particles.setAttribute("aria-hidden", "true");
 
   const copy = document.createElement("div");
   copy.className = "bounty-copy";
-  const editor = document.createElement("label");
+  const editor = document.createElement("div");
   editor.className = "goal-editor";
   const label = document.createElement("span");
   label.textContent = config.label;
-  const input = document.createElement("input");
-  input.className = "goal-target-input";
-  input.type = "number";
-  input.value = config.kind === "study" ? String(config.target / 60) : String(config.target);
-  input.min = config.kind === "study" ? "0.5" : "1";
-  input.max = config.kind === "study" ? "16" : "10000";
-  input.step = config.kind === "study" ? "0.5" : "1";
-  input.setAttribute("aria-label", `${config.label}目标`);
-  const unit = document.createElement("span");
-  unit.className = "goal-unit";
-  unit.textContent = config.unit;
-  input.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") { event.preventDefault(); input.blur(); }
-    if (event.key === "Escape") { input.value = config.kind === "study" ? String(config.target / 60) : String(config.target); input.blur(); }
-  });
-  input.addEventListener("change", () => {
-    const raw = Number(input.value);
-    const studyMinutesTarget = config.kind === "study" ? Math.round(raw * 60) : goals.studyMinutesTarget;
-    const questionsTarget = config.kind === "questions" ? Math.round(raw) : goals.questionsTarget;
-    if (!Number.isFinite(raw) || studyMinutesTarget < 30 || questionsTarget < 1) {
-      showFeedback("目标要写成一个有效数字哦。");
-      input.value = config.kind === "study" ? String(config.target / 60) : String(config.target);
-      return;
-    }
-    void runTaskAction(() => api.setAutomaticGoals(studyMinutesTarget, questionsTarget));
-  });
-  editor.append(label, input, unit);
+  const value = document.createElement("strong");
+  value.textContent = `${formatPercent(config.percent)}%`;
+  editor.append(label, value);
   copy.append(editor);
-  card.append(art, copy);
+  card.append(art, particles, copy);
   return card;
 }
 
@@ -401,8 +428,8 @@ function taskRow(task) {
   recurring.className = `task-action task-recurring${task.recurringTaskId ? " active" : ""}`;
   recurring.type = "button";
   recurring.textContent = "日";
-  recurring.setAttribute("aria-label", task.recurringTaskId ? "取消每日固定" : "设为每日固定");
-  recurring.title = task.recurringTaskId ? "取消每日固定" : "每天重复";
+  recurring.setAttribute("aria-label", task.recurringTaskId ? "取消每日刷新" : "设为每日刷新");
+  recurring.title = task.recurringTaskId ? "取消每日刷新" : "每日刷新并提醒";
   recurring.addEventListener("click", () => void runTaskAction(() => api.setTaskRecurring(task.id, !task.recurringTaskId)));
   const remove = document.createElement("button");
   remove.className = "task-action";
@@ -442,9 +469,9 @@ function renderBookmarkCollection(stats) {
   byId("bookmark-together-count").textContent = stats.togetherBookmarks;
   const total = stats.selfBountyBookmarks + stats.giftBountyBookmarks + stats.togetherBookmarks;
   byId("bookmark-summary").textContent = total === 0
-    ? "第一枚学习书签、做题书签和双人书签，都在等认真完成的一天。"
+    ? "两枚学习书签和双人书签，都在等认真完成的一天。"
     : stats.togetherBookmarks > 0
-      ? `做题书签 ${stats.selfBountyBookmarks} 枚、学习书签 ${stats.giftBountyBookmarks} 枚，双目标完成 ${stats.togetherBookmarks} 天。`
+      ? `我的书签 ${stats.selfBountyBookmarks} 枚、她的书签 ${stats.giftBountyBookmarks} 枚，双目标完成 ${stats.togetherBookmarks} 天。`
       : `两项目标已经赢下 ${stats.selfBountyBookmarks + stats.giftBountyBookmarks} 枚书签，双人书签还在等同一天全部完成。`;
 }
 
@@ -459,11 +486,9 @@ function renderPager(name, page, pageCount, alwaysVisible = false) {
 function renderStats(stats) {
   const entries = [
     ["累计学习", compactDuration(stats.totalStudyMs)],
-    ["累计做题", `${stats.totalProblems} 题`],
     ["按时打卡", `${stats.checkedCount} 次`],
     ["双人书签", `${stats.togetherBookmarks} 枚`],
-    ["累计完成任务", `${stats.completedTasks} 项`],
-    ["累计笔记字数", `${stats.totalNoteCharacters} 字`],
+    ["累计背词", `${stats.totalVocabulary ?? 0} 个`],
   ];
   byId("stats-grid").replaceChildren(...entries.map(([label, value]) => {
     const card = document.createElement("article");
@@ -484,9 +509,15 @@ function emptyMessage(text) {
 }
 
 function switchTab(name) {
+  if (name !== "tasks" && goalParticleTimer) {
+    clearInterval(goalParticleTimer);
+    goalParticleTimer = null;
+  }
   document.querySelectorAll(".tab").forEach((tab) => tab.classList.toggle("active", tab.dataset.tab === name));
   document.querySelectorAll(".view").forEach((view) => view.classList.toggle("active", view.id === `view-${name}`));
   byId("open-bookmarks").classList.toggle("active", name === "bookmarks");
+  byId("open-history").classList.toggle("active", name === "history");
+  if (name === "tasks") requestAnimationFrame(startGoalParticles);
   if (name === "report") {
     switchTab("today");
     setTimeout(() => byId("report-section").scrollIntoView({ behavior: "smooth", block: "start" }), 50);
@@ -503,9 +534,10 @@ document.querySelectorAll(".choice-grid .choice").forEach((choice) => {
 });
 byId("history-prev").addEventListener("click", () => { historyPage = Math.max(0, historyPage - 1); renderHistory(latestState?.history ?? []); });
 byId("history-next").addEventListener("click", () => { historyPage += 1; renderHistory(latestState?.history ?? []); });
-byId("task-prev").addEventListener("click", () => { taskPage = Math.max(0, taskPage - 1); taskRenderKey = null; renderTasks(latestState?.today.tasks ?? [], latestState?.today, latestState?.automaticGoals); });
-byId("task-next").addEventListener("click", () => { taskPage += 1; taskRenderKey = null; renderTasks(latestState?.today.tasks ?? [], latestState?.today, latestState?.automaticGoals); });
+byId("task-prev").addEventListener("click", () => { taskPage = Math.max(0, taskPage - 1); taskRenderKey = null; renderTasks(latestState?.today.tasks ?? [], latestState?.today, latestState?.yuReader); });
+byId("task-next").addEventListener("click", () => { taskPage += 1; taskRenderKey = null; renderTasks(latestState?.today.tasks ?? [], latestState?.today, latestState?.yuReader); });
 byId("open-bookmarks").addEventListener("click", () => switchTab("bookmarks"));
+byId("open-history").addEventListener("click", () => switchTab("history"));
 byId("close").addEventListener("click", () => api.hide());
 byId("toggle-study").addEventListener("click", async () => {
   byId("toggle-study").disabled = true;
@@ -544,9 +576,9 @@ byId("report-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   byId("submit-report").disabled = true;
   try {
-    const state = await api.submitReport({
-      note: byId("note").value,
-    });
+    const vocabularyCount = Number(byId("vocabulary-count").value);
+    if (!Number.isFinite(vocabularyCount) || vocabularyCount < 0) throw new Error("单词数量要写成一个有效数字哦。");
+    const state = await api.submitReport({ vocabularyCount });
     render(state);
     showFeedback("今天已经好好收进日记啦。");
   } catch (error) {

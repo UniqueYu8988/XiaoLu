@@ -161,11 +161,11 @@ integratedState = saveYuQuizSnapshot(integratedState, {
   activeSession: false,
   syncedAt: at(14, 30).toISOString(),
 }, at(14, 30));
-assert.equal(studyMsForDay(integratedState, date, at(14, 30)), 150 * 60_000);
+assert.equal(studyMsForDay(integratedState, date, at(14, 30)), 120 * 60_000);
 integratedState = setYuQuizIntegration(integratedState, false, at(15, 0));
 integratedState = toggleStudy(integratedState, at(15, 0)).state;
 integratedState = toggleStudy(integratedState, at(15, 30)).state;
-assert.equal(studyMsForDay(integratedState, date, at(15, 30)), 180 * 60_000);
+assert.equal(studyMsForDay(integratedState, date, at(15, 30)), 150 * 60_000);
 
 state = submitDailyReport(state, {
   problemCount: 42,
@@ -285,9 +285,9 @@ assert.equal(calculateStats(noteTotalsState, at(23, 51)).totalNoteCharacters, 74
 
 let taskState = initialStudyState(at(8, 0, 19));
 taskState = addDailyTask(taskState, "task-1", " 完成 第一章  ", at(8, 1, 19));
-assert.equal(taskState.days[localDateKey(at(8, 1, 19))]?.tasks[0]?.title, "完成 第一章");
+assert.equal(taskState.backlogTasks[0]?.title, "完成 第一章");
 taskState = editDailyTask(taskState, "task-1", "完成第二章", at(8, 2, 19));
-assert.equal(taskState.days[localDateKey(at(8, 2, 19))]?.tasks[0]?.title, "完成第二章");
+assert.equal(taskState.backlogTasks[0]?.title, "完成第二章");
 taskState = setDailyTaskCompleted(taskState, "task-1", true, at(9, 0, 19));
 assert.equal(taskState.days[localDateKey(at(9, 0, 19))]?.tasks[0]?.completedAt, at(9, 0, 19).toISOString());
 const taskSummary = daySummaries(taskState, at(9, 1, 19))[0];
@@ -295,15 +295,18 @@ assert.equal(taskSummary?.taskCount, 1);
 assert.equal(taskSummary?.completedTaskCount, 1);
 assert.equal(calculateStats(taskState, at(9, 1, 19)).completedTasks, 1);
 taskState = setDailyTaskCompleted(taskState, "task-1", false, at(9, 2, 19));
-assert.equal(taskState.days[localDateKey(at(9, 2, 19))]?.tasks[0]?.completedAt, undefined);
+assert.equal(taskState.days[localDateKey(at(9, 2, 19))]?.tasks.length, 0);
+assert.equal(taskState.backlogTasks[0]?.title, "完成第二章");
 taskState = deleteDailyTask(taskState, "task-1", at(9, 3, 19));
-assert.equal(taskState.days[localDateKey(at(9, 3, 19))]?.tasks.length, 0);
+assert.equal(taskState.backlogTasks.length, 0);
 
 let recurringState = initialStudyState(at(8, 0, 19));
 recurringState = addDailyTask(recurringState, "daily-reading", "阅读一章", at(8, 1, 19));
+assert.equal(recurringState.backlogTasks[0]?.title, "阅读一章");
 recurringState = setDailyTaskRecurring(recurringState, "daily-reading", true, "repeat-reading", at(8, 2, 19));
 assert.equal(recurringState.recurringTasks[0]?.title, "阅读一章");
-recurringState = setDailyTaskCompleted(recurringState, "daily-reading", true, at(20, 0, 19));
+const repeatedDay19 = recurringState.days[localDateKey(at(8, 2, 19))]?.tasks.find((task) => task.recurringTaskId === "repeat-reading");
+recurringState = setDailyTaskCompleted(recurringState, repeatedDay19.id, true, at(20, 0, 19));
 recurringState = reconcileStudyState(recurringState, at(8, 0, 20)).state;
 const day20 = localDateKey(at(8, 0, 20));
 const repeatedDay20 = recurringState.days[day20]?.tasks.find((task) => task.recurringTaskId === "repeat-reading");
@@ -323,29 +326,19 @@ recurringState = reconcileStudyState(recurringState, at(8, 0, 22)).state;
 assert.equal(recurringState.days[localDateKey(at(8, 0, 22))]?.tasks.length, 0);
 
 let goalState = initialStudyState(at(8, 0, 19));
-goalState = setAutomaticGoalTargets(goalState, 60, 10, at(8, 1, 19));
+goalState = setAutomaticGoalTargets(goalState, 60, 120, at(8, 1, 19));
 goalState = toggleStudy(goalState, at(8, 2, 19)).state;
 goalState = toggleStudy(goalState, at(9, 2, 19)).state;
 goalState = reconcileStudyState(goalState, at(9, 2, 19)).state;
 const goalDate19 = localDateKey(at(9, 2, 19));
 assert.ok(goalState.days[goalDate19]?.goals?.studyCompletedAt);
-assert.equal(goalState.days[goalDate19]?.goals?.questionsCompletedAt, undefined);
-goalState = setYuQuizIntegration(goalState, true, at(9, 3, 19));
-goalState = saveYuQuizSnapshot(goalState, {
-  date: goalDate19,
-  todayQuestions: 10,
-  todayCorrect: 8,
-  todayAccuracy: 80,
-  todayLearningSeconds: 0,
-  currentView: "quiz",
-  isLearning: true,
-  activeSession: true,
-  syncedAt: at(9, 4, 19).toISOString(),
-}, at(9, 4, 19));
-goalState = reconcileStudyState(goalState, at(9, 4, 19)).state;
-assert.ok(goalState.days[goalDate19]?.goals?.questionsCompletedAt);
+assert.equal(goalState.days[goalDate19]?.goals?.secondStudyCompletedAt, undefined);
+goalState = toggleStudy(goalState, at(9, 3, 19)).state;
+goalState = toggleStudy(goalState, at(10, 3, 19)).state;
+goalState = reconcileStudyState(goalState, at(10, 3, 19)).state;
+assert.ok(goalState.days[goalDate19]?.goals?.secondStudyCompletedAt);
 assert.ok(goalState.days[goalDate19]?.goals?.togetherCompletedAt);
-let goalStats = calculateStats(goalState, at(9, 4, 19));
+let goalStats = calculateStats(goalState, at(10, 3, 19));
 assert.equal(goalStats.selfBountyBookmarks, 1);
 assert.equal(goalStats.giftBountyBookmarks, 1);
 assert.equal(goalStats.togetherBookmarks, 1);
@@ -355,11 +348,11 @@ assert.equal(goalStats.completedTasks, 2);
 goalState = reconcileStudyState(goalState, at(8, 0, 20)).state;
 const goalDate20 = localDateKey(at(8, 0, 20));
 assert.equal(goalState.days[goalDate20]?.goals?.studyMinutesTarget, 60);
-assert.equal(goalState.days[goalDate20]?.goals?.questionsTarget, 10);
+assert.equal(goalState.days[goalDate20]?.goals?.secondStudyMinutesTarget, 120);
 assert.equal(goalState.days[goalDate20]?.goals?.studyCompletedAt, undefined);
 goalState = setAutomaticGoalTargets(goalState, 120, 20, at(8, 1, 20));
 assert.equal(goalState.automaticGoals.studyMinutes, 120);
-assert.equal(goalState.automaticGoals.questions, 20);
+assert.equal(goalState.automaticGoals.secondStudyMinutes, 30);
 assert.equal(goalState.days[goalDate20]?.goals?.studyMinutesTarget, 120);
 assert.equal(goalState.days[goalDate19]?.goals?.studyMinutesTarget, 60);
 
@@ -387,10 +380,9 @@ let migratedGoalState = normalizeStudyState({
   lastEvaluatedAt: at(9, 0, 20).toISOString(),
 }, at(9, 1, 20));
 assert.equal(migratedGoalState.automaticGoals.studyMinutes, 180);
-assert.equal(migratedGoalState.automaticGoals.questions, 80);
+assert.equal(migratedGoalState.automaticGoals.secondStudyMinutes, 240);
 migratedGoalState = reconcileStudyState(migratedGoalState, at(9, 1, 20)).state;
-assert.equal(migratedGoalState.days[goalDate20]?.goals?.questionsCompletedAt, at(9, 0, 20).toISOString());
-assert.equal(calculateStats(migratedGoalState, at(9, 1, 20)).selfBountyBookmarks, 1);
+assert.equal(migratedGoalState.days[goalDate20]?.goals?.secondStudyCompletedAt, undefined);
 
 let overnight = initialStudyState(at(23, 50));
 overnight = toggleStudy(overnight, at(23, 50)).state;

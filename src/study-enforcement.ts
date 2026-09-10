@@ -16,6 +16,49 @@ export interface StudyForegroundDecision {
   readonly key: string;
 }
 
+export interface YuReaderPatrolSnapshot {
+  readonly pageOpen?: boolean;
+  readonly studyState?: string;
+  readonly currentView?: string;
+}
+
+export function classifyYuReaderPatrol(snapshot?: YuReaderPatrolSnapshot): {
+  readonly active: boolean;
+  readonly enteredContent: boolean;
+  readonly waitingAtHome: boolean;
+} {
+  const state = snapshot?.studyState ?? "closed";
+  const pageOpen = snapshot?.pageOpen === true;
+  const active = state === "learning" || state === "consulting";
+  const enteredContent = pageOpen && (active || state === "paused" || (snapshot?.currentView ?? "home") !== "home");
+  const waitingAtHome = pageOpen && state === "ready" && (snapshot?.currentView ?? "home") === "home";
+  return { active, enteredContent, waitingAtHome };
+}
+
+export function canCheckInWhileStudying(input: {
+  readonly manualSessionActive: boolean;
+  readonly yuReaderState?: string | undefined;
+}): boolean {
+  return input.manualSessionActive || input.yuReaderState === "learning" || input.yuReaderState === "consulting";
+}
+
+export function shouldAutoOpenYuReaderForCheckIn(input: {
+  readonly enabled: boolean;
+  readonly slot: string;
+  readonly now: number;
+  readonly scheduledAt: number;
+  readonly windowEnd: number;
+  readonly pageOpen: boolean;
+  readonly alreadyHandled: boolean;
+}): boolean {
+  return input.enabled
+    && (input.slot === "09:00" || input.slot === "18:00" || input.slot === "21:00")
+    && !input.pageOpen
+    && !input.alreadyHandled
+    && input.now >= input.scheduledAt
+    && input.now <= input.windowEnd;
+}
+
 export function strongSupervisionBlocksPanel(mode: string | null | undefined): boolean {
   return mode === "strong-start" || mode === "strong-return";
 }

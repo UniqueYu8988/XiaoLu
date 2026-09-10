@@ -4,7 +4,7 @@ export type CheckInSlot = typeof CHECK_IN_SLOTS[number];
 export type CheckInStatus = "checked" | "missed";
 export type BookmarkType = "together";
 export type BountySlot = "self" | "gift";
-export type TaskReminderSlot = "21:00" | "22:00";
+export type TaskReminderSlot = "21:00" | "22:00" | "23:00" | "00:00" | "01:00";
 export type StudyLaunchPeriod = "morning" | "afternoon" | "evening";
 export type StrictStudyPeriod = "morning" | "afternoon";
 export type StudyLaunchSource = "prompt" | "double-click" | "manual" | "organic";
@@ -30,6 +30,13 @@ export interface DailyReport {
   readonly selfCompleted: boolean;
   readonly friendCompleted: boolean;
   readonly bookmark?: BookmarkType;
+  readonly overallProgress?: number;
+  readonly readingPercent?: number;
+  readonly questionsPercent?: number;
+  readonly vocabularyCount?: number;
+  readonly oralReviewCompleted?: boolean;
+  readonly mistakeReviewCompleted?: boolean;
+  readonly togetherCompleted?: boolean;
 }
 
 export interface ExternalDiaryReference {
@@ -68,16 +75,57 @@ export interface BountyDefinition {
 
 export interface AutomaticGoalSettings {
   readonly studyMinutes: number;
-  readonly questions: number;
+  readonly secondStudyMinutes: number;
   readonly updatedAt: string;
 }
 
 export interface DailyAutomaticGoals {
   readonly studyMinutesTarget: number;
-  readonly questionsTarget: number;
+  readonly secondStudyMinutesTarget?: number;
   readonly studyCompletedAt?: string;
+  readonly secondStudyCompletedAt?: string;
+  /** Legacy YuQuiz goal fields are retained for historical records only. */
+  readonly questionsTarget?: number;
   readonly questionsCompletedAt?: string;
   readonly togetherCompletedAt?: string;
+  readonly readingTargetSeconds?: number;
+  readonly questionsTargetCount?: number;
+  readonly readingPercent?: number;
+  readonly questionsPercent?: number;
+  readonly overallPercent?: number;
+}
+
+export interface YuReaderMetric {
+  readonly actual: number;
+  readonly target: number;
+  readonly percent: number;
+}
+
+export interface YuReaderSubjectSnapshot {
+  readonly percent: number;
+  readonly readingPercent: number;
+  readonly questionsPercent: number;
+}
+
+export interface YuReaderSnapshot {
+  readonly date: string;
+  readonly learningSeconds: number;
+  readonly reading: YuReaderMetric;
+  readonly questions: YuReaderMetric;
+  readonly vocabularyCount: number;
+  readonly vocabularyTarget: number;
+  readonly subjects: Readonly<Record<"medicine" | "politics" | "english", YuReaderSubjectSnapshot>>;
+  readonly oralReviewCompleted: boolean;
+  readonly mistakeReviewCompleted: boolean;
+  readonly pageOpen: boolean;
+  readonly pageVisible: boolean;
+  readonly studyState: "closed" | "ready" | "learning" | "paused" | "consulting";
+  readonly pauseReason: string;
+  readonly currentView: string;
+  readonly lastMeaningfulActivityAt?: string;
+  readonly goalsUpdatedAt?: string;
+  readonly lastEventId: number;
+  readonly syncedAt: string;
 }
 
 export interface YuQuizSnapshot {
@@ -127,6 +175,7 @@ export interface DayRecord {
   readonly taskReminders: readonly TaskReminderSlot[];
   readonly studyLaunches: Readonly<Partial<Record<StudyLaunchPeriod, StudyLaunchRecord>>>;
   readonly yuQuiz?: YuQuizSnapshot;
+  readonly yuReader?: YuReaderSnapshot;
   readonly goals?: DailyAutomaticGoals;
   readonly report?: DailyReport;
   readonly externalDiary?: ExternalDiaryReference;
@@ -141,6 +190,8 @@ export interface StudySettings {
   readonly petPosition?: RelativePetPosition;
   readonly studyAnchor?: RelativePetPosition;
   readonly yuQuizEventCursor?: number;
+  readonly yuReaderIntegration: boolean;
+  readonly yuReaderEventCursor?: number;
 }
 
 export interface RelativePetPosition {
@@ -158,6 +209,7 @@ export interface StudyState {
     readonly syncedAt: string;
   };
   readonly days: Readonly<Record<string, DayRecord>>;
+  readonly backlogTasks: readonly DailyTask[];
   readonly recurringTasks: readonly RecurringTask[];
   readonly bounties: Readonly<Partial<Record<BountySlot, BountyDefinition>>>;
   readonly automaticGoals: AutomaticGoalSettings;
@@ -200,6 +252,13 @@ export interface ReportInput {
   readonly note: string;
   readonly selfCompleted: boolean;
   readonly friendCompleted: boolean;
+  readonly overallProgress?: number;
+  readonly readingPercent?: number;
+  readonly questionsPercent?: number;
+  readonly vocabularyCount?: number;
+  readonly oralReviewCompleted?: boolean;
+  readonly mistakeReviewCompleted?: boolean;
+  readonly togetherCompleted?: boolean;
 }
 
 export interface PublicDaySummary {
@@ -214,6 +273,7 @@ export interface PublicDaySummary {
   readonly completedBountyCount: number;
   readonly problemCount: number;
   readonly yuQuiz?: YuQuizSnapshot;
+  readonly yuReader?: YuReaderSnapshot;
   readonly goals?: DailyAutomaticGoals;
   readonly report?: DailyReport;
   readonly externalDiary?: ExternalDiaryReference;
@@ -232,6 +292,13 @@ export interface StudyStats {
   readonly togetherBookmarks: number;
   readonly selfBountyBookmarks: number;
   readonly giftBountyBookmarks: number;
+  readonly totalVocabulary: number;
+}
+
+export interface YuReaderRewardProgress {
+  readonly readingPercent: number;
+  readonly questionsPercent: number;
+  readonly overallPercent: number;
 }
 
 const SLOT_MINUTES: Record<CheckInSlot, number> = {
@@ -243,16 +310,17 @@ const SLOT_MINUTES: Record<CheckInSlot, number> = {
 };
 
 const STUDY_LAUNCH_SOURCES = new Set<StudyLaunchSource>(["prompt", "double-click", "manual", "organic"]);
-const DEFAULT_AUTOMATIC_GOALS = { studyMinutes: 180, questions: 80 } as const;
+const DEFAULT_AUTOMATIC_GOALS = { studyMinutes: 180, secondStudyMinutes: 240 } as const;
 
 export function initialStudyState(now = new Date()): StudyState {
   return {
     version: 2,
     days: {},
+    backlogTasks: [],
     recurringTasks: [],
     bounties: {},
     automaticGoals: { ...DEFAULT_AUTOMATIC_GOALS, updatedAt: now.toISOString() },
-    settings: { launchAtLogin: true, yuQuizIntegration: false, patrolEnabled: true, voiceEnabled: true, voiceVolume: 0.82 },
+    settings: { launchAtLogin: true, yuQuizIntegration: false, yuReaderIntegration: true, patrolEnabled: true, voiceEnabled: true, voiceVolume: 0.82 },
     lastEvaluatedAt: now.toISOString(),
   };
 }
@@ -267,6 +335,23 @@ export function normalizeStudyState(value: unknown, now = new Date()): StudyStat
     }
   }
   const activeSessionStartedAt = isDateString(value.activeSessionStartedAt) ? value.activeSessionStartedAt : undefined;
+  const backlogById = new Map<string, DailyTask>();
+  if (Array.isArray(value.backlogTasks)) {
+    for (const raw of value.backlogTasks) {
+      const task = normalizeTask(raw);
+      if (task && !task.completedAt && !task.recurringTaskId && !task.bountySlot) backlogById.set(task.id, task);
+    }
+  }
+  // Before the schedule-manager model, ordinary unfinished items lived only in
+  // the day on which they were created. Move them into the persistent backlog.
+  for (const [date, day] of Object.entries(days)) {
+    const retained = day.tasks.filter((task) => {
+      if (task.completedAt || task.recurringTaskId || task.bountySlot) return true;
+      if (!backlogById.has(task.id)) backlogById.set(task.id, task);
+      return false;
+    });
+    if (retained.length !== day.tasks.length) days[date] = { ...day, tasks: retained };
+  }
   const recurringTasks: RecurringTask[] = [];
   if (Array.isArray(value.recurringTasks)) {
     for (const raw of value.recurringTasks) {
@@ -291,8 +376,9 @@ export function normalizeStudyState(value: unknown, now = new Date()): StudyStat
   const settingsValue = isRecord(value.settings) ? value.settings : {};
   const automaticGoalsValue = isRecord(value.automaticGoals) ? value.automaticGoals : {};
   const automaticStudyMinutes = finiteNumber(automaticGoalsValue.studyMinutes);
-  const automaticQuestions = finiteNumber(automaticGoalsValue.questions);
+  const automaticSecondStudyMinutes = finiteNumber(automaticGoalsValue.secondStudyMinutes);
   const yuQuizEventCursor = finiteNumber(settingsValue.yuQuizEventCursor);
+  const yuReaderEventCursor = finiteNumber(settingsValue.yuReaderEventCursor);
   const petPosition = normalizeRelativePetPosition(settingsValue.petPosition);
   const studyAnchor = normalizeRelativePetPosition(settingsValue.studyAnchor);
   const noteTotalsValue = isRecord(value.noteTotals) ? value.noteTotals : {};
@@ -312,20 +398,22 @@ export function normalizeStudyState(value: unknown, now = new Date()): StudyStat
         } }
       : {}),
     days,
+    backlogTasks: [...backlogById.values()],
     recurringTasks,
     bounties,
     automaticGoals: {
       studyMinutes: automaticStudyMinutes === undefined
         ? DEFAULT_AUTOMATIC_GOALS.studyMinutes
         : clampInteger(automaticStudyMinutes, 30, 16 * 60),
-      questions: automaticQuestions === undefined
-        ? DEFAULT_AUTOMATIC_GOALS.questions
-        : clampInteger(automaticQuestions, 1, 10_000),
+      secondStudyMinutes: automaticSecondStudyMinutes === undefined
+        ? DEFAULT_AUTOMATIC_GOALS.secondStudyMinutes
+        : clampInteger(automaticSecondStudyMinutes, 30, 16 * 60),
       updatedAt: isDateString(automaticGoalsValue.updatedAt) ? automaticGoalsValue.updatedAt : now.toISOString(),
     },
     settings: {
       launchAtLogin: settingsValue.launchAtLogin !== false,
-      yuQuizIntegration: settingsValue.yuQuizIntegration === true,
+      yuQuizIntegration: false,
+      yuReaderIntegration: settingsValue.yuReaderIntegration !== false,
       patrolEnabled: settingsValue.patrolEnabled !== false,
       voiceEnabled: settingsValue.voiceEnabled !== false,
       voiceVolume: Math.max(0, Math.min(1, finiteNumber(settingsValue.voiceVolume) ?? 0.82)),
@@ -334,9 +422,21 @@ export function normalizeStudyState(value: unknown, now = new Date()): StudyStat
       ...(yuQuizEventCursor !== undefined && yuQuizEventCursor >= 0
         ? { yuQuizEventCursor: Math.trunc(yuQuizEventCursor) }
         : {}),
+      ...(yuReaderEventCursor !== undefined && yuReaderEventCursor >= 0
+        ? { yuReaderEventCursor: Math.trunc(yuReaderEventCursor) }
+        : {}),
     },
     lastEvaluatedAt: isDateString(value.lastEvaluatedAt) ? value.lastEvaluatedAt : now.toISOString(),
   };
+}
+
+export function calculateYuReaderRewardProgress(snapshot: YuReaderSnapshot, checkedCount = 0): YuReaderRewardProgress {
+  const vocabularyBonus = Math.max(0, snapshot.vocabularyCount) / Math.max(1, snapshot.vocabularyTarget) * 10;
+  const clearanceBonus = Number(snapshot.oralReviewCompleted) * 10 + Number(snapshot.mistakeReviewCompleted) * 10;
+  const readingPercent = roundProgress(Math.max(0, snapshot.reading.percent) + vocabularyBonus);
+  const questionsPercent = roundProgress(Math.max(0, snapshot.questions.percent) + clearanceBonus);
+  const overallPercent = roundProgress(readingPercent * 0.5 + questionsPercent * 0.5 + Math.max(0, checkedCount));
+  return { readingPercent, questionsPercent, overallPercent };
 }
 
 export function reconcileStudyState(current: StudyState, now = new Date()): ReconcileResult {
@@ -359,21 +459,37 @@ export function reconcileStudyState(current: StudyState, now = new Date()): Reco
   const currentToday = days[today] ?? todayRecord;
   const existingGoals = currentToday.goals;
   const legacyStudyCompletedAt = currentToday.tasks.find((task) => task.bountySlot === "gift" && task.completedAt)?.completedAt;
-  const legacyQuestionsCompletedAt = currentToday.tasks.find((task) => task.bountySlot === "self" && task.completedAt)?.completedAt;
-  let goals: DailyAutomaticGoals = existingGoals ?? {
-    studyMinutesTarget: state.automaticGoals.studyMinutes,
-    questionsTarget: state.automaticGoals.questions,
-    ...(legacyStudyCompletedAt ? { studyCompletedAt: legacyStudyCompletedAt } : {}),
-    ...(legacyQuestionsCompletedAt ? { questionsCompletedAt: legacyQuestionsCompletedAt } : {}),
-    ...(legacyStudyCompletedAt && legacyQuestionsCompletedAt ? { togetherCompletedAt: now.toISOString() } : {}),
-  };
-  const progressState = { ...state, days };
-  const studyReached = studyMsForDay(progressState, today, now) >= goals.studyMinutesTarget * 60_000;
-  const questionsReached = (currentToday.yuQuiz?.todayQuestions ?? 0) >= goals.questionsTarget;
-  if (studyReached && !goals.studyCompletedAt) goals = { ...goals, studyCompletedAt: now.toISOString() };
-  if (questionsReached && !goals.questionsCompletedAt) goals = { ...goals, questionsCompletedAt: now.toISOString() };
-  if (goals.studyCompletedAt && goals.questionsCompletedAt && !goals.togetherCompletedAt) {
-    goals = { ...goals, togetherCompletedAt: now.toISOString() };
+  const migratedStudyCompletedAt = existingGoals?.studyCompletedAt ?? legacyStudyCompletedAt;
+  let goals: DailyAutomaticGoals;
+  if (currentToday.yuReader) {
+    const reward = calculateYuReaderRewardProgress(currentToday.yuReader, Object.values(currentToday.checkIns).filter((item) => item?.status === "checked").length);
+    goals = {
+      studyMinutesTarget: Math.max(1, Math.round(currentToday.yuReader.reading.target / 60)),
+      secondStudyMinutesTarget: existingGoals?.secondStudyMinutesTarget ?? state.automaticGoals.secondStudyMinutes,
+      readingTargetSeconds: currentToday.yuReader.reading.target,
+      questionsTargetCount: currentToday.yuReader.questions.target,
+      readingPercent: reward.readingPercent,
+      questionsPercent: reward.questionsPercent,
+      overallPercent: reward.overallPercent,
+      ...(existingGoals?.studyCompletedAt ? { studyCompletedAt: existingGoals.studyCompletedAt } : {}),
+      ...(existingGoals?.secondStudyCompletedAt ? { secondStudyCompletedAt: existingGoals.secondStudyCompletedAt } : {}),
+      ...(existingGoals?.togetherCompletedAt ? { togetherCompletedAt: existingGoals.togetherCompletedAt } : {}),
+    };
+    if (reward.readingPercent >= 100 && !goals.studyCompletedAt) goals = { ...goals, studyCompletedAt: now.toISOString() };
+    if (reward.questionsPercent >= 100 && !goals.secondStudyCompletedAt) goals = { ...goals, secondStudyCompletedAt: now.toISOString() };
+    if (reward.overallPercent >= 100 && !goals.togetherCompletedAt) goals = { ...goals, togetherCompletedAt: now.toISOString() };
+  } else {
+    goals = existingGoals?.secondStudyMinutesTarget ? existingGoals : {
+      studyMinutesTarget: state.automaticGoals.studyMinutes,
+      secondStudyMinutesTarget: state.automaticGoals.secondStudyMinutes,
+      ...(migratedStudyCompletedAt ? { studyCompletedAt: migratedStudyCompletedAt } : {}),
+    };
+    const progressState = { ...state, days };
+    const studyReached = studyMsForDay(progressState, today, now) >= goals.studyMinutesTarget * 60_000;
+    const secondStudyReached = studyMsForDay(progressState, today, now) >= (goals.secondStudyMinutesTarget ?? state.automaticGoals.secondStudyMinutes) * 60_000;
+    if (studyReached && !goals.studyCompletedAt) goals = { ...goals, studyCompletedAt: now.toISOString() };
+    if (secondStudyReached && !goals.secondStudyCompletedAt) goals = { ...goals, secondStudyCompletedAt: now.toISOString() };
+    if (goals.studyCompletedAt && goals.secondStudyCompletedAt && !goals.togetherCompletedAt) goals = { ...goals, togetherCompletedAt: now.toISOString() };
   }
   if (!existingGoals || JSON.stringify(existingGoals) !== JSON.stringify(goals)) {
     days[today] = { ...currentToday, goals };
@@ -460,10 +576,10 @@ export function checkIn(current: StudyState, now = new Date(), requestedSlot?: C
   };
 }
 
-export function submitDailyReport(current: StudyState, input: ReportInput, now = new Date()): StudyState {
+export function submitDailyReport(current: StudyState, input: ReportInput, now = new Date(), dateOverride?: string): StudyState {
   let state = reconcileStudyState(current, now).state;
   if (state.activeSessionStartedAt) state = closeActiveSession(state, now);
-  const date = localDateKey(now);
+  const date = dateOverride && isDateKey(dateOverride) ? dateOverride : localDateKey(now);
   const day = getDay(state, date);
   const problemCount = clampInteger(input.problemCount, 0, 1_000_000);
   const rawAccuracy = finiteNumber(input.accuracy);
@@ -471,7 +587,7 @@ export function submitDailyReport(current: StudyState, input: ReportInput, now =
   const noteEntries = clampInteger(input.noteEntries, 0, 1_000_000);
   const noteCharacters = clampInteger(input.noteCharacters, 0, 100_000_000);
   const note = typeof input.note === "string" ? input.note.trim().slice(0, 120) : "";
-  const bookmark = bookmarkFor(input.selfCompleted, input.friendCompleted);
+  const bookmark = input.togetherCompleted ? "together" : bookmarkFor(input.selfCompleted, input.friendCompleted);
   const report: DailyReport = {
     submittedAt: now.toISOString(),
     problemCount,
@@ -481,6 +597,13 @@ export function submitDailyReport(current: StudyState, input: ReportInput, now =
     note,
     selfCompleted: input.selfCompleted,
     friendCompleted: input.friendCompleted,
+    ...(finiteNumber(input.overallProgress) !== undefined ? { overallProgress: Math.max(0, input.overallProgress as number) } : {}),
+    ...(finiteNumber(input.readingPercent) !== undefined ? { readingPercent: Math.max(0, input.readingPercent as number) } : {}),
+    ...(finiteNumber(input.questionsPercent) !== undefined ? { questionsPercent: Math.max(0, input.questionsPercent as number) } : {}),
+    ...(finiteNumber(input.vocabularyCount) !== undefined ? { vocabularyCount: clampInteger(input.vocabularyCount, 0, 5000) } : {}),
+    ...(typeof input.oralReviewCompleted === "boolean" ? { oralReviewCompleted: input.oralReviewCompleted } : {}),
+    ...(typeof input.mistakeReviewCompleted === "boolean" ? { mistakeReviewCompleted: input.mistakeReviewCompleted } : {}),
+    ...(typeof input.togetherCompleted === "boolean" ? { togetherCompleted: input.togetherCompleted } : {}),
     ...(bookmark ? { bookmark } : {}),
   };
   const days = cloneDays(state.days);
@@ -493,7 +616,7 @@ export function updateDailyReportNote(current: StudyState, date: string, value: 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !state.days[date]) throw new Error("没有找到这一天的学习记录。");
   const day = getDay(state, date);
   const note = typeof value === "string" ? value.trim().slice(0, 120) : "";
-  const selfCompleted = Boolean(day.goals?.questionsCompletedAt || day.tasks.some((task) => task.bountySlot === "self" && task.completedAt));
+  const selfCompleted = Boolean(day.goals?.secondStudyCompletedAt || day.goals?.questionsCompletedAt || day.tasks.some((task) => task.bountySlot === "self" && task.completedAt));
   const friendCompleted = Boolean(day.goals?.studyCompletedAt || day.tasks.some((task) => task.bountySlot === "gift" && task.completedAt));
   const bookmark = bookmarkFor(selfCompleted, friendCompleted);
   const report: DailyReport = day.report
@@ -563,21 +686,26 @@ export function addDailyTask(current: StudyState, id: string, title: string, now
   const normalizedId = normalizeTaskId(id);
   const normalizedTitle = normalizeTaskTitle(title);
   if (!normalizedId || !normalizedTitle) throw new Error("任务内容不能为空。");
-  const date = localDateKey(now);
-  const day = getDay(state, date);
-  if (day.tasks.some((task) => task.id === normalizedId)) throw new Error("任务编号重复。");
-  const days = cloneDays(state.days);
-  days[date] = {
-    ...day,
-    tasks: [...day.tasks, { id: normalizedId, title: normalizedTitle, createdAt: now.toISOString() }],
+  if (state.backlogTasks.some((task) => task.id === normalizedId)) throw new Error("任务编号重复。");
+  return {
+    ...state,
+    backlogTasks: [...state.backlogTasks, { id: normalizedId, title: normalizedTitle, createdAt: now.toISOString() }],
+    lastEvaluatedAt: now.toISOString(),
   };
-  return { ...state, days, lastEvaluatedAt: now.toISOString() };
 }
 
 export function editDailyTask(current: StudyState, id: string, title: string, now = new Date()): StudyState {
   const state = reconcileStudyState(current, now).state;
   const normalizedTitle = normalizeTaskTitle(title);
   if (!normalizedTitle) throw new Error("任务内容不能为空。");
+  const backlogTask = state.backlogTasks.find((item) => item.id === id);
+  if (backlogTask) {
+    return {
+      ...state,
+      backlogTasks: state.backlogTasks.map((item) => item.id === id ? { ...item, title: normalizedTitle } : item),
+      lastEvaluatedAt: now.toISOString(),
+    };
+  }
   const task = getDay(state, localDateKey(now)).tasks.find((item) => item.id === id);
   const updated = updateTodayTasks(state, id, now, (item) => ({ ...item, title: normalizedTitle }));
   if (task?.bountySlot) {
@@ -598,6 +726,23 @@ export function editDailyTask(current: StudyState, id: string, title: string, no
 
 export function setDailyTaskCompleted(current: StudyState, id: string, completed: boolean, now = new Date()): StudyState {
   const state = reconcileStudyState(current, now).state;
+  const backlogTask = state.backlogTasks.find((task) => task.id === id);
+  if (backlogTask && completed) {
+    const date = localDateKey(now);
+    const day = getDay(state, date);
+    const days = cloneDays(state.days);
+    days[date] = { ...day, tasks: [...day.tasks, { ...backlogTask, completedAt: now.toISOString() }] };
+    return { ...state, days, backlogTasks: state.backlogTasks.filter((task) => task.id !== id), lastEvaluatedAt: now.toISOString() };
+  }
+  const todayTask = getDay(state, localDateKey(now)).tasks.find((task) => task.id === id);
+  if (todayTask && !completed && !todayTask.recurringTaskId && !todayTask.bountySlot) {
+    const date = localDateKey(now);
+    const day = getDay(state, date);
+    const { completedAt: _completedAt, ...restored } = todayTask;
+    const days = cloneDays(state.days);
+    days[date] = { ...day, tasks: day.tasks.filter((task) => task.id !== id) };
+    return { ...state, days, backlogTasks: [...state.backlogTasks, restored], lastEvaluatedAt: now.toISOString() };
+  }
   return updateTodayTasks(state, id, now, (task) => {
     if (completed) return task.completedAt ? task : { ...task, completedAt: now.toISOString() };
     const { completedAt: _completedAt, ...rest } = task;
@@ -607,6 +752,9 @@ export function setDailyTaskCompleted(current: StudyState, id: string, completed
 
 export function deleteDailyTask(current: StudyState, id: string, now = new Date()): StudyState {
   const state = reconcileStudyState(current, now).state;
+  if (state.backlogTasks.some((task) => task.id === id)) {
+    return { ...state, backlogTasks: state.backlogTasks.filter((task) => task.id !== id), lastEvaluatedAt: now.toISOString() };
+  }
   const date = localDateKey(now);
   const day = getDay(state, date);
   const removed = day.tasks.find((task) => task.id === id);
@@ -635,12 +783,13 @@ export function setDailyTaskRecurring(
   const state = reconcileStudyState(current, now).state;
   const date = localDateKey(now);
   const day = getDay(state, date);
-  const task = day.tasks.find((item) => item.id === id);
+  const backlogTask = state.backlogTasks.find((item) => item.id === id);
+  const task = day.tasks.find((item) => item.id === id) ?? backlogTask;
   if (!task) return state;
   if (task.bountySlot) throw new Error("悬赏本身就是每日任务，不需要再次固定。");
   const recurringTaskId = task.recurringTaskId ?? normalizeTaskId(newRecurringTaskId);
   if (recurring && !recurringTaskId) throw new Error("固定任务编号不正确。");
-  const tasks = day.tasks.map((item) => {
+  let tasks = day.tasks.map((item) => {
     if (item.id !== id) return item;
     if (recurring) return { ...item, recurringTaskId: recurringTaskId as string };
     const { recurringTaskId: _recurringTaskId, ...rest } = item;
@@ -654,9 +803,17 @@ export function setDailyTaskRecurring(
   } else if (task.recurringTaskId) {
     recurringTasks = state.recurringTasks.filter((item) => item.id !== task.recurringTaskId);
   }
+  let backlogTasks = state.backlogTasks.filter((item) => item.id !== id);
+  if (recurring && backlogTask && recurringTaskId) {
+    tasks = [...tasks, { ...backlogTask, id: `repeat:${recurringTaskId}:${date}`, recurringTaskId }];
+  } else if (!recurring && task.recurringTaskId && !task.completedAt) {
+    tasks = tasks.filter((item) => item.id !== id);
+    const { recurringTaskId: _recurringTaskId, completedAt: _completedAt, ...plain } = task;
+    backlogTasks = [...backlogTasks, { ...plain, id: normalizeTaskId(newRecurringTaskId) ?? plain.id }];
+  }
   const days = cloneDays(state.days);
   days[date] = { ...day, tasks };
-  return { ...state, days, recurringTasks, lastEvaluatedAt: now.toISOString() };
+  return { ...state, days, backlogTasks, recurringTasks, lastEvaluatedAt: now.toISOString() };
 }
 
 export function setBountyDefinition(
@@ -694,25 +851,26 @@ export function setBountyDefinition(
 export function setAutomaticGoalTargets(
   current: StudyState,
   studyMinutes: number,
-  questions: number,
+  secondStudyMinutes: number,
   now = new Date(),
 ): StudyState {
   const state = reconcileStudyState(current, now).state;
   const normalizedStudyMinutes = clampInteger(studyMinutes, 30, 16 * 60);
-  const normalizedQuestions = clampInteger(questions, 1, 10_000);
+  const normalizedSecondStudyMinutes = clampInteger(secondStudyMinutes, 30, 16 * 60);
   const date = localDateKey(now);
   const day = getDay(state, date);
-  const existing = day.goals ?? {
-    studyMinutesTarget: normalizedStudyMinutes,
-    questionsTarget: normalizedQuestions,
-  };
+  const existing = day.goals;
   const days = cloneDays(state.days);
   days[date] = {
     ...day,
     goals: {
-      ...existing,
       studyMinutesTarget: normalizedStudyMinutes,
-      questionsTarget: normalizedQuestions,
+      secondStudyMinutesTarget: normalizedSecondStudyMinutes,
+      ...(existing?.studyCompletedAt ? { studyCompletedAt: existing.studyCompletedAt } : {}),
+      ...(existing?.secondStudyCompletedAt ? { secondStudyCompletedAt: existing.secondStudyCompletedAt } : {}),
+      ...(existing?.studyCompletedAt && existing?.secondStudyCompletedAt && existing?.togetherCompletedAt
+        ? { togetherCompletedAt: existing.togetherCompletedAt }
+        : {}),
     },
   };
   return reconcileStudyState({
@@ -720,16 +878,16 @@ export function setAutomaticGoalTargets(
     days,
     automaticGoals: {
       studyMinutes: normalizedStudyMinutes,
-      questions: normalizedQuestions,
+      secondStudyMinutes: normalizedSecondStudyMinutes,
       updatedAt: now.toISOString(),
     },
     lastEvaluatedAt: now.toISOString(),
   }, now).state;
 }
 
-export function markTaskReminderShown(current: StudyState, slot: TaskReminderSlot, now = new Date()): StudyState {
+export function markTaskReminderShown(current: StudyState, slot: TaskReminderSlot, now = new Date(), requestedDate?: string): StudyState {
   const state = reconcileStudyState(current, now).state;
-  const date = localDateKey(now);
+  const date = requestedDate && /^\d{4}-\d{2}-\d{2}$/.test(requestedDate) ? requestedDate : localDateKey(now);
   const day = getDay(state, date);
   if (day.taskReminders.includes(slot)) return state;
   const days = cloneDays(state.days);
@@ -852,6 +1010,15 @@ export function setYuQuizIntegration(current: StudyState, enabled: boolean, now 
   };
 }
 
+export function setYuReaderIntegration(current: StudyState, enabled: boolean, now = new Date()): StudyState {
+  const state = normalizeStudyState(current, now);
+  return {
+    ...state,
+    settings: { ...state.settings, yuReaderIntegration: enabled },
+    lastEvaluatedAt: now.toISOString(),
+  };
+}
+
 export function setPatrolEnabled(current: StudyState, enabled: boolean, now = new Date()): StudyState {
   const state = normalizeStudyState(current, now);
   return {
@@ -910,6 +1077,41 @@ export function setYuQuizEventCursor(current: StudyState, cursor: number, now = 
   };
 }
 
+export function setYuReaderEventCursor(current: StudyState, cursor: number, now = new Date()): StudyState {
+  const state = normalizeStudyState(current, now);
+  return {
+    ...state,
+    settings: { ...state.settings, yuReaderEventCursor: Math.max(0, Math.trunc(cursor)) },
+    lastEvaluatedAt: now.toISOString(),
+  };
+}
+
+export function saveYuReaderSnapshot(current: StudyState, snapshot: YuReaderSnapshot, now = new Date()): StudyState {
+  const state = normalizeStudyState(current, now);
+  if (!state.settings.yuReaderIntegration) return state;
+  const days = cloneDays(state.days);
+  const day = getDay(state, snapshot.date);
+  const progress = calculateYuReaderRewardProgress(snapshot, Object.values(day.checkIns).filter((item) => item?.status === "checked").length);
+  const existing = day.goals;
+  let goals: DailyAutomaticGoals = {
+    studyMinutesTarget: Math.max(1, Math.round(snapshot.reading.target / 60)),
+    secondStudyMinutesTarget: existing?.secondStudyMinutesTarget ?? state.automaticGoals.secondStudyMinutes,
+    readingTargetSeconds: snapshot.reading.target,
+    questionsTargetCount: snapshot.questions.target,
+    readingPercent: progress.readingPercent,
+    questionsPercent: progress.questionsPercent,
+    overallPercent: progress.overallPercent,
+    ...(existing?.studyCompletedAt ? { studyCompletedAt: existing.studyCompletedAt } : {}),
+    ...(existing?.secondStudyCompletedAt ? { secondStudyCompletedAt: existing.secondStudyCompletedAt } : {}),
+    ...(existing?.togetherCompletedAt ? { togetherCompletedAt: existing.togetherCompletedAt } : {}),
+  };
+  if (progress.readingPercent >= 100 && !goals.studyCompletedAt) goals = { ...goals, studyCompletedAt: now.toISOString() };
+  if (progress.questionsPercent >= 100 && !goals.secondStudyCompletedAt) goals = { ...goals, secondStudyCompletedAt: now.toISOString() };
+  if (progress.overallPercent >= 100 && !goals.togetherCompletedAt) goals = { ...goals, togetherCompletedAt: now.toISOString() };
+  days[snapshot.date] = { ...day, yuReader: snapshot, goals };
+  return reconcileStudyState({ ...state, days, lastEvaluatedAt: now.toISOString() }, now).state;
+}
+
 export function saveYuQuizSnapshot(current: StudyState, snapshot: YuQuizSnapshot, now = new Date()): StudyState {
   const state = normalizeStudyState(current, now);
   if (!state.settings.yuQuizIntegration || snapshot.date !== localDateKey(now)) return state;
@@ -954,7 +1156,8 @@ export function studyMsForDay(state: StudyState, date: string, now = new Date())
   if (state.activeSessionStartedAt && localDateKey(new Date(state.activeSessionStartedAt)) === date) {
     total += Math.max(0, now.getTime() - new Date(state.activeSessionStartedAt).getTime());
   }
-  if (day.yuQuiz) total += Math.max(0, day.yuQuiz.todayLearningSeconds * 1_000);
+  if (day.yuReader) total += Math.max(0, day.yuReader.learningSeconds * 1_000);
+  else if (day.yuQuiz) total += Math.max(0, day.yuQuiz.todayLearningSeconds * 1_000);
   return total;
 }
 
@@ -976,10 +1179,11 @@ export function daySummaries(state: StudyState, now = new Date(), limit = 120): 
         bountyCount: day.goals ? 2 : day.tasks.filter((task) => task.bountySlot).length,
         completedBountyCount: day.goals
           ? Number(Boolean(day.goals.studyCompletedAt || day.tasks.some((task) => task.bountySlot === "self" && task.completedAt)))
-            + Number(Boolean(day.goals.questionsCompletedAt || day.tasks.some((task) => task.bountySlot === "gift" && task.completedAt)))
+            + Number(Boolean(day.goals.secondStudyCompletedAt || day.goals.questionsCompletedAt || day.tasks.some((task) => task.bountySlot === "gift" && task.completedAt)))
           : day.tasks.filter((task) => task.bountySlot && task.completedAt).length,
-        problemCount: day.yuQuiz?.todayQuestions ?? day.report?.problemCount ?? 0,
+        problemCount: day.yuReader?.questions.actual ?? day.yuQuiz?.todayQuestions ?? day.report?.problemCount ?? 0,
         ...(day.yuQuiz ? { yuQuiz: day.yuQuiz } : {}),
+        ...(day.yuReader ? { yuReader: day.yuReader } : {}),
         ...(day.goals ? { goals: day.goals } : {}),
         ...(day.report ? { report: day.report } : {}),
         ...(day.externalDiary ? { externalDiary: day.externalDiary } : {}),
@@ -998,6 +1202,7 @@ export function calculateStats(state: StudyState, now = new Date(), latestYuQuiz
   let togetherBookmarks = 0;
   let selfBountyBookmarks = 0;
   let giftBountyBookmarks = 0;
+  let totalVocabulary = 0;
   for (const summary of summaries) {
     totalProblems += summary.problemCount;
     fallbackNoteEntries += summary.yuQuiz?.todayNoteEntries ?? summary.report?.noteEntries ?? 0;
@@ -1008,8 +1213,9 @@ export function calculateStats(state: StudyState, now = new Date(), latestYuQuiz
     const tasks = getDay(state, summary.date).tasks;
     const goals = getDay(state, summary.date).goals;
     if (goals?.togetherCompletedAt || summary.report?.bookmark === "together") togetherBookmarks += 1;
-    selfBountyBookmarks += goals?.questionsCompletedAt || tasks.some((task) => task.bountySlot === "self" && task.completedAt) ? 1 : 0;
+    selfBountyBookmarks += goals?.secondStudyCompletedAt || goals?.questionsCompletedAt || tasks.some((task) => task.bountySlot === "self" && task.completedAt) ? 1 : 0;
     giftBountyBookmarks += goals?.studyCompletedAt || tasks.some((task) => task.bountySlot === "gift" && task.completedAt) ? 1 : 0;
+    totalVocabulary += summary.yuReader?.vocabularyCount ?? summary.report?.vocabularyCount ?? 0;
   }
   const cumulativeSnapshot = latestYuQuiz?.totalNoteCharacters !== undefined
     ? latestYuQuiz
@@ -1030,6 +1236,7 @@ export function calculateStats(state: StudyState, now = new Date(), latestYuQuiz
     togetherBookmarks,
     selfBountyBookmarks,
     giftBountyBookmarks,
+    totalVocabulary,
   };
 }
 
@@ -1120,7 +1327,7 @@ function normalizeDay(value: Record<string, unknown>, date: string): DayRecord {
     }
   }
   const taskReminders = Array.isArray(value.taskReminders)
-    ? value.taskReminders.filter((slot): slot is TaskReminderSlot => slot === "21:00" || slot === "22:00")
+    ? value.taskReminders.filter((slot): slot is TaskReminderSlot => slot === "21:00" || slot === "22:00" || slot === "23:00" || slot === "00:00" || slot === "01:00")
     : [];
   const studyLaunches: Partial<Record<StudyLaunchPeriod, StudyLaunchRecord>> = {};
   if (isRecord(value.studyLaunches)) {
@@ -1130,6 +1337,7 @@ function normalizeDay(value: Record<string, unknown>, date: string): DayRecord {
     }
   }
   const yuQuiz = normalizeYuQuizSnapshot(value.yuQuiz, date);
+  const yuReader = normalizeYuReaderSnapshot(value.yuReader, date);
   const goals = normalizeDailyAutomaticGoals(value.goals);
   const externalDiary = normalizeExternalDiaryReference(value.externalDiary);
   const authoritativeReport = report && yuQuiz
@@ -1141,7 +1349,50 @@ function normalizeDay(value: Record<string, unknown>, date: string): DayRecord {
         noteCharacters: yuQuiz.todayNoteCharacters,
       }
     : report;
-  return { date, ...(value.studyTimeUnknown === true ? { studyTimeUnknown: true } : {}), sessions, checkIns, tasks, taskReminders: [...new Set(taskReminders)], studyLaunches, ...(yuQuiz ? { yuQuiz } : {}), ...(goals ? { goals } : {}), ...(authoritativeReport ? { report: authoritativeReport } : {}), ...(externalDiary ? { externalDiary } : {}) };
+  return { date, ...(value.studyTimeUnknown === true ? { studyTimeUnknown: true } : {}), sessions, checkIns, tasks, taskReminders: [...new Set(taskReminders)], studyLaunches, ...(yuQuiz ? { yuQuiz } : {}), ...(yuReader ? { yuReader } : {}), ...(goals ? { goals } : {}), ...(authoritativeReport ? { report: authoritativeReport } : {}), ...(externalDiary ? { externalDiary } : {}) };
+}
+
+function normalizeYuReaderSnapshot(value: unknown, date: string): YuReaderSnapshot | undefined {
+  if (!isRecord(value) || value.date !== date || !isDateString(value.syncedAt)) return undefined;
+  const metric = (raw: unknown): YuReaderMetric => {
+    const record = isRecord(raw) ? raw : {};
+    return {
+      actual: Math.max(0, finiteNumber(record.actual) ?? 0),
+      target: Math.max(0, finiteNumber(record.target) ?? 0),
+      percent: Math.max(0, finiteNumber(record.percent) ?? 0),
+    };
+  };
+  const rawSubjects = isRecord(value.subjects) ? value.subjects : {};
+  const subject = (key: "medicine" | "politics" | "english"): YuReaderSubjectSnapshot => {
+    const record = isRecord(rawSubjects[key]) ? rawSubjects[key] : {};
+    return {
+      percent: Math.max(0, finiteNumber(record.percent) ?? 0),
+      readingPercent: Math.max(0, finiteNumber(record.readingPercent) ?? 0),
+      questionsPercent: Math.max(0, finiteNumber(record.questionsPercent) ?? 0),
+    };
+  };
+  const studyState = value.studyState === "ready" || value.studyState === "learning" || value.studyState === "paused" || value.studyState === "consulting"
+    ? value.studyState : "closed";
+  return {
+    date,
+    learningSeconds: clampInteger(value.learningSeconds, 0, 86_400 * 366),
+    reading: metric(value.reading),
+    questions: metric(value.questions),
+    vocabularyCount: clampInteger(value.vocabularyCount, 0, 5000),
+    vocabularyTarget: clampInteger(value.vocabularyTarget, 1, 5000),
+    subjects: { medicine: subject("medicine"), politics: subject("politics"), english: subject("english") },
+    oralReviewCompleted: value.oralReviewCompleted === true,
+    mistakeReviewCompleted: value.mistakeReviewCompleted === true,
+    pageOpen: value.pageOpen === true,
+    pageVisible: value.pageVisible === true,
+    studyState,
+    pauseReason: typeof value.pauseReason === "string" ? value.pauseReason.slice(0, 40) : "none",
+    currentView: typeof value.currentView === "string" ? value.currentView.slice(0, 40) : "home",
+    ...(isDateString(value.lastMeaningfulActivityAt) ? { lastMeaningfulActivityAt: value.lastMeaningfulActivityAt } : {}),
+    ...(isDateString(value.goalsUpdatedAt) ? { goalsUpdatedAt: value.goalsUpdatedAt } : {}),
+    lastEventId: clampInteger(value.lastEventId, 0, Number.MAX_SAFE_INTEGER),
+    syncedAt: value.syncedAt,
+  };
 }
 
 function normalizeExternalDiaryReference(value: unknown): ExternalDiaryReference | undefined {
@@ -1154,21 +1405,37 @@ function normalizeExternalDiaryReference(value: unknown): ExternalDiaryReference
 function normalizeDailyAutomaticGoals(value: unknown): DailyAutomaticGoals | undefined {
   if (!isRecord(value)) return undefined;
   const rawStudyMinutesTarget = finiteNumber(value.studyMinutesTarget);
+  const rawSecondStudyMinutesTarget = finiteNumber(value.secondStudyMinutesTarget);
   const rawQuestionsTarget = finiteNumber(value.questionsTarget);
-  if (rawStudyMinutesTarget === undefined || rawQuestionsTarget === undefined) return undefined;
+  if (rawStudyMinutesTarget === undefined || (rawSecondStudyMinutesTarget === undefined && rawQuestionsTarget === undefined)) return undefined;
   const studyMinutesTarget = clampInteger(rawStudyMinutesTarget, 30, 16 * 60);
-  const questionsTarget = clampInteger(rawQuestionsTarget, 1, 10_000);
+  const secondStudyMinutesTarget = rawSecondStudyMinutesTarget === undefined ? undefined : clampInteger(rawSecondStudyMinutesTarget, 30, 16 * 60);
+  const questionsTarget = rawQuestionsTarget === undefined ? undefined : clampInteger(rawQuestionsTarget, 1, 10_000);
   const studyCompletedAt = isDateString(value.studyCompletedAt) ? value.studyCompletedAt : undefined;
+  const secondStudyCompletedAt = isDateString(value.secondStudyCompletedAt) ? value.secondStudyCompletedAt : undefined;
   const questionsCompletedAt = isDateString(value.questionsCompletedAt) ? value.questionsCompletedAt : undefined;
-  const togetherCompletedAt = studyCompletedAt && questionsCompletedAt && isDateString(value.togetherCompletedAt)
+  const secondCompletedAt = secondStudyCompletedAt ?? questionsCompletedAt;
+  const togetherCompletedAt = studyCompletedAt && secondCompletedAt && isDateString(value.togetherCompletedAt)
     ? value.togetherCompletedAt
     : undefined;
+  const readingTargetSeconds = finiteNumber(value.readingTargetSeconds);
+  const questionsTargetCount = finiteNumber(value.questionsTargetCount);
+  const readingPercent = finiteNumber(value.readingPercent);
+  const questionsPercent = finiteNumber(value.questionsPercent);
+  const overallPercent = finiteNumber(value.overallPercent);
   return {
     studyMinutesTarget,
-    questionsTarget,
+    ...(secondStudyMinutesTarget !== undefined ? { secondStudyMinutesTarget } : {}),
+    ...(questionsTarget !== undefined ? { questionsTarget } : {}),
     ...(studyCompletedAt ? { studyCompletedAt } : {}),
+    ...(secondStudyCompletedAt ? { secondStudyCompletedAt } : {}),
     ...(questionsCompletedAt ? { questionsCompletedAt } : {}),
     ...(togetherCompletedAt ? { togetherCompletedAt } : {}),
+    ...(readingTargetSeconds !== undefined ? { readingTargetSeconds: Math.max(0, readingTargetSeconds) } : {}),
+    ...(questionsTargetCount !== undefined ? { questionsTargetCount: Math.max(0, questionsTargetCount) } : {}),
+    ...(readingPercent !== undefined ? { readingPercent: Math.max(0, readingPercent) } : {}),
+    ...(questionsPercent !== undefined ? { questionsPercent: Math.max(0, questionsPercent) } : {}),
+    ...(overallPercent !== undefined ? { overallPercent: Math.max(0, overallPercent) } : {}),
   };
 }
 
@@ -1215,7 +1482,8 @@ function normalizeReport(value: unknown): DailyReport | undefined {
   if (!isRecord(value) || !isDateString(value.submittedAt)) return undefined;
   const selfCompleted = value.selfCompleted === true;
   const friendCompleted = value.friendCompleted === true;
-  const bookmark = bookmarkFor(selfCompleted, friendCompleted);
+  const togetherCompleted = value.togetherCompleted === true;
+  const bookmark = togetherCompleted ? "together" : bookmarkFor(selfCompleted, friendCompleted);
   const rawAccuracy = finiteNumber(value.accuracy);
   return {
     submittedAt: value.submittedAt,
@@ -1226,6 +1494,13 @@ function normalizeReport(value: unknown): DailyReport | undefined {
     note: typeof value.note === "string" ? value.note.slice(0, 120) : "",
     selfCompleted,
     friendCompleted,
+    ...(finiteNumber(value.overallProgress) !== undefined ? { overallProgress: Math.max(0, value.overallProgress as number) } : {}),
+    ...(finiteNumber(value.readingPercent) !== undefined ? { readingPercent: Math.max(0, value.readingPercent as number) } : {}),
+    ...(finiteNumber(value.questionsPercent) !== undefined ? { questionsPercent: Math.max(0, value.questionsPercent as number) } : {}),
+    ...(finiteNumber(value.vocabularyCount) !== undefined ? { vocabularyCount: clampInteger(value.vocabularyCount, 0, 5000) } : {}),
+    ...(typeof value.oralReviewCompleted === "boolean" ? { oralReviewCompleted: value.oralReviewCompleted } : {}),
+    ...(typeof value.mistakeReviewCompleted === "boolean" ? { mistakeReviewCompleted: value.mistakeReviewCompleted } : {}),
+    ...(togetherCompleted ? { togetherCompleted: true } : {}),
     ...(bookmark ? { bookmark } : {}),
   };
 }
@@ -1310,6 +1585,18 @@ function normalizeTaskId(value: unknown): string | undefined {
   return id.length > 0 && id.length <= 120 ? id : undefined;
 }
 
+function normalizeTask(value: unknown): DailyTask | undefined {
+  if (!isRecord(value)) return undefined;
+  const id = normalizeTaskId(value.id);
+  const title = normalizeTaskTitle(value.title);
+  const createdAt = isDateString(value.createdAt) ? value.createdAt : undefined;
+  if (!id || !title || !createdAt) return undefined;
+  const completedAt = isDateString(value.completedAt) ? value.completedAt : undefined;
+  const recurringTaskId = normalizeTaskId(value.recurringTaskId);
+  const bountySlot = value.bountySlot === "self" || value.bountySlot === "gift" ? value.bountySlot : undefined;
+  return { id, title, createdAt, ...(completedAt ? { completedAt } : {}), ...(recurringTaskId ? { recurringTaskId } : {}), ...(bountySlot ? { bountySlot } : {}) };
+}
+
 function normalizeTaskTitle(value: unknown): string | undefined {
   if (typeof value !== "string") return undefined;
   const title = value.trim().replace(/\s+/g, " ").slice(0, 60);
@@ -1341,6 +1628,10 @@ function clampInteger(value: unknown, min: number, max: number): number {
   return typeof value === "number" && Number.isFinite(value)
     ? Math.min(max, Math.max(min, Math.round(value)))
     : min;
+}
+
+function roundProgress(value: number): number {
+  return Math.round((Number.isFinite(value) ? value : 0) * 10) / 10;
 }
 
 function finiteNumber(value: unknown): number | undefined {

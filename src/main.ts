@@ -14,6 +14,7 @@ import {
 import { existsSync, readFileSync } from "node:fs";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
+import { spawn } from "node:child_process";
 import { dirname, join } from "node:path";
 import type { Server } from "node:http";
 import { fileURLToPath } from "node:url";
@@ -44,6 +45,10 @@ import {
   setStudyAnchor,
   setVoiceEnabled,
   setVoiceVolume,
+  setYuReaderIntegration,
+  setYuReaderEventCursor,
+  saveYuReaderSnapshot,
+  calculateYuReaderRewardProgress,
   setYuQuizIntegration,
   setYuQuizEventCursor,
   saveYuQuizSnapshot,
@@ -68,18 +73,19 @@ import {
   type StudyLaunchPeriod,
   type SupervisionTier,
   type YuQuizSnapshot,
+  type YuReaderSnapshot,
 } from "./game.js";
 import { scanExternalDiaryDirectory } from "./external-diary.js";
-import { shouldRepeatStudyForeground, strongSupervisionBlocksPanel, studyForegroundDecision, type StudyForegroundDecision } from "./study-enforcement.js";
+import { canCheckInWhileStudying, classifyYuReaderPatrol, shouldAutoOpenYuReaderForCheckIn, shouldRepeatStudyForeground, strongSupervisionBlocksPanel, studyForegroundDecision, type StudyForegroundDecision } from "./study-enforcement.js";
 import { activateExistingYuQuizTab } from "./windows-browser.js";
 import { createYuQuizWakeServer } from "./yuquiz-wakeup.js";
+import { parseYuReaderStatus, YUREADER_BASE_URL } from "./yureader.js";
 
 const PET_WINDOW = { width: 128, height: 208 } as const;
 const PET_HITBOX = { width: 68, height: 102, bottom: 9 } as const;
 const PANEL_WINDOW = { width: 420, height: 680 } as const;
 const checkInSlots = new Set<string>(CHECK_IN_SLOTS);
-const panelViews = new Set(["today", "tasks", "history", "stats", "bookmarks", "report"]);
-const YUQUIZ_BASE_URL = "http://127.0.0.1:8765";
+const panelViews = new Set(["today", "tasks", "todos", "history", "stats", "bookmarks", "report"]);
 const YUQUIZ_OFFLINE_POLL_MS = 60_000;
 const YUQUIZ_IDLE_POLL_MS = 15_000;
 const YUQUIZ_LEARNING_POLL_MS = 2_000;
@@ -184,6 +190,8 @@ const voicePools = {
   automaticStudy: ["automatic-study-1", "automatic-study-2", "automatic-study-3"],
   automaticQuestions: ["automatic-questions-1", "automatic-questions-2", "automatic-questions-3"],
   automaticTogether: ["automatic-together-1", "automatic-together-2", "automatic-together-3"],
+  oralReviewCompleted: ["oral-review-complete-1", "oral-review-complete-2", "oral-review-complete-3"],
+  mistakeReviewCompleted: ["mistake-review-complete-1", "mistake-review-complete-2", "mistake-review-complete-3"],
   settlementSummary: ["settlement-summary-1", "settlement-summary-2", "settlement-summary-3"],
   studyStarted: ["study-started-1", "study-started-2", "study-started-3"],
   studyStopped: ["study-stopped-1", "study-stopped-2", "study-stopped-3"],
@@ -208,11 +216,11 @@ const lines = {
   taskFixed: ["固定好啦，明天我会再放进任务栏。", "记住啦，这件事每天都会回来。", "以后每天，我都替你准备好这一项。"],
   taskUnfixed: ["好，只留在今天，不再每天重复。", "已经取消固定，明天不会自动出现啦。"],
   bountySelf: ["做题目标达成啦，这枚书签是你一道道赢回来的。", "今天的题量攒够啦，你的书签收好。", "做题目标完成，认真做过的每一道都算数。"],
-  bountyGift: ["学习时间达标啦，她的书签也被你认真赢回来啦。", "今天的学习时间攒够啦，我替她把书签收好。", "时长目标完成，这份坚持替她好好记下来了。"],
+  bountyGift: ["阅读目标达成啦，这枚书签被你一页页认真点亮了。", "今天的阅读进度攒够啦，我替你把书签收好。", "阅读目标完成，这份专注已经好好记下来了。"],
   automaticStudy: [
-    "刚好，学习时间达标啦。这枚书签是你认真坐下来的证明。",
-    "看吧，只要开始，你就能做得很好。第一枚书签，我替你收好啦。",
-    "今天的时长目标完成。辛苦啦，我就知道你可以。",
+    "阅读目标达成啦。这枚书签，是你一页一页点亮的。",
+    "今天读得很认真呀，阅读书签已经全部恢复颜色啦。",
+    "阅读进度到一百啦。我替你把这枚书签好好收起来。",
   ],
   automaticQuestions: [
     "做题目标达成啦。这一枚，是你一道一道赢回来的。",
@@ -220,9 +228,19 @@ const lines = {
     "你认真做过的每一道都算数。这枚书签，收好哦。",
   ],
   automaticTogether: [
-    "两个目标都完成啦。今天的双人书签，要好好收着。",
-    "今天的时长和题量都达标了。你又把想做的事，真的做到了。",
-    "双目标完成。嗯，我现在真的很为你开心。",
+    "今天的综合目标完成啦。双人书签，也被你完整点亮了。",
+    "阅读、做题，还有额外的认真，都被你攒到一起啦。双人书签收好。",
+    "综合进度到一百啦。嗯，我就知道你今天可以做到。",
+  ],
+  oralReviewCompleted: [
+    "口腔背诵完成啦。今天最难啃的一块，又被你拿下了。",
+    "背完啦？好，我帮你在今天这里打上一个勾。",
+    "这一轮背诵收好啦。记住的东西，又多了一点。",
+  ],
+  mistakeReviewCompleted: [
+    "错题攻坚完成。那些卡住你的地方，现在都变成你的了。",
+    "错题也清干净啦。还不错嘛，今天很稳。",
+    "终于把错题抓住啦。这次不许它再偷偷跑掉。",
   ],
   settlementSummary: [
     "今天的数据和这句话，我都替你好好收起来啦。",
@@ -230,9 +248,9 @@ const lines = {
     "这一天已经写进日记了。无论结果怎样，我都陪你走到这里啦。",
   ],
   yuQuizSetCompleted: ["这一组收好啦，今天又向前走了一小步。", "这组题完成啦，认真留下了新的痕迹。", "题目一组组做完，今天的努力也亮起来啦。"],
-  studyLaunchPrompt: ["先不想学多久。打开第一题，我陪你把开头走过去。", "不用先决定学多久，我们只把第一题打开。", "先迈最小的一步吧，我陪你从第一题开始。"],
-  studyLaunchSuccess: ["好啦，已经开始了。最难的那一步过去了。", "第一题完成啦，接下来交给状态。", "你已经走进学习里了，我就不再催你啦。"],
-  studyLaunchReturn: ["学习台还在等你。打开一道题或一段教材，我就不再催啦。", "别在门口停太久，我们进去学一点吧。", "再拉你一下：先进入具体内容，开始以后我就安静。"],
+  studyLaunchPrompt: ["先不想学多久。点一下开始，我陪你把开头走过去。", "不用先决定学多久，我们只把计时打开。", "先迈最小的一步吧，我陪你认真十分钟。"],
+  studyLaunchSuccess: ["好啦，已经开始了。最难的那一步过去了。", "计时开始啦，接下来交给状态。", "你已经走进学习里了，我就不再催你啦。"],
+  studyLaunchReturn: ["刚才的学习还在等你。点一下开始，我们接着来。", "别在门口停太久，我们进去学一点吧。", "再拉你一下：先开始计时，进入状态以后我就安静。"],
 } as const;
 
 const supervisionVoices = {
@@ -355,7 +373,7 @@ let persistQueue = Promise.resolve();
 let nextSettlementActionAt = 0;
 let settlementDate = "";
 let pendingAutomaticGoalAwards: Array<"study" | "questions" | "together"> = [];
-let yuQuizRuntime: { connected: boolean; statusAvailable: boolean; error?: string; snapshot?: YuQuizSnapshot } = { connected: false, statusAvailable: false };
+let yuQuizRuntime: { connected: boolean; statusAvailable: boolean; error?: string; snapshot?: YuReaderSnapshot } = { connected: false, statusAvailable: false };
 let yuQuizEventsInitialized = false;
 let yuQuizAutoSuppressed = false;
 let yuQuizStatusBubble = "";
@@ -364,6 +382,8 @@ let lastEffectiveStudyAt = 0;
 let wasEffectivelyStudying = false;
 let lastForcedYuQuizInterventionKey = "";
 let lastForcedYuQuizInterventionAt = 0;
+let lastCheckInAutoOpenKey = "";
+let yuReaderOpenInFlight: Promise<boolean> | null = null;
 let roamingMode: RoamingMode | null = null;
 let roamingTimer: NodeJS.Timeout | null = null;
 let lastHourlyChatterKey = "";
@@ -400,8 +420,8 @@ app.whenReady().then(async () => {
   installIpc();
   createPetWindow();
   createTray();
-  startYuQuizWakeListener();
   startBackgroundLoops();
+  scheduleYuQuizSync(0);
   await persistState();
   screen.on("display-metrics-changed", keepPetOnPrimaryDisplay);
   screen.on("display-removed", keepPetOnPrimaryDisplay);
@@ -639,10 +659,10 @@ function installIpc(): void {
     if ((slot !== "self" && slot !== "gift") || typeof title !== "string") throw new Error("悬赏内容格式不正确。");
     return performSetBounty(slot, title);
   });
-  ipcMain.handle("xiaolu:set-automatic-goals", async (event, studyMinutes: unknown, questions: unknown) => {
+  ipcMain.handle("xiaolu:set-automatic-goals", async (event, studyMinutes: unknown, secondStudyMinutes: unknown) => {
     assertTrustedSender(event);
-    if (typeof studyMinutes !== "number" || typeof questions !== "number") throw new Error("目标数值格式不正确。");
-    studyState = setAutomaticGoalTargets(studyState, studyMinutes, questions, new Date());
+    if (typeof studyMinutes !== "number" || typeof secondStudyMinutes !== "number") throw new Error("目标数值格式不正确。");
+    studyState = setAutomaticGoalTargets(studyState, studyMinutes, secondStudyMinutes, new Date());
     await persistState();
     sendState();
     emitAction("review", "目标记好啦。达到以后，我会自动把书签收进收藏。", "◆", 1_650);
@@ -676,9 +696,17 @@ function installIpc(): void {
   });
   ipcMain.handle("xiaolu:set-yuquiz-integration", async (event, enabled: unknown) => {
     assertTrustedSender(event);
-    if (typeof enabled !== "boolean") throw new Error("YuQuiz 联动设置格式不正确。");
-    await updateYuQuizIntegration(enabled);
-    return publicState();
+    if (typeof enabled !== "boolean") throw new Error("YuReader 联动设置格式不正确。");
+    studyState = setYuReaderIntegration(studyState, enabled, new Date());
+    if (!enabled) {
+      yuQuizRuntime = { connected: false, statusAvailable: false };
+      handleYuQuizDocking(undefined);
+    } else {
+      scheduleYuQuizSync(0);
+    }
+    await persistState();
+    sendState();
+    return publicState(enabled ? "已经和 YuReader 接上啦。" : "好，先按普通日程模式陪你。");
   });
   ipcMain.handle("xiaolu:set-patrol-enabled", async (event, enabled: unknown) => {
     assertTrustedSender(event);
@@ -815,7 +843,6 @@ function installIpc(): void {
 }
 
 async function performToggleStudy(): Promise<Record<string, unknown>> {
-  if (studyState.settings.yuQuizIntegration) return publicState("已开启 YuQuiz 联动，学习时间会由网页自动记录。");
   const now = new Date();
   const wasStudying = Boolean(studyState.activeSessionStartedAt);
   const result = toggleStudy(studyState, now);
@@ -842,11 +869,6 @@ async function performToggleStudy(): Promise<Record<string, unknown>> {
 }
 
 async function performPetDoubleClick(): Promise<Record<string, unknown>> {
-  const now = new Date();
-  const period = studyLaunchPeriodAt(now);
-  if (!studyState.activeSessionStartedAt && !studyState.settings.yuQuizIntegration && period) {
-    return startStudyLaunchRitual(period, "double-click", now);
-  }
   return performToggleStudy();
 }
 
@@ -892,17 +914,6 @@ async function performPromptAction(promptId: string, action: string): Promise<Re
 async function startStudyLaunchRitual(period: StudyLaunchPeriod, source: "prompt" | "double-click", now = new Date()): Promise<Record<string, unknown>> {
   studyState = beginStudyLaunchRitual(studyState, period, source, now);
   if (activePromptType === "study-launch") clearActivePrompt();
-  setStudyLaunchStatusBubble("先不用管学多久，我们只把第一题打开。");
-  await persistState();
-  sendState();
-  const pageOpen = yuQuizRuntime.snapshot?.pageOpen === true;
-  const health = pageOpen ? true : Boolean(await fetchYuQuizJson("/api/health", false));
-  if (health) {
-    if (!pageOpen) await shell.openExternal(YUQUIZ_BASE_URL);
-    emitPairedAction("studyStarted", "waving", lines.studyStarted, voicePools.studyStarted, "✦", 1_650);
-    scheduleYuQuizSync(100);
-    return publicState();
-  }
   const result = toggleStudy(studyState, now);
   studyState = completeStudyLaunch(result.state, period, "manual", now);
   setStudyLaunchStatusBubble("");
@@ -914,7 +925,16 @@ async function startStudyLaunchRitual(period: StudyLaunchPeriod, source: "prompt
 }
 
 async function performCheckIn(requested?: CheckInSlot): Promise<Record<string, unknown>> {
-  const result = checkIn(studyState, new Date(), requested);
+  const now = new Date();
+  if (!studyState.activeSessionStartedAt && studyState.settings.yuReaderIntegration) await syncYuQuiz(false);
+  if (!canCheckInWhileStudying({
+    manualSessionActive: Boolean(studyState.activeSessionStartedAt),
+    yuReaderState: yuQuizRuntime.snapshot?.studyState,
+  })) {
+    emitAction("waiting", "先开始这一段学习，再来告诉我你已经到位啦。", "▶", 2_300);
+    return publicState("打卡要在学习计时中完成。先双击小鹿开始，或进入 YuReader 的有效学习页面吧。");
+  }
+  const result = checkIn(studyState, now, requested);
   studyState = result.state;
   if (!result.accepted) return publicState(result.reason === "already-recorded" ? "这一格已经打过卡啦。" : "现在不在打卡时间内。");
   clearActivePrompt();
@@ -927,27 +947,53 @@ async function performCheckIn(requested?: CheckInSlot): Promise<Record<string, u
 
 async function performReport(value: unknown): Promise<Record<string, unknown>> {
   if (!isRecord(value)) throw new Error("今日结算内容格式不正确。");
-  const date = localDateKey();
+  if (typeof value.vocabularyCount === "number" && studyState.settings.yuReaderIntegration) {
+    await updateYuReaderVocabulary(value.vocabularyCount);
+  }
+  const date = activeStudyDate();
   const day = getDay(studyState, date);
   const runtimeSnapshot = yuQuizRuntime.snapshot?.date === date ? yuQuizRuntime.snapshot : undefined;
-  const syncedSnapshot = runtimeSnapshot ?? day.yuQuiz;
+  const syncedSnapshot = runtimeSnapshot ?? day.yuReader;
+  const checkedCount = Object.values(day.checkIns).filter((item) => item?.status === "checked").length;
+  const progress = syncedSnapshot ? calculateYuReaderRewardProgress(syncedSnapshot, checkedCount) : undefined;
   const input: ReportInput = {
-    problemCount: syncedSnapshot?.todayQuestions ?? 0,
-    accuracy: syncedSnapshot?.todayAccuracy ?? null,
-    noteEntries: syncedSnapshot?.todayNoteEntries ?? 0,
-    noteCharacters: syncedSnapshot?.todayNoteCharacters ?? 0,
-    note: typeof value.note === "string" ? value.note : "",
-    selfCompleted: Boolean(day.goals?.questionsCompletedAt),
+    problemCount: syncedSnapshot?.questions.actual ?? 0,
+    accuracy: null,
+    noteEntries: 0,
+    noteCharacters: 0,
+    note: "",
+    selfCompleted: Boolean(day.goals?.secondStudyCompletedAt),
     friendCompleted: Boolean(day.goals?.studyCompletedAt),
+    ...(progress ? {
+      overallProgress: progress.overallPercent,
+      readingPercent: progress.readingPercent,
+      questionsPercent: progress.questionsPercent,
+    } : {}),
+    vocabularyCount: syncedSnapshot?.vocabularyCount ?? 0,
+    oralReviewCompleted: syncedSnapshot?.oralReviewCompleted ?? false,
+    mistakeReviewCompleted: syncedSnapshot?.mistakeReviewCompleted ?? false,
+    togetherCompleted: Boolean(day.goals?.togetherCompletedAt || (progress && progress.overallPercent >= 100)),
   };
-  studyState = submitDailyReport(studyState, input, new Date());
+  studyState = submitDailyReport(studyState, input, new Date(), date);
   await persistState();
   sendState();
   refreshTrayMenu();
-  const report = getDay(studyState, localDateKey()).report;
+  const report = getDay(studyState, date).report;
   if (report) playSettlementAction(report, true);
   scheduleNextSettlementAction();
   return publicState("今天已经好好收进日记啦。");
+}
+
+async function updateYuReaderVocabulary(count: number): Promise<void> {
+  const normalized = Math.max(0, Math.min(5000, Math.round(count)));
+  const response = await net.fetch(`${YUREADER_BASE_URL}/api/companion/vocabulary`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ count: normalized }),
+    signal: AbortSignal.timeout(4_000),
+  });
+  if (!response.ok) throw new Error(`YuReader 单词同步失败（HTTP ${response.status}）`);
+  await syncYuQuiz(false);
 }
 
 async function performAddTask(title: string): Promise<Record<string, unknown>> {
@@ -1039,7 +1085,7 @@ async function performSetStudyAnchor(): Promise<Record<string, unknown>> {
   studyState = setStudyAnchor(studyState, petPositionRatio(bounds.x, bounds.y), new Date());
   await persistState();
   sendState();
-  return publicState("记住啦，以后打开学习台，我会来这里陪你。");
+  return publicState("记住啦，以后开始学习时，我会来这里陪你。");
 }
 
 function applyLoginSetting(): void {
@@ -1073,17 +1119,6 @@ function startBackgroundLoops(): void {
   scheduleTimer.unref?.();
   stateTimer = setInterval(sendState, 1_000);
   stateTimer.unref?.();
-  scheduleYuQuizSync(0);
-}
-
-async function updateYuQuizIntegration(enabled: boolean): Promise<void> {
-  if (enabled && studyState.activeSessionStartedAt) {
-    studyState = toggleStudy(studyState, new Date()).state;
-  }
-  yuQuizAutoSuppressed = !enabled;
-  studyState = setYuQuizIntegration(studyState, enabled, new Date());
-  await persistState();
-  await syncYuQuiz(false);
 }
 
 async function syncYuQuiz(announce: boolean): Promise<void> {
@@ -1093,74 +1128,35 @@ async function syncYuQuiz(announce: boolean): Promise<void> {
   }
   yuQuizSyncInFlight = true;
   const previous = yuQuizRuntime.snapshot;
-  const wasEnabled = studyState.settings.yuQuizIntegration;
   let nextDelay = YUQUIZ_OFFLINE_POLL_MS;
   try {
     const status = await fetchYuQuizJson("/api/companion/status");
-    if (!status) throw new Error("YuQuiz 返回内容为空");
-    const statusRecord = isRecord(status) ? status : {};
+    if (!status) throw new Error("YuReader 返回内容为空");
     const now = new Date();
-    const date = localDateKey(now);
-    const snapshot: YuQuizSnapshot = {
-      date,
-      todayQuestions: clampExternalInteger(statusRecord.today_questions),
-      todayCorrect: clampExternalInteger(statusRecord.today_correct),
-      todayAccuracy: externalAccuracy(statusRecord.today_accuracy),
-      todayNoteEntries: clampExternalInteger(statusRecord.today_note_entries),
-      todayNoteCharacters: clampExternalInteger(statusRecord.today_note_characters, 100_000_000),
-      totalNoteEntries: clampExternalInteger(statusRecord.total_note_entries),
-      totalNoteCharacters: clampExternalInteger(statusRecord.total_note_characters, 100_000_000),
-      totalNoteFiles: clampExternalInteger(statusRecord.total_note_files),
-      todayLearningSeconds: clampExternalInteger(statusRecord.today_learning_seconds, 86_400 * 366),
-      currentView: typeof statusRecord.current_view === "string" ? statusRecord.current_view : "home",
-      isLearning: statusRecord.is_learning === true,
-      activeSession: statusRecord.active_session === true,
-      ...(typeof statusRecord.page_open === "boolean" ? { pageOpen: statusRecord.page_open } : {}),
-      ...(typeof statusRecord.page_suspected_open === "boolean" ? { pageSuspectedOpen: statusRecord.page_suspected_open } : {}),
-      ...(typeof statusRecord.page_visible === "boolean" ? { pageVisible: statusRecord.page_visible } : {}),
-      ...(statusRecord.study_state === "closed" || statusRecord.study_state === "ready" || statusRecord.study_state === "learning" || statusRecord.study_state === "paused" || statusRecord.study_state === "consulting"
-        ? { studyState: statusRecord.study_state } : {}),
-      ...(statusRecord.pause_reason === "idle" || statusRecord.pause_reason === "hidden" || statusRecord.pause_reason === "manual" || statusRecord.pause_reason === "none"
-        ? { pauseReason: statusRecord.pause_reason } : {}),
-      ...(typeof statusRecord.ai_consulting === "boolean" ? { aiConsulting: statusRecord.ai_consulting } : {}),
-      ...(isValidDateString(statusRecord.last_activity_at) ? { lastActivityAt: statusRecord.last_activity_at } : {}),
-      ...(isValidDateString(statusRecord.last_meaningful_activity_at)
-        ? { lastMeaningfulActivityAt: statusRecord.last_meaningful_activity_at }
-        : {}),
-      syncedAt: now.toISOString(),
-    };
-    studyState = saveYuQuizNoteTotals(studyState, snapshot, now);
-    if (!snapshot.isLearning) yuQuizAutoSuppressed = false;
-    const studyMode = snapshot.studyState ?? (snapshot.isLearning ? "learning" : "ready");
-    const shouldEnable = (studyMode === "learning" || studyMode === "consulting") && !yuQuizAutoSuppressed;
-    if (shouldEnable && !studyState.settings.yuQuizIntegration) {
-      if (studyState.activeSessionStartedAt) studyState = toggleStudy(studyState, now).state;
-      studyState = setYuQuizIntegration(studyState, true, now);
+    const snapshot = parseYuReaderStatus(status, now);
+    const shouldTrack = studyState.settings.yuReaderIntegration;
+    const isExternalStudy = snapshot.studyState === "learning" || snapshot.studyState === "consulting";
+    if (shouldTrack && isExternalStudy && studyState.activeSessionStartedAt) studyState = toggleStudy(studyState, now).state;
+    if (shouldTrack) {
+      const previousGoals = getDay(studyState, snapshot.date).goals;
+      studyState = saveYuReaderSnapshot(studyState, snapshot, now);
+      captureAutomaticGoalAwards(previousGoals, getDay(studyState, snapshot.date).goals);
     }
-    if (studyState.settings.yuQuizIntegration) studyState = saveYuQuizSnapshot(studyState, snapshot, now);
-    await syncYuQuizEvents(wasEnabled || shouldEnable);
-    if (!shouldEnable && studyState.settings.yuQuizIntegration) {
-      studyState = setYuQuizIntegration(studyState, false, now);
-    }
+    await syncYuQuizEvents(shouldTrack);
     yuQuizRuntime = { connected: true, statusAvailable: Boolean(status), snapshot };
     handleYuQuizDocking(snapshot);
-    if (shouldEnable) await completeOrganicStudyLaunch(now);
+    if (isExternalStudy) await completeOrganicStudyLaunch(now);
     updateYuQuizStatusBubble(snapshot, now);
     if (activePromptType !== "check-in") manageRoaming(now);
     await persistState();
-    if (announce && previous?.isLearning && !snapshot.isLearning && activityTimedOut(snapshot, now)) {
-      emitVoiceVariant("yuquiz-pause-gentle", functionalVoicePool("yuquiz-pause-gentle"));
+    if (announce && previous && (previous.studyState === "learning" || previous.studyState === "consulting") && snapshot.studyState === "paused" && activityTimedOut(snapshot, now)) {
+      emitAction("waiting", "读累了就歇一会儿，回来时我还在这里。", undefined, 1_700);
     }
-    nextDelay = shouldEnable || strongSupervisionBlocksPanel(roamingMode)
+    nextDelay = snapshot.pageOpen || strongSupervisionBlocksPanel(roamingMode)
       ? YUQUIZ_LEARNING_POLL_MS
       : YUQUIZ_IDLE_POLL_MS;
   } catch (error) {
-    yuQuizAutoSuppressed = false;
-    if (studyState.settings.yuQuizIntegration) {
-      studyState = setYuQuizIntegration(studyState, false, new Date());
-      await persistState();
-    }
-    yuQuizRuntime = { ...yuQuizRuntime, connected: false, error: error instanceof Error ? error.message : "学习网站暂时无法读取" };
+    yuQuizRuntime = { ...yuQuizRuntime, connected: false, error: error instanceof Error ? error.message : "YuReader 暂时无法读取" };
     setYuQuizStatusBubble("");
   }
   sendState();
@@ -1173,20 +1169,13 @@ async function syncYuQuiz(announce: boolean): Promise<void> {
   }
 }
 
-type YuQuizEvent = {
+type YuReaderEvent = {
   readonly id: number;
   readonly type: string;
-  readonly result?: string;
-  readonly session_type?: string;
-  readonly total?: number;
-  readonly answered?: number;
-  readonly correct?: number;
-  readonly wrong?: number;
-  readonly accuracy?: number;
 };
 
 async function syncYuQuizEvents(playEvents: boolean): Promise<Record<string, unknown> | undefined> {
-  const cursor = studyState.settings.yuQuizEventCursor;
+  const cursor = studyState.settings.yuReaderEventCursor;
   const shouldStartAtHead = !yuQuizEventsInitialized || !playEvents;
   const payload = await fetchYuQuizJson(shouldStartAtHead || cursor === undefined
     ? "/api/companion/events?after=2147483647"
@@ -1195,53 +1184,38 @@ async function syncYuQuizEvents(playEvents: boolean): Promise<Record<string, unk
   yuQuizEventsInitialized = true;
   const lastEventId = clampExternalInteger(payload.last_event_id);
   if (shouldStartAtHead || cursor === undefined || lastEventId < cursor) {
-    studyState = setYuQuizEventCursor(studyState, lastEventId, new Date());
+    studyState = setYuReaderEventCursor(studyState, lastEventId, new Date());
     await persistState();
     return payload;
   }
   const rawEvents = Array.isArray(payload.events) ? payload.events : [];
   const events = rawEvents
     .filter((event): event is Record<string, unknown> => isRecord(event))
-    .map((event): YuQuizEvent | undefined => {
+    .map((event): YuReaderEvent | undefined => {
       const id = clampExternalInteger(event.id);
       if (!id) return undefined;
-      return {
-        id,
-        type: typeof event.type === "string" ? event.type : "",
-        total: clampExternalInteger(event.total),
-        answered: clampExternalInteger(event.answered),
-        correct: clampExternalInteger(event.correct),
-        wrong: clampExternalInteger(event.wrong),
-        ...(typeof event.result === "string" ? { result: event.result } : {}),
-        ...(typeof event.session_type === "string" ? { session_type: event.session_type } : {}),
-        ...(externalAccuracy(event.accuracy) !== null ? { accuracy: externalAccuracy(event.accuracy) as number } : {}),
-      };
+      return { id, type: typeof event.type === "string" ? event.type : "" };
     })
-    .filter((event): event is YuQuizEvent => Boolean(event))
+    .filter((event): event is YuReaderEvent => Boolean(event))
     .sort((a, b) => a.id - b.id);
   if (events.length) {
-    const completion = events.find((event) => event.type === "set_completed");
-    const latestAnswer = [...events].reverse().find((event) => event.type === "answer");
-    const launchCompleted = latestAnswer ? await completeActiveStudyLaunch(new Date()) : false;
+    const latestAnswer = [...events].reverse().find((event) => event.type === "answer_correct" || event.type === "answer_wrong");
+    const studyStarted = events.some((event) => event.type === "study_started" || event.type === "study_resumed");
+    const launchCompleted = studyStarted || latestAnswer ? await completeActiveStudyLaunch(new Date()) : false;
     if (launchCompleted) {
       emitPairedAction("studyLaunchSuccess", "jumping", lines.studyLaunchSuccess, voicePools.launchSuccess, "✦", 1_900);
-    } else if (completion) {
-      const accuracy = completion.accuracy ?? 0;
-      const extraVoices = functionalVoicePool("yuquiz-set-complete-extra");
-      emitPairedAction(
-        "yuQuizSetCompleted",
-        accuracy >= 80 ? "jumping" : "waving",
-        [...lines.yuQuizSetCompleted, ...extraVoices.map((entry) => entry.message)],
-        [...voicePools.yuQuizSetCompleted, ...extraVoices.map((entry) => entry.voice)],
-        accuracy >= 80 ? "✦" : "✓",
-        accuracy >= 80 ? 1_900 : 1_600,
-      );
-    } else {
-      if (latestAnswer?.result === "correct") emitAction("waving", undefined, undefined, 750);
-      if (latestAnswer?.result === "wrong") emitAction("failed", undefined, undefined, 1_250);
+    } else if (latestAnswer?.type === "answer_correct") emitAction("waving", undefined, undefined, 750);
+    else if (latestAnswer?.type === "answer_wrong") emitAction("failed", undefined, undefined, 1_250);
+    else {
+      const clearance = [...events].reverse().find((event) => event.type === "oral_review_completed" || event.type === "mistake_review_completed");
+      if (clearance?.type === "oral_review_completed") {
+        emitPairedAction("oral-review-completed", "review", lines.oralReviewCompleted, voicePools.oralReviewCompleted, "✓", 1_850);
+      } else if (clearance?.type === "mistake_review_completed") {
+        emitPairedAction("mistake-review-completed", "waving", lines.mistakeReviewCompleted, voicePools.mistakeReviewCompleted, "✓", 1_850);
+      }
     }
   }
-  studyState = setYuQuizEventCursor(studyState, Math.max(cursor, lastEventId), new Date());
+  studyState = setYuReaderEventCursor(studyState, Math.max(cursor, lastEventId), new Date());
   await persistState();
   return payload;
 }
@@ -1265,17 +1239,15 @@ function startYuQuizWakeListener(): void {
   }
 }
 
-function activityTimedOut(snapshot: YuQuizSnapshot, now: Date): boolean {
-  if (!snapshot.lastActivityAt) return false;
-  const lastActivityAt = new Date(snapshot.lastActivityAt).getTime();
+function activityTimedOut(snapshot: YuReaderSnapshot, now: Date): boolean {
+  if (!snapshot.lastMeaningfulActivityAt) return false;
+  const lastActivityAt = new Date(snapshot.lastMeaningfulActivityAt).getTime();
   return Number.isFinite(lastActivityAt) && now.getTime() - lastActivityAt >= YUQUIZ_ACTIVITY_TIMEOUT_MS;
 }
 
-function updateYuQuizStatusBubble(snapshot: YuQuizSnapshot, now = new Date()): void {
+function updateYuQuizStatusBubble(snapshot: YuReaderSnapshot, now = new Date()): void {
   if (snapshot.pageOpen !== true) {
-    setYuQuizStatusBubble(snapshot.pageSuspectedOpen
-      ? "YuQuiz 好像还开着，但联动信号断开啦。刷新一下页面，我就能继续陪你计时。"
-      : "");
+    setYuQuizStatusBubble("");
     return;
   }
   if (!studyLaunchPeriodAt(now)) {
@@ -1289,8 +1261,8 @@ function updateYuQuizStatusBubble(snapshot: YuQuizSnapshot, now = new Date()): v
 
 async function fetchYuQuizJson(path: string, required = true): Promise<Record<string, unknown> | undefined> {
   try {
-    const response = await net.fetch(`${YUQUIZ_BASE_URL}${path}`, { signal: AbortSignal.timeout(4_000) });
-    if (!response.ok) throw new Error(`YuQuiz HTTP ${response.status}`);
+    const response = await net.fetch(`${YUREADER_BASE_URL}${path}`, { signal: AbortSignal.timeout(4_000) });
+    if (!response.ok) throw new Error(`YuReader HTTP ${response.status}`);
     const value: unknown = await response.json();
     return isRecord(value) ? value : undefined;
   } catch (error) {
@@ -1299,9 +1271,65 @@ async function fetchYuQuizJson(path: string, required = true): Promise<Record<st
   }
 }
 
+async function waitForYuReaderBackend(timeoutMs = 12_000): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (await fetchYuQuizJson("/api/health", false)) return true;
+    await new Promise((resolve) => setTimeout(resolve, 350));
+  }
+  return false;
+}
+
+function spawnYuReader(command: string, args: readonly string[], cwd: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    try {
+      const child = spawn(command, [...args], {
+        cwd,
+        detached: true,
+        windowsHide: true,
+        stdio: "ignore",
+      });
+      child.once("spawn", () => {
+        child.unref();
+        resolve(true);
+      });
+      child.once("error", () => resolve(false));
+    } catch {
+      resolve(false);
+    }
+  });
+}
+
+async function ensureYuReaderBackend(): Promise<boolean> {
+  if (await fetchYuQuizJson("/api/health", false)) return true;
+  const directory = join(app.getPath("documents"), "YuReader");
+  const appFile = join(directory, "app.py");
+  const executable = join(directory, "YuReader.exe");
+  if (existsSync(appFile) && await spawnYuReader("py.exe", ["-3", appFile], directory) && await waitForYuReaderBackend(8_000)) return true;
+  if (existsSync(executable) && await spawnYuReader(executable, [], directory) && await waitForYuReaderBackend(8_000)) return true;
+  return false;
+}
+
+function openYuReaderStudyPage(): Promise<boolean> {
+  if (yuReaderOpenInFlight) return yuReaderOpenInFlight;
+  yuReaderOpenInFlight = (async () => {
+    if (!await ensureYuReaderBackend()) return false;
+    const activated = activateExistingYuQuizTab();
+    if (!activated) await shell.openExternal(YUREADER_BASE_URL);
+    scheduleYuQuizSync(100);
+    setTimeout(ensurePetAlwaysOnTop, 180);
+    return true;
+  })().finally(() => { yuReaderOpenInFlight = null; });
+  return yuReaderOpenInFlight;
+}
+
 function clampExternalInteger(value: unknown, max = 1_000_000): number {
   const number = typeof value === "number" ? value : Number(value);
   return Number.isFinite(number) ? Math.max(0, Math.min(max, Math.trunc(number))) : 0;
+}
+
+function formatProgress(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
 function externalAccuracy(value: unknown): number | null {
@@ -1323,6 +1351,7 @@ async function evaluateSchedule(announceMissed: boolean): Promise<void> {
   if (changed) void persistState();
 
   if (result.pendingCheckIn) {
+    await maybeAutoOpenYuReaderForCheckIn(result.pendingCheckIn, now);
     pauseRoamingForCheckIn();
     const key = `${localDateKey(now)}:${result.pendingCheckIn.slot}`;
     if (activePromptKey !== key || activePromptType !== "check-in") {
@@ -1359,6 +1388,32 @@ async function evaluateSchedule(announceMissed: boolean): Promise<void> {
   sendState();
 }
 
+async function maybeAutoOpenYuReaderForCheckIn(
+  pending: { readonly slot: CheckInSlot; readonly windowEnd: string },
+  now: Date,
+): Promise<void> {
+  const key = `${localDateKey(now)}:${pending.slot}`;
+  const [hour, minute] = pending.slot.split(":").map(Number);
+  const scheduledAt = new Date(now);
+  scheduledAt.setHours(hour ?? 0, minute ?? 0, 0, 0);
+  const shouldOpen = shouldAutoOpenYuReaderForCheckIn({
+    enabled: studyState.settings.yuReaderIntegration,
+    slot: pending.slot,
+    now: now.getTime(),
+    scheduledAt: scheduledAt.getTime(),
+    windowEnd: new Date(pending.windowEnd).getTime(),
+    pageOpen: yuQuizRuntime.snapshot?.pageOpen === true,
+    alreadyHandled: lastCheckInAutoOpenKey === key,
+  });
+  if (!shouldOpen) {
+    if (now.getTime() >= scheduledAt.getTime() && yuQuizRuntime.snapshot?.pageOpen === true) lastCheckInAutoOpenKey = key;
+    return;
+  }
+  const opened = await openYuReaderStudyPage();
+  if (opened) lastCheckInAutoOpenKey = key;
+  else emitAction("failed", "YuReader 后端没有启动成功。先检查一下本机的 YuReader 文件夹吧。", undefined, 3_200);
+}
+
 async function maybeSyncExternalDiary(now: Date): Promise<void> {
   if (!externalDiaryDirectory || now.getHours() !== 21) return;
   const date = localDateKey(now);
@@ -1391,14 +1446,12 @@ function maybePlayHourlyChatter(now: Date): void {
 }
 
 function effectiveStudyIsActive(now: Date): boolean {
-  if (studyState.activeSessionStartedAt) return true;
-  const snapshot = yuQuizRuntime.snapshot;
-  const mode = snapshot?.studyState ?? (snapshot?.isLearning ? "learning" : "ready");
-  return mode === "learning" || mode === "consulting";
+  void now;
+  return Boolean(studyState.activeSessionStartedAt) || isYuQuizActivelyStudying();
 }
 
 function meaningfulActivityTime(): number {
-  const value = yuQuizRuntime.snapshot?.lastMeaningfulActivityAt ?? yuQuizRuntime.snapshot?.lastActivityAt;
+  const value = yuQuizRuntime.snapshot?.lastMeaningfulActivityAt;
   const time = value ? new Date(value).getTime() : Number.NaN;
   return Number.isFinite(time) ? time : 0;
 }
@@ -1520,15 +1573,14 @@ function forceYuQuizToForeground(intervention: StudyForegroundDecision): void {
       3_200,
     );
   }
-  const foreground = pageAlreadyOpen
-    ? activateExistingYuQuizTab()
-    : shell.openExternal(YUQUIZ_BASE_URL).then(() => true);
-  void foreground.then((activated) => {
-    if (!activated && pageAlreadyOpen) {
+  void openYuReaderStudyPage().then((opened) => {
+    if (!opened) {
+      lastForcedYuQuizInterventionKey = "";
+      lastForcedYuQuizInterventionAt = 0;
+      emitAction("failed", "YuReader 后端没有启动成功。先检查一下本机的 YuReader 文件夹吧。", undefined, 3_200);
+    } else if (pageAlreadyOpen && yuQuizRuntime.snapshot?.pageVisible !== true) {
       emitAction("waiting", "学习台已经开着啦，回到浏览器里的那个标签页吧。", "▶", 3_200);
     }
-    setTimeout(ensurePetAlwaysOnTop, 180);
-    scheduleYuQuizSync(100);
   }).catch((error) => {
     lastForcedYuQuizInterventionKey = "";
     lastForcedYuQuizInterventionAt = 0;
@@ -1570,12 +1622,17 @@ function strongPatrolVoice(mode: Exclude<RoamingMode, "night">, now = new Date()
   const tier = supervisionTierForElapsed(now.getTime() - roamingEscalationStartedAt);
   if (mode === "strong-return") {
     const gentleTier: SupervisionTier = tier === "playful" ? "playful" : "firm";
-    return { key: "patrol-return", pool: supervisionVoices.returning, tier: gentleTier };
+    return { key: "patrol-return", pool: scheduleOnlyVoicePool(supervisionVoices.returning), tier: gentleTier };
   }
-  if (tier === "final") return { key: "patrol-final", pool: supervisionVoices.startFinal, tier };
-  if (tier === "angry") return { key: "patrol-angry", pool: supervisionVoices.startAngry, tier };
-  if (tier === "firm") return { key: "patrol-firm", pool: supervisionVoices.startFirm, tier };
-  return { key: "patrol-playful", pool: supervisionVoices.startPlayful, tier };
+  if (tier === "final") return { key: "patrol-final", pool: scheduleOnlyVoicePool(supervisionVoices.startFinal), tier };
+  if (tier === "angry") return { key: "patrol-angry", pool: scheduleOnlyVoicePool(supervisionVoices.startAngry), tier };
+  if (tier === "firm") return { key: "patrol-firm", pool: scheduleOnlyVoicePool(supervisionVoices.startFirm), tier };
+  return { key: "patrol-playful", pool: scheduleOnlyVoicePool(supervisionVoices.startPlayful), tier };
+}
+
+function scheduleOnlyVoicePool(pool: readonly VoiceVariant[]): readonly VoiceVariant[] {
+  const compatible = pool.filter((entry) => !/[题]|学习台|教材|YuQuiz/i.test(entry.message));
+  return compatible.length > 0 ? compatible : pool;
 }
 
 function strongPatrolStepDelay(tier: SupervisionTier): number {
@@ -1702,7 +1759,7 @@ async function maybeManageStudyLaunch(now: Date): Promise<void> {
   if (record.ritualStartedAt) {
     const elapsed = now.getTime() - new Date(record.ritualStartedAt).getTime();
     if (elapsed < STUDY_LAUNCH_RITUAL_MS) {
-      setStudyLaunchStatusBubble("我还在这儿。打开一道题或一段教材，我们就算正式开始。");
+      setStudyLaunchStatusBubble("我还在这儿。点一下开始计时，我们就算正式开始。");
       return;
     }
     if (!record.finalPromptedAt && activePromptType !== "check-in") {
@@ -1779,21 +1836,18 @@ function showStudyLaunchPrompt(
   const actions = final
     ? [{ id: "start", label: "再试一次" }, { id: "skip", label: "跳过" }]
     : [{ id: "start", label: "现在开始" }, ...(!alreadySnoozed ? [{ id: "snooze", label: "10分后" }] : []), { id: "skip", label: "跳过" }];
-  const paired = !final && !repeated
-    ? choosePaired(`studyLaunch-${period}`, lines.studyLaunchPrompt, voicePools.launchPrompt)
-    : undefined;
   const repeatedPaired = repeated
-    ? chooseVariant(`studyLaunchReturn-${period}`, functionalVoicePool("study-launch-return"))
+    ? chooseVariant(`studyLaunchReturn-${period}`, scheduleOnlyVoicePool(functionalVoicePool("study-launch-return")))
     : undefined;
-  const promptVoice = paired?.voice ?? repeatedPaired?.voice;
+  const promptVoice = repeatedPaired?.voice;
   petWindow?.webContents.send("xiaolu:prompt", {
     id: key,
     type: "study-launch",
-    message: paired?.message ?? (repeated
+    message: repeated
       ? repeatedPaired?.message ?? lines.studyLaunchReturn[0]
       : final
-        ? "我还在等你。现在打开一道题或一段教材，今天就不算被拖延带走。"
-        : lines.studyLaunchPrompt[0]),
+        ? "我还在等你。现在点一下开始，今天就不算被拖延带走。"
+        : lines.studyLaunchPrompt[0],
     ...(promptVoice ? { voice: promptVoice } : {}),
     actions,
   });
@@ -1806,22 +1860,15 @@ function isUserAvailableForLaunch(): boolean {
 }
 
 function isYuQuizActivelyStudying(): boolean {
-  const mode = yuQuizRuntime.snapshot?.studyState;
-  return mode === "learning" || mode === "consulting";
+  return classifyYuReaderPatrol(yuQuizRuntime.snapshot).active;
 }
 
 function hasYuQuizEnteredStudyContent(): boolean {
-  const snapshot = yuQuizRuntime.snapshot;
-  if (!snapshot?.pageOpen) return false;
-  const mode = snapshot.studyState ?? (snapshot.isLearning ? "learning" : "ready");
-  return mode === "learning" || mode === "consulting" || mode === "paused" || snapshot.currentView !== "home";
+  return classifyYuReaderPatrol(yuQuizRuntime.snapshot).enteredContent;
 }
 
 function isYuQuizWaitingAtHome(): boolean {
-  const snapshot = yuQuizRuntime.snapshot;
-  if (!snapshot?.pageOpen) return false;
-  const mode = snapshot.studyState ?? (snapshot.isLearning ? "learning" : "ready");
-  return mode === "ready" && snapshot.currentView === "home";
+  return classifyYuReaderPatrol(yuQuizRuntime.snapshot).waitingAtHome;
 }
 
 function reminderIsDue(record: { readonly lastReminderAt?: string }, now: Date): boolean {
@@ -1860,19 +1907,13 @@ async function completeActiveStudyLaunch(now: Date): Promise<boolean> {
 }
 
 function maybePromptIncompleteTasks(now: Date): void {
-  const date = localDateKey(now);
+  const snapshot = yuQuizRuntime.snapshot;
+  if (!studyState.settings.yuReaderIntegration || !snapshot) return;
+  const date = snapshot.date;
   const day = getDay(studyState, date);
-  const incompleteCount = day.tasks.filter((task) => !task.bountySlot && !task.completedAt).length;
-  const goals = day.goals;
-  const remainingStudyMinutes = goals?.studyCompletedAt
-    ? 0
-    : Math.max(0, goals ? Math.ceil(goals.studyMinutesTarget - studyMsForDay(studyState, date, now) / 60_000) : 0);
-  const remainingQuestions = goals?.questionsCompletedAt
-    ? 0
-    : Math.max(0, goals ? goals.questionsTarget - (day.yuQuiz?.todayQuestions ?? 0) : 0);
-  const studyIsClose = remainingStudyMinutes > 0 && remainingStudyMinutes <= 30;
-  const questionsAreClose = remainingQuestions > 0 && remainingQuestions <= 10;
-  if (incompleteCount === 0 && !studyIsClose && !questionsAreClose) {
+  const checkedCount = Object.values(day.checkIns).filter((item) => item?.status === "checked").length;
+  const progress = calculateYuReaderRewardProgress(snapshot, checkedCount);
+  if (progress.overallPercent >= 100) {
     if (activePromptType === "task-reminder") clearActivePrompt();
     return;
   }
@@ -1880,24 +1921,21 @@ function maybePromptIncompleteTasks(now: Date): void {
     if (now.getTime() < activePromptExpiresAt) return;
     clearActivePrompt();
   }
-  const minutes = now.getHours() * 60 + now.getMinutes();
-  const reminderSlot = minutes >= 22 * 60 ? "22:00" : minutes >= 21 * 60 + 6 ? "21:00" : undefined;
+  const hour = now.getHours();
+  const reminderSlot = hour === 21 && now.getMinutes() >= 6 ? "21:00"
+    : hour === 22 ? "22:00"
+      : hour === 23 ? "23:00"
+        : hour === 0 ? "00:00"
+          : hour === 1 ? "01:00" : undefined;
   if (!reminderSlot) return;
   if (day.taskReminders.includes(reminderSlot)) return;
   const key = `${date}:tasks:${reminderSlot}`;
-  studyState = markTaskReminderShown(studyState, reminderSlot, now);
+  studyState = markTaskReminderShown(studyState, reminderSlot, now, date);
   void persistState();
-  const goalMessage = studyIsClose && questionsAreClose
-    ? `今天还差 ${remainingStudyMinutes} 分钟和 ${remainingQuestions} 题，两枚书签都已经很近啦。`
-    : studyIsClose
-      ? `再认真 ${remainingStudyMinutes} 分钟，今天的学习书签就能收好啦。`
-      : questionsAreClose
-        ? `只差 ${remainingQuestions} 题了，要不要把今天的做题书签带回来？`
-        : undefined;
-  const paired = goalMessage ? undefined : chooseVariant(
+  const paired = hour >= 21 ? chooseVariant(
     `taskReminder-${reminderSlot}`,
     functionalVoicePool(reminderSlot === "21:00" ? "task-reminder-21" : "task-reminder-22"),
-  );
+  ) : undefined;
   activePromptKey = key;
   activePromptType = "task-reminder";
   activePromptExpiresAt = now.getTime() + 25 * 60_000;
@@ -1905,8 +1943,8 @@ function maybePromptIncompleteTasks(now: Date): void {
   petWindow?.webContents.send("xiaolu:prompt", {
     id: key,
     type: "task-reminder",
-    label: goalMessage ? "看目标" : "看任务",
-    message: goalMessage ?? paired?.message ?? "今天还有一件事没有收好，来看看吧。",
+    label: "看任务",
+    message: paired?.message ?? `今天完成到 ${formatProgress(progress.overallPercent)}% 啦，再看一眼还差哪一点吧。`,
     ...(paired?.voice ? { voice: paired.voice } : {}),
     expiresAt: new Date(activePromptExpiresAt).toISOString(),
   });
@@ -1943,7 +1981,7 @@ function syncStatusBubble(): void {
 }
 
 function maybePlaySettlementAction(now: Date): void {
-  const date = localDateKey(now);
+  const date = activeStudyDate(now);
   const report = getDay(studyState, date).report;
   if (!report) {
     settlementDate = "";
@@ -1958,7 +1996,7 @@ function maybePlaySettlementAction(now: Date): void {
 }
 
 function scheduleNextSettlementAction(now = new Date()): void {
-  settlementDate = localDateKey(now);
+  settlementDate = activeStudyDate(now);
   nextSettlementActionAt = now.getTime() + randomBetween(4 * 60_000, 7 * 60_000);
 }
 
@@ -1970,9 +2008,14 @@ function playSettlementAction(_report: DailyReport, announce: boolean): void {
   emitAction("review", undefined, undefined, 1_850);
 }
 
+function activeStudyDate(now = new Date()): string {
+  const snapshotDate = yuQuizRuntime.snapshot?.date;
+  return now.getHours() < 2 && snapshotDate ? snapshotDate : localDateKey(now);
+}
+
 function publicState(message?: string): Record<string, unknown> {
   const now = new Date();
-  const date = localDateKey(now);
+  const date = activeStudyDate(now);
   const previousGoals = getDay(studyState, date).goals;
   const reconciled = reconcileStudyState(studyState, now);
   studyState = reconciled.state;
@@ -1987,39 +2030,37 @@ function publicState(message?: string): Record<string, unknown> {
       ...(record?.checkedAt ? { checkedAt: record.checkedAt } : {}),
     };
   });
-  const yuQuizEnabled = studyState.settings.yuQuizIntegration;
-  const yuQuizSnapshot = yuQuizRuntime.snapshot ?? today.yuQuiz;
-  const yuQuizMode = yuQuizSnapshot?.studyState;
-  const yuQuizIsStudying = yuQuizMode === "learning" || yuQuizMode === "consulting" || (!yuQuizMode && yuQuizSnapshot?.isLearning === true);
-  const isStudying = yuQuizEnabled ? yuQuizIsStudying : Boolean(studyState.activeSessionStartedAt);
+  const yuReaderSnapshot = yuQuizRuntime.snapshot?.date === date ? yuQuizRuntime.snapshot : today.yuReader;
+  const isStudying = Boolean(studyState.activeSessionStartedAt);
   return {
     version: studyState.version,
     now: now.toISOString(),
     date,
     isStudying,
-    activeSessionStartedAt: yuQuizEnabled ? null : studyState.activeSessionStartedAt ?? null,
-    persistentAnimation: pending ? "waiting" : !yuQuizEnabled && isStudying ? "running" : "idle",
+    activeSessionStartedAt: studyState.activeSessionStartedAt ?? null,
+    persistentAnimation: pending ? "waiting" : isStudying ? "running" : "idle",
     pendingCheckIn: pending ?? null,
     today: {
       date,
       studyMs: studyMsForDay(studyState, date, now),
       checkIns,
-      tasks: today.tasks,
+      tasks: [...today.tasks, ...studyState.backlogTasks],
       goals: today.goals ?? null,
       report: today.report ?? null,
       externalDiary: today.externalDiary ?? null,
-      yuQuiz: yuQuizSnapshot ?? null,
+      yuQuiz: today.yuQuiz ?? null,
+      yuReader: yuReaderSnapshot ?? null,
     },
     bounties: studyState.bounties,
     automaticGoals: studyState.automaticGoals,
     history: daySummaries(studyState, now),
-    stats: calculateStats(studyState, now, yuQuizSnapshot),
+    stats: calculateStats(studyState, now, today.yuQuiz),
     settings: studyState.settings,
-    yuQuiz: {
-      enabled: yuQuizEnabled,
+    yuReader: {
+      enabled: studyState.settings.yuReaderIntegration,
       connected: yuQuizRuntime.connected,
       statusAvailable: yuQuizRuntime.statusAvailable,
-      snapshot: yuQuizSnapshot ?? null,
+      snapshot: yuReaderSnapshot ?? null,
       ...(yuQuizRuntime.error ? { error: yuQuizRuntime.error } : {}),
     },
     ...((studyLaunchStatusBubble || yuQuizStatusBubble) ? { statusBubble: studyLaunchStatusBubble || yuQuizStatusBubble } : {}),
@@ -2040,7 +2081,7 @@ function captureAutomaticGoalAwards(
 ): void {
   if (!current) return;
   if (!previous?.studyCompletedAt && current.studyCompletedAt) pendingAutomaticGoalAwards.push("study");
-  if (!previous?.questionsCompletedAt && current.questionsCompletedAt) pendingAutomaticGoalAwards.push("questions");
+  if (!previous?.secondStudyCompletedAt && current.secondStudyCompletedAt) pendingAutomaticGoalAwards.push("questions");
   if (!previous?.togetherCompletedAt && current.togetherCompletedAt) pendingAutomaticGoalAwards.push("together");
 }
 
@@ -2197,7 +2238,7 @@ function stopDragging(notifyRenderer = false): void {
   syncPetMousePassthrough();
 }
 
-function handleYuQuizDocking(snapshot?: YuQuizSnapshot): void {
+function handleYuQuizDocking(snapshot?: YuReaderSnapshot): void {
   if (!petReady || !petWindow || petWindow.isDestroyed() || !snapshot) return;
   const isClosed = snapshot.studyState === "closed" || snapshot.pageOpen === false;
   if (isClosed) {

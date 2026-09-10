@@ -17,3 +17,13 @@ https://github.com/TakWolf/fusion-pixel-font
 
 The font software is distributed under the SIL Open Font License 1.1. The
 license and bundled upstream font notices are preserved under `assets/fonts/`.
+
+## canvas-confetti
+
+The completed-goal pixel particles use canvas-confetti 1.9.4 by Cat Dad and
+contributors:
+
+https://github.com/catdad/canvas-confetti
+
+canvas-confetti is distributed under the ISC License. Its license is preserved
+at `assets/vendor/canvas-confetti.LICENSE.txt`.
