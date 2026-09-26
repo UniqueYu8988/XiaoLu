@@ -7,8 +7,8 @@ export const YUREADER_BASE_URL = "http://127.0.0.1:8775";
 export function parseYuReaderStatus(value: unknown, now = new Date()): YuReaderSnapshot {
   if (!isRecord(value)) throw new Error("YuReader 返回内容格式不正确");
   const today = record(value.today);
-  const page = record(value.page);
-  const currentActivity = record(value.current_activity);
+  const page = record(value.desktop_page ?? value.page);
+  const currentActivity = record(value.desktop_activity ?? value.current_activity);
   const vocabulary = record(today.vocabulary);
   const clearances = record(today.clearances);
   const subjects = record(today.subjects);
@@ -29,7 +29,7 @@ export function parseYuReaderStatus(value: unknown, now = new Date()): YuReaderS
       politics: subject(subjects.politics),
       english: subject(subjects.english),
     },
-    oralReviewCompleted: record(clearances.oral_review).completed === true,
+    oralReviewCompleted: record(clearances.daily_review).completed === true || record(clearances.oral_review).completed === true,
     mistakeReviewCompleted: record(clearances.mistake_review).completed === true,
     pageOpen: page.open === true,
     pageVisible: page.visible === true,

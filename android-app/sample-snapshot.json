@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-09-26T08:30:00.000Z",
+  "studyDay": "2026-09-26",
+  "today": {
+    "studySeconds": 7200,
+    "readingPercent": 68,
+    "questionsPercent": 54,
+    "overallPercent": 62,
+    "vocabularyCount": 40,
+    "subjects": { "medicine": 72, "english": 55, "politics": 43 },
+    "checkIns": [
+      { "slot": "09:00", "status": "checked" },
+      { "slot": "12:00", "status": "upcoming" },
+      { "slot": "15:00", "status": "upcoming" },
+      { "slot": "18:00", "status": "upcoming" },
+      { "slot": "21:00", "status": "upcoming" }
+    ]
+  },
+  "todos": [
+    { "id": "sample-1", "title": "整理今天读过的章节", "completed": false, "daily": true },
+    { "id": "sample-2", "title": "周末想去的地方", "completed": false, "daily": false }
+  ]
+}

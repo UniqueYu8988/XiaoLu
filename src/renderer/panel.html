@@ -55,7 +55,7 @@
                 <div class="settlement-stat settlement-stat-wide stat-time"><img class="settlement-stat-icon" src="../assets/ui/settlement/study-time.png" alt="" /><span>学习时间</span><strong id="report-study-time">0 分钟</strong></div>
                 <div class="settlement-stat settlement-stat-wide stat-questions"><img class="settlement-stat-icon" src="../assets/ui/settlement/questions.png" alt="" /><span>综合完成</span><strong id="report-questions">0%</strong></div>
                 <div class="settlement-stat stat-accuracy"><img class="settlement-stat-icon" src="../assets/ui/settlement/accuracy.png" alt="" /><span>错题攻坚</span><strong id="report-accuracy">待完成</strong></div>
-                <div class="settlement-stat stat-notes"><img class="settlement-stat-icon" src="../assets/ui/settlement/notes.png" alt="" /><span>口腔背诵</span><strong id="report-note-entries">待完成</strong></div>
+                <div class="settlement-stat stat-notes"><img class="settlement-stat-icon" src="../assets/ui/settlement/notes.png" alt="" /><span>每日复习</span><strong id="report-note-entries">待完成</strong></div>
                 <div class="settlement-stat stat-characters"><img class="settlement-stat-icon" src="../assets/ui/settlement/note-characters.png" alt="" /><span>在场打卡</span><strong id="report-note-characters">0/5</strong></div>
                 <div class="settlement-stat stat-subject stat-subject-oral"><img class="settlement-stat-icon" src="../assets/ui/settlement/subject-oral.png" alt="" /><span>口腔</span><strong id="report-subject-oral">0%</strong></div>
                 <div class="settlement-stat stat-subject stat-subject-english"><img class="settlement-stat-icon" src="../assets/ui/settlement/subject-english.png" alt="" /><span>英语</span><strong id="report-subject-english">0%</strong></div>
@@ -69,13 +69,25 @@
             </form>
             <p id="report-result" class="report-result" hidden></p>
           </div>
-          <button id="save-study-anchor" class="study-anchor-button" type="button" aria-label="把小鹿当前位置设为学习驻守点" title="把小鹿当前位置设为学习驻守点"><span class="study-anchor-symbol" aria-hidden="true"></span></button>
         </section>
 
         <section id="view-tasks" class="view">
           <div class="section-title goal-section-title"><span>GOAL</span><h2>今日任务</h2><strong id="goal-overall-progress">0%</strong></div>
           <p id="goal-helper" class="helper">书签会跟着进度一点点亮起来，完成后就正式收入收藏。</p>
           <div id="bounty-board" class="bounty-board"></div>
+          <button id="open-score-rules" class="pixel-button score-rules-entry" type="button">看看今天的得分怎么算 <span aria-hidden="true">›</span></button>
+        </section>
+
+        <section id="view-rules" class="view">
+          <div class="section-title"><span>RULE</span><h2>得分说明</h2></div>
+          <p class="helper">今天的三个进度，都是实时计算的；目标在 YuReader 调整后，也会跟着更新。</p>
+          <div class="score-rules">
+            <article class="score-rule reading"><div class="score-rule-heading"><span>01</span><strong>阅读达成</strong></div><p>YuReader 阅读进度 ＋ 背词加成</p><small>背词数 ÷ YuReader 当前单词目标 × 10 个百分点。背完一份目标加 10%，超额背词继续累加。</small></article>
+            <article class="score-rule questions"><div class="score-rule-heading"><span>02</span><strong>做题达成</strong></div><p>YuReader 做题进度 ＋ 两项复习加成</p><small>错题攻坚、每日复习每完成一项，做题进度各加 10 个百分点。</small></article>
+            <article class="score-rule together"><div class="score-rule-heading"><span>03</span><strong>综合达成</strong></div><p>阅读达成 × 50% ＋ 做题达成 × 50% ＋ 在场打卡</p><small>每次有效打卡再加 1 个百分点。三种进度都可以超过 100%。</small></article>
+          </div>
+          <p class="score-rules-footnote">阅读、做题、综合分别达到 100%，就各收下一枚对应书签。</p>
+          <button id="close-score-rules" class="pixel-button score-rules-back" type="button">‹ 返回今日任务</button>
         </section>
 
         <section id="view-todos" class="view">
@@ -146,6 +158,7 @@
               <input id="voice-enabled" type="checkbox" aria-label="启用小鹿语音" />
             </div>
           </div>
+          <button id="save-study-anchor" class="study-anchor-button" type="button" aria-label="把小鹿当前位置设为学习驻守点" title="把小鹿当前位置设为学习驻守点"><span class="study-anchor-symbol" aria-hidden="true"></span></button>
         </section>
       </main>
 

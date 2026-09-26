@@ -34,6 +34,13 @@ assert.equal(snapshot.questions.percent, 80);
 assert.equal(snapshot.subjects.medicine.percent, 105);
 assert.equal(snapshot.pageOpen, true);
 assert.equal(snapshot.studyState, "learning");
+const phoneOnly = parseYuReaderStatus({ ...status,
+  desktop_page: { open: false, visible: false, study_state: "closed" },
+  desktop_activity: { view: "home" },
+}, now);
+assert.equal(phoneOnly.studyState, "closed");
+assert.equal(phoneOnly.pageOpen, false);
+assert.equal(phoneOnly.learningSeconds, snapshot.learningSeconds, "shared facts still include phone study");
 
 const reward = calculateYuReaderRewardProgress(snapshot, 4);
 assert.deepEqual(reward, {

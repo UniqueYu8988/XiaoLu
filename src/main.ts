@@ -1,6 +1,7 @@
 import {
   app,
   BrowserWindow,
+  dialog,
   ipcMain,
   Menu,
   net,
@@ -14,10 +15,11 @@ import {
 import { existsSync, readFileSync } from "node:fs";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
-import { spawn } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { dirname, join } from "node:path";
 import type { Server } from "node:http";
 import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 
 import {
   CHECK_IN_SLOTS,
@@ -80,12 +82,16 @@ import { canCheckInWhileStudying, classifyYuReaderPatrol, shouldAutoOpenYuReader
 import { activateExistingYuQuizTab } from "./windows-browser.js";
 import { createYuQuizWakeServer } from "./yuquiz-wakeup.js";
 import { parseYuReaderStatus, YUREADER_BASE_URL } from "./yureader.js";
+import { createMobileSnapshot } from "./mobile-snapshot.js";
+import { createMobileServer, MOBILE_PORT, type MobileTaskChange } from "./mobile-server.js";
 
 const PET_WINDOW = { width: 128, height: 208 } as const;
+const execFileAsync = promisify(execFile);
+const MOBILE_TAILSCALE_PORT = 8786;
 const PET_HITBOX = { width: 68, height: 102, bottom: 9 } as const;
 const PANEL_WINDOW = { width: 420, height: 680 } as const;
 const checkInSlots = new Set<string>(CHECK_IN_SLOTS);
-const panelViews = new Set(["today", "tasks", "todos", "history", "stats", "bookmarks", "report"]);
+const panelViews = new Set(["today", "tasks", "todos", "history", "stats", "bookmarks", "rules", "report"]);
 const YUQUIZ_OFFLINE_POLL_MS = 60_000;
 const YUQUIZ_IDLE_POLL_MS = 15_000;
 const YUQUIZ_LEARNING_POLL_MS = 2_000;
@@ -233,9 +239,9 @@ const lines = {
     "综合进度到一百啦。嗯，我就知道你今天可以做到。",
   ],
   oralReviewCompleted: [
-    "口腔背诵完成啦。今天最难啃的一块，又被你拿下了。",
-    "背完啦？好，我帮你在今天这里打上一个勾。",
-    "这一轮背诵收好啦。记住的东西，又多了一点。",
+    "每日复习完成啦。昨天沉淀的思考与笔记，已经全部梳理巩固好了。",
+    "复盘完成啦？好，我帮你在今天这里打上一个勾。",
+    "这一轮复习收好啦。复盘通关，今天更扎实了。",
   ],
   mistakeReviewCompleted: [
     "错题攻坚完成。那些卡住你的地方，现在都变成你的了。",
@@ -335,6 +341,9 @@ let scheduleTimer: NodeJS.Timeout | null = null;
 let stateTimer: NodeJS.Timeout | null = null;
 let yuQuizTimer: NodeJS.Timeout | null = null;
 let yuQuizWakeServer: Server | null = null;
+let mobileServer: Server | null = null;
+let mobilePairingCode: (() => string) | null = null;
+let mobileRevoke: (() => Promise<void>) | null = null;
 let yuQuizSyncInFlight = false;
 let yuQuizSyncQueued = false;
 let dragTimer: NodeJS.Timeout | null = null;
@@ -420,6 +429,49 @@ app.whenReady().then(async () => {
   installIpc();
   createPetWindow();
   createTray();
+  try {
+    const mobile = await createMobileServer({
+      tokenFile: join(app.getPath("userData"), "mobile-pairing-token"),
+      snapshot: () => createMobileSnapshot(studyState, activeStudyDate(), new Date()),
+      add: async (title) => { await performAddTask(title); },
+      change: async (change: MobileTaskChange) => {
+        if (change.title !== undefined) await performEditTask(change.id, change.title);
+        if (change.completed !== undefined) await performSetTaskCompleted(change.id, change.completed);
+        if (change.daily !== undefined) await performSetTaskRecurring(change.id, change.daily);
+      },
+      remove: async (id) => { await performDeleteTask(id); },
+      vocabulary: async (count, studyDay, expectedCount) => {
+        const status = await fetchYuQuizJson("/api/companion/status");
+        if (!status) throw new Error("YuReader 暂时没有回应，请稍后重试");
+        const current = parseYuReaderStatus(status);
+        if (current.date !== studyDay) throw new Error("学习日已变化，请刷新后重新填写");
+        if (current.vocabularyCount !== expectedCount) {
+          studyState = saveYuReaderSnapshot(studyState, current);
+          await persistState();
+          sendState();
+          throw new Error("YuReader 的背词数量已变化，请刷新后确认再保存");
+        }
+        const response = await net.fetch(`${YUREADER_BASE_URL}/api/companion/vocabulary`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ count, study_day: studyDay }), signal: AbortSignal.timeout(4_000),
+        });
+        if (!response.ok) throw new Error(`背词同步失败（HTTP ${response.status}）`);
+        const result = await response.json() as Record<string, unknown>;
+        const next = parseYuReaderStatus(result.status);
+        const previousGoals = getDay(studyState, next.date).goals;
+        studyState = saveYuReaderSnapshot(studyState, next);
+        captureAutomaticGoalAwards(previousGoals, getDay(studyState, next.date).goals);
+        await persistState();
+        sendState();
+      },
+    });
+    mobileServer = mobile.server;
+    mobilePairingCode = mobile.newPairingCode;
+    mobileRevoke = mobile.revoke;
+    refreshTrayMenu();
+  } catch (error) {
+    console.error("Mobile companion listener unavailable", error);
+  }
   startBackgroundLoops();
   scheduleYuQuizSync(0);
   await persistState();
@@ -447,6 +499,7 @@ app.on("before-quit", () => {
   if (roamingTimer) clearTimeout(roamingTimer);
   cancelPetTravel();
   yuQuizWakeServer?.close();
+  mobileServer?.close();
   stopDragging();
 });
 
@@ -599,6 +652,19 @@ function refreshTrayMenu(): void {
     },
     { label: "显示小鹿", click: () => petWindow?.showInactive() },
     { label: "暂时隐藏", click: () => petWindow?.hide() },
+    { type: "separator" },
+    {
+      label: "手机配对",
+      enabled: Boolean(mobilePairingCode),
+      click: () => {
+        void showMobilePairing();
+      },
+    },
+    {
+      label: "取消手机授权",
+      enabled: Boolean(mobileRevoke),
+      click: () => { void mobileRevoke?.(); },
+    },
     ...(strictPeriod && studyState.settings.patrolEnabled ? [{
       label: "暂停本时段强监督",
       type: "checkbox" as const,
@@ -612,6 +678,51 @@ function refreshTrayMenu(): void {
     { type: "separator" },
     { label: "退出（提醒也会停止）", click: () => { isQuitting = true; app.quit(); } },
   ]));
+}
+
+async function showMobilePairing(): Promise<void> {
+  try {
+    const address = await ensureMobileTailscaleServe();
+    const code = mobilePairingCode?.();
+    if (!code) throw new Error("手机接口尚未启动");
+    await dialog.showMessageBox({
+      type: "info",
+      title: "共学日记 · 手机配对",
+      message: `配对码：${code}`,
+      detail: `手机地址：${address}\n\n请在 5 分钟内输入到 Android 共学日记。手机须加入同一个 Tailscale 网络。新手机配对后旧手机会失效。`,
+      buttons: ["知道了"],
+    });
+  } catch (error) {
+    await dialog.showMessageBox({
+      type: "warning",
+      title: "手机配对暂不可用",
+      message: error instanceof Error ? error.message : "无法设置 Tailscale 连接",
+      detail: "请确认电脑已登录 Tailscale；不会改动其他已配置的 Serve 服务。",
+      buttons: ["知道了"],
+    });
+  }
+}
+
+async function ensureMobileTailscaleServe(): Promise<string> {
+  const executable = join(process.env.ProgramFiles ?? "C:\\Program Files", "Tailscale", "tailscale.exe");
+  if (!existsSync(executable)) throw new Error("电脑尚未安装 Tailscale，或安装位置无法找到。");
+  const readStatus = async (): Promise<{ TCP?: Record<string, unknown>; Web?: Record<string, { Handlers?: Record<string, { Proxy?: string }> }> }> => {
+    const { stdout } = await execFileAsync(executable, ["serve", "status", "--json"], { timeout: 5_000 });
+    return JSON.parse(stdout) as { TCP?: Record<string, unknown>; Web?: Record<string, { Handlers?: Record<string, { Proxy?: string }> }> };
+  };
+  let status = await readStatus();
+  const port = String(MOBILE_TAILSCALE_PORT);
+  const existing = Object.entries(status.Web ?? {}).find(([key]) => key.endsWith(`:${port}`));
+  if (status.TCP?.[port] && existing?.[1].Handlers?.["/"]?.Proxy !== `http://127.0.0.1:${MOBILE_PORT}`) {
+    throw new Error(`Tailscale 的 ${port} 端口已被其他服务使用，小鹿不会覆盖它。`);
+  }
+  if (!status.TCP?.[port]) {
+    await execFileAsync(executable, ["serve", "--bg", `--https=${port}`, `http://127.0.0.1:${MOBILE_PORT}`], { timeout: 10_000 });
+    status = await readStatus();
+  }
+  const name = Object.keys(status.Web ?? {}).find((key) => key.endsWith(`:${port}`));
+  if (!name) throw new Error("Tailscale 未返回手机连接地址，请查看 Serve 状态。");
+  return `https://${name}`;
 }
 
 function installIpc(): void {
@@ -1207,8 +1318,8 @@ async function syncYuQuizEvents(playEvents: boolean): Promise<Record<string, unk
     } else if (latestAnswer?.type === "answer_correct") emitAction("waving", undefined, undefined, 750);
     else if (latestAnswer?.type === "answer_wrong") emitAction("failed", undefined, undefined, 1_250);
     else {
-      const clearance = [...events].reverse().find((event) => event.type === "oral_review_completed" || event.type === "mistake_review_completed");
-      if (clearance?.type === "oral_review_completed") {
+      const clearance = [...events].reverse().find((event) => event.type === "review_completed" || event.type === "oral_review_completed" || event.type === "mistake_review_completed");
+      if (clearance?.type === "review_completed" || clearance?.type === "oral_review_completed") {
         emitPairedAction("oral-review-completed", "review", lines.oralReviewCompleted, voicePools.oralReviewCompleted, "✓", 1_850);
       } else if (clearance?.type === "mistake_review_completed") {
         emitPairedAction("mistake-review-completed", "waving", lines.mistakeReviewCompleted, voicePools.mistakeReviewCompleted, "✓", 1_850);

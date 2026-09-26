@@ -12,7 +12,7 @@ let taskRenderKey = null;
 let bookmarkCounts = null;
 let goalParticleTimer = null;
 const HISTORY_PAGE_SIZE = 4;
-const TASK_PAGE_SIZE = 3;
+const TASK_PAGE_SIZE = 8;
 
 const portraitAnimations = {
   idle: { row: 0, frames: 6, duration: 5500, iterations: 1 },
@@ -167,7 +167,7 @@ function renderReport(today, yuReader = { enabled: false }) {
   const mistakeCompleted = Boolean(snapshot?.mistakeReviewCompleted ?? report?.mistakeReviewCompleted);
   const oralCompleted = Boolean(snapshot?.oralReviewCompleted ?? report?.oralReviewCompleted);
   setCompletionMark("report-accuracy", mistakeCompleted, mistakeCompleted ? "错题攻坚已完成" : "错题攻坚未完成");
-  setCompletionMark("report-note-entries", oralCompleted, oralCompleted ? "口腔背诵已完成" : "口腔背诵未完成");
+  setCompletionMark("report-note-entries", oralCompleted, oralCompleted ? "每日复习已完成" : "每日复习未完成");
   const checkInSummary = byId("report-note-characters");
   checkInSummary.classList.remove("completion-yes", "completion-no");
   checkInSummary.textContent = `${checkedCount}/5`;
@@ -538,6 +538,8 @@ byId("task-prev").addEventListener("click", () => { taskPage = Math.max(0, taskP
 byId("task-next").addEventListener("click", () => { taskPage += 1; taskRenderKey = null; renderTasks(latestState?.today.tasks ?? [], latestState?.today, latestState?.yuReader); });
 byId("open-bookmarks").addEventListener("click", () => switchTab("bookmarks"));
 byId("open-history").addEventListener("click", () => switchTab("history"));
+byId("open-score-rules").addEventListener("click", () => switchTab("rules"));
+byId("close-score-rules").addEventListener("click", () => switchTab("tasks"));
 byId("close").addEventListener("click", () => api.hide());
 byId("toggle-study").addEventListener("click", async () => {
   byId("toggle-study").disabled = true;
