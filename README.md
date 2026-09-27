@@ -1,179 +1,39 @@
 <div align="center">
   <img src="assets/icons/app-icon.svg" width="112" alt="小鹿图标" />
   <h1>共学日记</h1>
-  <p>不是桌面宠物，而是住在桌面上的学习搭子。</p>
+  <p>把朋友的陪伴，留在桌面，也带在身边。</p>
   <p>
-    <img alt="Version" src="https://img.shields.io/badge/version-2.0.4-76558f" />
+    <img alt="Windows" src="https://img.shields.io/badge/Windows-2.0.4-76558f" />
     <img alt="Android" src="https://img.shields.io/badge/Android-1.0.0-76558f" />
-    <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%20%2B%20Android-4b315e" />
     <img alt="Data" src="https://img.shields.io/badge/data-local--first-a9c99e" />
     <img alt="License" src="https://img.shields.io/badge/license-MIT-f4d57b" />
   </p>
   <p>
-    <a href="https://github.com/UniqueYu8988/XiaoLu/releases/latest"><strong>下载安装包</strong></a>
-    ·
-    <a href="docs/xiaolu-study-guide.pdf"><strong>下载 PDF 说明书</strong></a>
+    <a href="https://github.com/UniqueYu8988/XiaoLu/releases"><strong>下载 Windows 安装包</strong></a>
+    · <a href="https://github.com/UniqueYu8988/XiaoLu/releases/tag/android-v1.0.0"><strong>下载 Android 应用</strong></a>
+    · <a href="docs/xiaolu-study-guide.pdf"><strong>PDF 说明书</strong></a>
   </p>
 </div>
 
-## 图文说明书
+## 和小鹿一起，把每一天过好
 
-Android 1.0.0 已发布：查看今日、任务、书签与历史，在线编辑待办、提交今日背词，使用两款随进度变化的 2×2 像素插画组件、快捷入口和分级提醒。电脑负责保存；手机经 Tailscale 配对，离线显示上次摘要。公开 APK 不含个人地址或配对信息，首次使用需填写电脑托盘提供的 HTTPS 地址。[下载手机版](https://github.com/UniqueYu8988/XiaoLu/releases/tag/android-v1.0.0) · [连接与编译说明](android-app/README.md)。
+![共学日记：桌面陪伴、学习目标、日记与手机组件](docs/images/xiaolu-study-guide-long.png)
 
-新版说明书共十页，保留原封面与桌面核心功能，只合并重复说明和边缘细节；加入手机使用与两款组件的十张插画，移除整页界面截图展示。可以直接[下载 PDF](docs/xiaolu-study-guide.pdf)，也可以在下方展开阅读。
+## 改造成自己的桌面搭子
 
-<details>
-  <summary><strong>展开完整图文说明书</strong></summary>
-  <br />
-  <img src="docs/images/xiaolu-study-guide-long.png" alt="共学日记完整图文说明书" />
-</details>
+这个项目从一张朋友的头像开始，通过持续对话、试用和修改逐渐长成。可以 Fork 后沿着以下路线迁移，不必一次重写所有功能：
 
-## 这个项目是怎样做出来的
+1. **角色与动作**：先在 Codex Pet 中制作并验证角色图集，再替换 `assets/xiaolu/pet.json` 和 `spritesheet.webp`。现有素材为 v2、8 × 11 图集；安装后的软件不依赖 Codex。
+2. **声音与装饰**：替换 `assets/voice/`、`assets/bookmarks/` 和 `assets/ui/`，同步核对台词、语音和动作。已有语音离线播放，无需接入在线 TTS。
+3. **规则与界面**：学习、打卡和奖励规则在 `src/game.ts`；窗口、提醒和语音在 `src/main.ts`；页面在 `src/renderer/`。先换角色、名称和一句提醒，再逐项调整。
+4. **学习工具联动**：参考 `src/yureader.ts`，让自己的工具提供最少量的本机状态接口。明确区分学习状态、目标进度与动作事件，不共享正文或密钥。
+5. **手机适配**：Android 项目位于 `android-app/`，通过 Tailscale 与电脑配对。公开安装包不包含个人地址；连接、配置及编译方法见 [Android 指南](android-app/README.md)。
 
-共学日记不是先写好需求文档、再由专业团队开发的产品。它从一张角色图和一个很小的念头开始，由一个没有编程经验的人通过持续对话、测试和取舍，一点点 vibe coding 出来。
+Vibe coding 的实用经验：用“操作 → 实际结果 → 预期结果”和截图描述问题；先诊断再修改；明确哪些已有行为不能改变。每次只改一组相关功能，规则跑测试，界面看实际效果，并保留可回退的提交。
 
-### 1. 先在 Codex Pet 中让角色活起来
+## 开发与打包
 
-最初只需要准备一张能说明人物外形的参考图，再让 Codex Pet 的制作能力补全动作。当前项目使用的是 v2 宠物素材：
-
-- `pet.json` 描述角色名称、图集和动画版本；
-- `spritesheet.webp` 是一张 `8 × 11` 的精灵图；
-- 图集中包含待机、跑步、挥手、跳跃、失落、等待、专注、回顾等标准动作，以及 16 个看向方向。
-
-这一步只负责“让角色动起来”。你可以先在 Codex 中反复调整形象与动作，确认人物没有走样，再把最终的 `pet.json` 和 spritesheet 放进本项目的 `assets/xiaolu/`。Codex Pet 是素材的起点，不是运行依赖；打包后的应用可以完全脱离 Codex。
-
-### 2. 用 Electron 把宠物变成独立桌面程序
-
-有了动画素材以后，本项目重新实现了桌面外壳：
-
-- 创建透明、置顶且没有系统边框的 Electron 窗口；
-- 只让人物和气泡附近接收鼠标，避免透明区域挡住其他程序；
-- 根据鼠标方向选择视线帧；拖动或自动移动时播放左右跑步；
-- 处理 Windows 缩放、屏幕边缘、工作区和窗口坐标，避免角色漂移或越拖越偏；
-- 通过托盘、开机自启和 MSI 安装包，让它像普通软件一样运行。
-
-如果只想做一个会动的桌面角色，到这里已经足够。后面的学习功能都建立在这个稳定的桌面窗口之上。
-
-### 3. 先定义“她是谁”，再增加功能
-
-这个项目真正发生变化，是从“桌面宠物”改成“桌面学习搭子”以后。定位确定后，功能才有了统一的判断标准：她不是等待喂食的宠物，而是替一位现实中的朋友陪伴和监督学习。
-
-于是交互被尽量压缩成几个自然动作：双击开始或结束学习，右键打开日记，拖动改变位置；固定时间只确认“我在”，自动目标、任务和书签负责留下长期成果。没有商店、金币、等级和复杂养成，因为这些内容虽然常见，却会让学习工具反过来消耗注意力。
-
-### 4. 把规则做成状态，而不是堆按钮
-
-核心学习数据集中在 `src/game.ts`，包括计时、打卡、目标、任务、书签和统计；窗口、动作、通知、语音、YuReader 联动与自动移动主要位于 `src/main.ts`。本地状态保存为 JSON，不需要服务器或账号。
-
-一个提醒通常不是“弹出一句话”这么简单，而是一段状态变化：
-
-```text
-检测到场景 → 选择台词和动作 → 必要时移动到提醒位置
-→ 等待回应或超时 → 恢复学习驻守点或自由位置
-```
-
-把它写成明确状态后，才不会出现动作互相覆盖、网页关闭后无法返程、重复计时或提醒无限触发等问题。
-
-强监督时段内，打开日记菜单不再暂停小鹿的巡逻：菜单会自动收起，小鹿继续提醒。超过 15 分钟仍未开始或回到有效学习时，应用会把 YuReader 学习台带到前台；页面已打开时复用并选中原标签页，只有确实未打开时才创建页面。进入有效阅读、做题或查询状态后解除约束。
-
-在 09:00、18:00、21:00 三个关键打卡点，如果 YuReader 尚未打开，小鹿会先启动本机后端、确认健康状态，再打开或复用浏览器标签页。五次“我在”均要求当时正处于手动学习计时，或 YuReader 的有效学习/查询状态；单纯停留在首页、暂停或关闭状态不会记为成功打卡。
-
-### 5. 用本机 API 联动其他学习工具
-
-YuReader 在 `127.0.0.1:8775` 暴露少量 companion 状态，共学日记只读取页面状态、阅读与做题目标、三门学科进度、单词数和两项复习清关结果。任务页的三枚书签会随阅读、做题和综合进度由灰白逐渐恢复颜色；达到 100% 后收入收藏并显示轻量像素粒子。正文、题目和密钥不需要共享。
-
-这种方式很适合继续扩展：你的背词软件、阅读器、番茄钟或其他网页工具，只要提供一个很小的本机接口，就可以驱动桌面角色的计时、动作和提醒，而不必把两个项目强行合并。
-
-## 如何改造成你自己的桌面搭子
-
-最省力的路线不是从空项目重写，而是 Fork 本仓库后逐层替换：
-
-1. **换角色**：替换 `assets/xiaolu/pet.json` 和 `spritesheet.webp`。
-2. **换图标与收藏物**：修改 `assets/icons/` 和 `assets/bookmarks/`。
-3. **换声音**：按现有文件命名替换 `assets/voice/`，或在 `src/main.ts` 中调整语音触发关系。
-4. **换规则**：在 `src/game.ts` 修改打卡时间、自动目标、任务、奖励和统计；优先为规则补测试。
-5. **换界面**：修改 `src/renderer/panel.html`、`panel.css` 和 `panel.js`，继续保持一屏布局或设计自己的信息结构。
-6. **换联动**：参考 YuReader 的本机 HTTP 状态接口，为自己的学习工具暴露最少量的数据。
-7. **测试与打包**：运行 `pnpm check`，确认后用 `pnpm package:msi` 生成安装包。
-
-建议第一次只替换角色、名称和一句提醒，先让开发版正常运行。确认“这个角色确实像你想要的人”以后，再逐个增加功能。一次改十件事通常不会更快，只会让问题变得难以定位。
-
-## 这次 vibe coding 最有用的经验
-
-### 把感受翻译成可验收的现象
-
-“拖动不舒服”很难直接修；“按住十秒后每秒向右下偏移几像素”就能调查。“页面不好看”也很宽泛；“不允许滚动条、所有内容必须在固定高度内显示”才是可以验证的约束。
-
-向 AI 描述问题时，尽量包含：发生前的状态、具体操作、实际结果、预期结果、截图，以及问题是否能稳定复现。
-
-### 先要求诊断，再授权修改
-
-连续试错最容易把一个小问题改成多个问题。比较可靠的对话方式是：
-
-```text
-先不要改代码。请阅读相关实现并复现问题，说明根因、涉及的状态和坐标系。
-确认根因后再给出最小修改方案，并列出必须保持不变的行为。
-```
-
-等解释能够对应实际现象，再让 AI 动手。涉及窗口拖动、计时、跨进程通信和多状态切换时，这一步尤其重要。
-
-### 每次都写清“不应该改变什么”
-
-增加中央提醒时，必须说明不能覆盖自由位置和学习驻守点；增加 YuReader 自动进度时，要说明手动时长仍需累计；调整页面高度时，要说明不能重新引入滚动条。负面约束往往比“新增什么”更能保护已经稳定的功能。
-
-### 保留小版本、测试和回退点
-
-每完成一组相关功能再升级版本，不要每改一个像素就发布。核心规则放在纯逻辑文件中测试，视觉修改则必须真实打开页面检查。提交前至少运行：
-
-```powershell
-pnpm check
-```
-
-如果某次尝试让角色形象走样或交互更糟，应果断回到上一个稳定提交。vibe coding 的优势是试验成本低，而不是所有试验都必须留下。
-
-### 让 AI 负责实现，让使用者负责品味
-
-AI 很擅长查代码、补状态、写测试和机械调整，却不知道哪一句话像你的朋友、哪个动作显得生硬、什么功能会反过来造成负担。这些判断无法外包。这个项目能逐渐形成统一性，主要依靠不断使用、指出细微的不协调，并主动删掉不需要的功能。
-
-### 永远把个人数据留在仓库外
-
-开发时不要把真实日记、数据库、录音源文件、密钥和本机备份交给 Git。先配置 `.gitignore`，提交前查看 `git status`，发布前再搜索一次绝对路径和密钥格式。开源的是程序与可公开素材，不是使用者的生活记录。
-
-## 安装与使用
-
-1. 在 [Releases](https://github.com/UniqueYu8988/XiaoLu/releases) 下载最新的 `xiaolu-study-mate-*-x64.msi`。
-2. 双击安装；首次启动后，小鹿会出现在桌面并默认随 Windows 登录启动。
-3. 双击小鹿开始或结束手动学习计时，右键打开共学日记，拖动可以调整自由位置。
-
-安装包暂未使用商业代码签名，因此 Windows 可能显示“未知发布者”。
-
-## 数据、YuReader 与隐私
-
-学习记录默认保存在：
-
-```text
-%APPDATA%\xiaolu-desktop-pet\xiaolu-study-state.json
-```
-
-应用没有账号、排行榜或云同步。可选的 YuReader 联动只读取本机 `http://127.0.0.1:8775` 提供的学习状态与目标统计；不会读取学习正文、题目、API Key，也不会把数据上传到外部服务器。卸载前如需保留日记，请备份上面的状态文件。
-
-1.7.1 起可以选择从本机 Markdown 日记目录同步每日标题。应用启动时与每天 21:00 扫描目录，从 `YYYY-MM-DD｜标题.md` 和文件内第一个一级标题识别日期与标题；只把标题保存到学习记录，不复制正文，也不会因此创建虚假的今日结算。路径保存在本机私有配置：
-
-```json
-{
-  "externalDiary": {
-    "enabled": true,
-    "directory": "D:\\Diary\\2026"
-  }
-}
-```
-
-配置文件位置为 `%APPDATA%\xiaolu-desktop-pet\xiaolu-local-integrations.json`。具体私人路径不应提交到仓库。
-
-仓库不会收录使用者的日记、任务、打卡、位置、数据库、日志、密钥或备份。原始肖像、源录音和私人制作文件也不随项目发布；常见的本地数据路径已经加入 `.gitignore`。
-
-## 本地开发与打包
-
-需要 Node.js 20 或更高版本，以及 pnpm。
+需要 Node.js 20+ 和 pnpm：
 
 ```powershell
 git clone https://github.com/UniqueYu8988/XiaoLu.git
@@ -183,34 +43,10 @@ pnpm check
 pnpm start
 ```
 
-生成 Windows x64 MSI：
+Windows 安装包：`pnpm package:msi`，输出到 `release/`。沿用现有 MSI `upgradeCode`，以便覆盖升级。安装包尚未商业签名，Windows 可能提示未知发布者。
 
-```powershell
-pnpm package:msi
-```
+**注意数据隔离**：当前开发版与安装版共用 `%APPDATA%\xiaolu-desktop-pet\`。测试前备份，或按 [运行与数据维护](docs/development/operations.md) 确认隔离；不要把启动开发版当成无风险预览。日记、配置、数据库、密钥、日志和源录音不要提交到仓库。
 
-安装包输出到 `release/`。MSI 的 `upgradeCode` 已固定，后续版本只更新版本号，不要更换它。
+## 授权与来源
 
-## 项目结构
-
-```text
-assets/                 图标、角色动画、书签与离线语音
-docs/                   PDF 说明书、预览长图和版本说明
-scripts/                构建、说明书与 MSI 辅助脚本
-src/game.ts             学习记录、打卡、任务、书签和统计逻辑
-src/main.ts             Electron 主进程、窗口、联动、移动与自启动
-src/renderer/           桌面角色与共学日记界面
-tests/                  核心状态逻辑测试
-```
-
-## 项目来源
-
-- 角色动画素材最初按照 Codex v2 动画宠物素材规范整理；应用安装后可以完全脱离 Codex 独立运行。
-- 独立桌面窗口的早期实现参考了 [OpenPets](https://github.com/alvinunreal/openpets) 的思路，详见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
-- 共学日记的学习计时、打卡、启动监督、任务、书签、语音、YuReader 联动和本地存储均在本项目中重新实现。
-
-## 许可证
-
-共学日记已经完整开源。项目原创的代码、角色动画、图标、书签、离线语音、文档和说明书素材统一采用宽松的 [MIT License](LICENSE)，可以自由使用、修改、分发或制作自己的桌面搭子；分发时请保留版权声明和许可证。
-
-个人学习数据不会随仓库公开。完整授权与隐私边界见 [ASSET_LICENSE.md](ASSET_LICENSE.md)，第三方声明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+代码与可公开素材的授权见 [MIT License](LICENSE) 和 [素材授权说明](ASSET_LICENSE.md)。角色动画起点为 Codex v2 素材规范；早期桌面窗口参考 OpenPets，详见 [第三方声明](THIRD_PARTY_NOTICES.md)。个人学习记录不随仓库公开。
