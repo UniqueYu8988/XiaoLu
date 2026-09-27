@@ -1,0 +1,159 @@
+{
+  "version": "retake-slow-2026-09",
+  "entries": [
+    {
+      "id": "study-started-1",
+      "group": "study-started",
+      "message": "那就开始吧，我陪你。",
+      "animation": "waving",
+      "synth": "那就开始吧，我陪你。<#0.4#>"
+    },
+    {
+      "id": "study-started-2",
+      "group": "study-started",
+      "message": "专心去吧，结束时再叫我。",
+      "animation": "waving",
+      "synth": "专心去吧，结束时再叫我。<#0.4#>"
+    },
+    {
+      "id": "study-started-3",
+      "group": "study-started",
+      "message": "这一段，我们一起认真。",
+      "animation": "waving",
+      "synth": "这一段，我们一起认真。<#0.4#>"
+    },
+    {
+      "id": "study-stopped-1",
+      "group": "study-stopped",
+      "message": "这一段收好啦。",
+      "animation": "review",
+      "synth": "这一段收好啦。<#0.4#>"
+    },
+    {
+      "id": "study-stopped-2",
+      "group": "study-stopped",
+      "message": "辛苦了，先喘口气也没关系。",
+      "animation": "review",
+      "synth": "辛苦了，先喘口气也没关系。<#0.4#>"
+    },
+    {
+      "id": "study-stopped-3",
+      "group": "study-stopped",
+      "message": "我记下来啦，休息一下吧。",
+      "animation": "review",
+      "synth": "我记下来啦，休息一下吧。<#0.4#>"
+    },
+    {
+      "id": "launch-prompt-1",
+      "group": "launch-prompt",
+      "message": "先不想学多久。打开一页，我陪你把开头走过去。",
+      "animation": "waiting",
+      "synth": "先不想学多久。<#0.4#>打开一页，我陪你把开头走过去。"
+    },
+    {
+      "id": "launch-prompt-2",
+      "group": "launch-prompt",
+      "message": "不用等状态来。先开始一点，状态会慢慢跟上的。",
+      "animation": "waiting",
+      "synth": "不用等状态来。<#0.4#>先开始一点，状态会慢慢跟上的。"
+    },
+    {
+      "id": "launch-prompt-3",
+      "group": "launch-prompt",
+      "message": "我抓到你还没有开始啦。我们先翻开学习内容，好不好？",
+      "animation": "waiting",
+      "synth": "我抓到你还没有开始啦。<#0.4#>我们先翻开学习内容，好不好？"
+    },
+    {
+      "id": "launch-snooze-1",
+      "group": "launch-snooze",
+      "message": "好，再给你一点准备时间。等一会儿，我再来找你。",
+      "animation": "waiting",
+      "synth": "好，再给你一点准备时间。<#0.4#>等一会儿，我再来找你。"
+    },
+    {
+      "id": "launch-snooze-2",
+      "group": "launch-snooze",
+      "message": "那就稍后开始。记得，我们不是把今天取消了哦。",
+      "animation": "waiting",
+      "synth": "那就稍后开始。<#0.4#>记得，我们不是把今天取消了哦。"
+    },
+    {
+      "id": "launch-skip-1",
+      "group": "launch-skip",
+      "message": "好，这一段先跳过。我们在下一段重新开始。",
+      "animation": "review",
+      "synth": "好，这一段先跳过。<#0.4#>我们在下一段重新开始。"
+    },
+    {
+      "id": "launch-skip-2",
+      "group": "launch-skip",
+      "message": "收到，这次不催啦。照顾好自己，也别把约定忘掉。",
+      "animation": "review",
+      "synth": "收到，这次不催啦。<#0.4#>照顾好自己，也别把约定忘掉。"
+    },
+    {
+      "id": "launch-final-1",
+      "group": "launch-final",
+      "message": "准备时间到啦。我们现在就迈出第一步。",
+      "animation": "waiting",
+      "synth": "准备时间到啦。<#0.4#>我们现在就迈出第一步。"
+    },
+    {
+      "id": "launch-final-2",
+      "group": "launch-final",
+      "message": "我又来拉你一下。先开始，别一直等一个完美的时机。",
+      "animation": "waiting",
+      "synth": "我又来拉你一下。<#0.4#>先开始，别一直等一个完美的时机。"
+    },
+    {
+      "id": "launch-success-1",
+      "group": "launch-success",
+      "message": "好啦，已经开始了。最难的那一步过去了。",
+      "animation": "jumping",
+      "synth": "好啦，已经开始了。<#0.4#>最难的那一步过去了。"
+    },
+    {
+      "id": "launch-success-2",
+      "group": "launch-success",
+      "message": "你已经走进学习里啦。接下来，我就安静陪你。",
+      "animation": "jumping",
+      "synth": "你已经走进学习里啦。<#0.4#>接下来，我就安静陪你。"
+    },
+    {
+      "id": "launch-success-3",
+      "group": "launch-success",
+      "message": "我就知道你可以开始。好啦，我不再催你了。",
+      "animation": "jumping",
+      "synth": "我就知道你可以开始。<#0.4#>好啦，我不再催你了。"
+    },
+    {
+      "id": "study-launch-return-1",
+      "group": "study-launch-return",
+      "message": "学习台还在等你。打开一道题或一段教材，我就不再催啦。",
+      "synth": "学习台还在等你。<#0.4#>打开一道题或一段教材，我就不再催啦。",
+      "animation": "waiting"
+    },
+    {
+      "id": "study-launch-return-2",
+      "group": "study-launch-return",
+      "message": "别在门口停太久，我们进去学一点吧。",
+      "synth": "别在门口停太久，我们进去学一点吧。<#0.4#>",
+      "animation": "waiting"
+    },
+    {
+      "id": "study-launch-return-3",
+      "group": "study-launch-return",
+      "message": "再拉你一下。先进入具体内容，开始以后我就安静。",
+      "synth": "再拉你一下。<#0.4#>先进入具体内容，开始以后我就安静。",
+      "animation": "waiting"
+    },
+    {
+      "id": "study-launch-return-4",
+      "group": "study-launch-return",
+      "message": "不用先做好准备。把内容打开，我们就已经赢过拖延一点了。",
+      "synth": "不用先做好准备。<#0.4#>把内容打开，我们就已经赢过拖延一点了。",
+      "animation": "waving"
+    }
+  ]
+}

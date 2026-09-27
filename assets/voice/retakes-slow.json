@@ -1,0 +1,1118 @@
+{
+  "version": "slow-2026-09",
+  "entries": [
+    {
+      "id": "checkin-09-1",
+      "group": "checkin-09",
+      "message": "早呀，我已经到位啦。开始学习以后，和我打个招呼吧。",
+      "animation": "waving",
+      "synth": "早呀，我已经到位啦。<#0.4#>开始学习以后，和我打个招呼吧。"
+    },
+    {
+      "id": "checkin-09-2",
+      "group": "checkin-09",
+      "message": "九点啦，一起把今天开个好头吧。",
+      "animation": "waving",
+      "synth": "九点啦，一起把今天开个好头吧。<#0.4#>"
+    },
+    {
+      "id": "checkin-09-3",
+      "group": "checkin-09",
+      "message": "我来报到啦。你开始学习了吗？",
+      "animation": "waving",
+      "synth": "我来报到啦。<#0.4#>你开始学习了吗？"
+    },
+    {
+      "id": "checkin-12-1",
+      "group": "checkin-12",
+      "message": "到中午啦。还在学习的话，给我一个“我在”吧。",
+      "animation": "waving",
+      "synth": "到中午啦。<#0.4#>还在学习的话，给我一个“我在”吧。"
+    },
+    {
+      "id": "checkin-12-2",
+      "group": "checkin-12",
+      "message": "十二点报到。我来看看，你还在不在。",
+      "animation": "waving",
+      "synth": "十二点报到。<#0.4#>我来看看，你还在不在。"
+    },
+    {
+      "id": "checkin-12-3",
+      "group": "checkin-12",
+      "message": "上午走到这里啦。和我打个招呼，再去吃饭吧。",
+      "animation": "waving",
+      "synth": "上午走到这里啦。<#0.4#>和我打个招呼，再去吃饭吧。"
+    },
+    {
+      "id": "checkin-15-1",
+      "group": "checkin-15",
+      "message": "三点啦，我们一起开始下午这一程。",
+      "animation": "waving",
+      "synth": "三点啦，我们一起开始下午这一程。<#0.4#>"
+    },
+    {
+      "id": "checkin-15-2",
+      "group": "checkin-15",
+      "message": "我来偷偷看一眼。你准备认真了吗？",
+      "animation": "waving",
+      "synth": "我来偷偷看一眼。<#0.4#>你准备认真了吗？"
+    },
+    {
+      "id": "checkin-15-3",
+      "group": "checkin-15",
+      "message": "下午的约定时间到啦。进入学习后，记得报到哦。",
+      "animation": "waving",
+      "synth": "下午的约定时间到啦。<#0.4#>进入学习后，记得报到哦。"
+    },
+    {
+      "id": "checkin-18-1",
+      "group": "checkin-18",
+      "message": "六点报到。今天也坚持到这里啦。",
+      "animation": "waving",
+      "synth": "六点报到。<#0.4#>今天也坚持到这里啦。"
+    },
+    {
+      "id": "checkin-18-2",
+      "group": "checkin-18",
+      "message": "傍晚啦，我来确认一下你还在。",
+      "animation": "waving",
+      "synth": "傍晚啦，我来确认一下你还在。<#0.4#>"
+    },
+    {
+      "id": "checkin-18-3",
+      "group": "checkin-18",
+      "message": "到六点这一站啦。还在学习的话，就和我打个招呼。",
+      "animation": "waving",
+      "synth": "到六点这一站啦。<#0.4#>还在学习的话，就和我打个招呼。"
+    },
+    {
+      "id": "checkin-21-1",
+      "group": "checkin-21",
+      "message": "九点啦。确认一下在场，再把今天的努力收好。",
+      "animation": "waving",
+      "synth": "九点啦。<#0.4#>确认一下在场，再把今天的努力收好。"
+    },
+    {
+      "id": "checkin-21-2",
+      "group": "checkin-21",
+      "message": "今天辛苦啦。我们一起看看，今天走到哪里了。",
+      "animation": "waving",
+      "synth": "今天辛苦啦。<#0.4#>我们一起看看，今天走到哪里了。"
+    },
+    {
+      "id": "checkin-21-3",
+      "group": "checkin-21",
+      "message": "晚上的报到时间啦。还在学习的话，点一下让我知道。",
+      "animation": "waving",
+      "synth": "晚上的报到时间啦。<#0.4#>还在学习的话，点一下让我知道。"
+    },
+    {
+      "id": "checkin-success-1",
+      "group": "checkin-success",
+      "message": "收到，我知道你在啦。",
+      "animation": "waving",
+      "synth": "收到，我知道你在啦。<#0.4#>"
+    },
+    {
+      "id": "checkin-success-2",
+      "group": "checkin-success",
+      "message": "好，今天这一格也点亮了。",
+      "animation": "waving",
+      "synth": "好，今天这一格也点亮了。<#0.4#>"
+    },
+    {
+      "id": "checkin-success-3",
+      "group": "checkin-success",
+      "message": "看见你啦，我们继续。",
+      "animation": "waving",
+      "synth": "看见你啦，我们继续。<#0.4#>"
+    },
+    {
+      "id": "checkin-missed-1",
+      "group": "checkin-missed",
+      "message": "这次没等到你，下个时间点见。",
+      "animation": "failed",
+      "synth": "这次没等到你，下个时间点见。<#0.4#>"
+    },
+    {
+      "id": "checkin-missed-2",
+      "group": "checkin-missed",
+      "message": "这一格先空着，我们继续往后走。",
+      "animation": "failed",
+      "synth": "这一格先空着，我们继续往后走。<#0.4#>"
+    },
+    {
+      "id": "checkin-missed-3",
+      "group": "checkin-missed",
+      "message": "刚才的时间点错过啦，下一次记得回应我。",
+      "animation": "failed",
+      "synth": "刚才的时间点错过啦，下一次记得回应我。<#0.4#>"
+    },
+    {
+      "id": "study-started-1",
+      "group": "study-started",
+      "message": "那就开始吧，我陪你。",
+      "animation": "waving",
+      "synth": "那就开始吧，我陪你。<#0.4#>"
+    },
+    {
+      "id": "study-started-2",
+      "group": "study-started",
+      "message": "专心去吧，结束时再叫我。",
+      "animation": "waving",
+      "synth": "专心去吧，结束时再叫我。<#0.4#>"
+    },
+    {
+      "id": "study-started-3",
+      "group": "study-started",
+      "message": "这一段，我们一起认真。",
+      "animation": "waving",
+      "synth": "这一段，我们一起认真。<#0.4#>"
+    },
+    {
+      "id": "study-stopped-1",
+      "group": "study-stopped",
+      "message": "这一段收好啦。",
+      "animation": "review",
+      "synth": "这一段收好啦。<#0.4#>"
+    },
+    {
+      "id": "study-stopped-2",
+      "group": "study-stopped",
+      "message": "辛苦了，先喘口气也没关系。",
+      "animation": "review",
+      "synth": "辛苦了，先喘口气也没关系。<#0.4#>"
+    },
+    {
+      "id": "study-stopped-3",
+      "group": "study-stopped",
+      "message": "我记下来啦，休息一下吧。",
+      "animation": "review",
+      "synth": "我记下来啦，休息一下吧。<#0.4#>"
+    },
+    {
+      "id": "launch-prompt-1",
+      "group": "launch-prompt",
+      "message": "先不想学多久。打开一页，我陪你把开头走过去。",
+      "animation": "waiting",
+      "synth": "先不想学多久。<#0.4#>打开一页，我陪你把开头走过去。"
+    },
+    {
+      "id": "launch-prompt-2",
+      "group": "launch-prompt",
+      "message": "不用等状态来。先开始一点，状态会慢慢跟上的。",
+      "animation": "waiting",
+      "synth": "不用等状态来。<#0.4#>先开始一点，状态会慢慢跟上的。"
+    },
+    {
+      "id": "launch-prompt-3",
+      "group": "launch-prompt",
+      "message": "我抓到你还没有开始啦。我们先翻开学习内容，好不好？",
+      "animation": "waiting",
+      "synth": "我抓到你还没有开始啦。<#0.4#>我们先翻开学习内容，好不好？"
+    },
+    {
+      "id": "launch-snooze-1",
+      "group": "launch-snooze",
+      "message": "好，再给你一点准备时间。等一会儿，我再来找你。",
+      "animation": "waiting",
+      "synth": "好，再给你一点准备时间。<#0.4#>等一会儿，我再来找你。"
+    },
+    {
+      "id": "launch-snooze-2",
+      "group": "launch-snooze",
+      "message": "那就稍后开始。记得，我们不是把今天取消了哦。",
+      "animation": "waiting",
+      "synth": "那就稍后开始。<#0.4#>记得，我们不是把今天取消了哦。"
+    },
+    {
+      "id": "launch-skip-1",
+      "group": "launch-skip",
+      "message": "好，这一段先跳过。我们在下一段重新开始。",
+      "animation": "review",
+      "synth": "好，这一段先跳过。<#0.4#>我们在下一段重新开始。"
+    },
+    {
+      "id": "launch-skip-2",
+      "group": "launch-skip",
+      "message": "收到，这次不催啦。照顾好自己，也别把约定忘掉。",
+      "animation": "review",
+      "synth": "收到，这次不催啦。<#0.4#>照顾好自己，也别把约定忘掉。"
+    },
+    {
+      "id": "launch-final-1",
+      "group": "launch-final",
+      "message": "准备时间到啦。我们现在就迈出第一步。",
+      "animation": "waiting",
+      "synth": "准备时间到啦。<#0.4#>我们现在就迈出第一步。"
+    },
+    {
+      "id": "launch-final-2",
+      "group": "launch-final",
+      "message": "我又来拉你一下。先开始，别一直等一个完美的时机。",
+      "animation": "waiting",
+      "synth": "我又来拉你一下。<#0.4#>先开始，别一直等一个完美的时机。"
+    },
+    {
+      "id": "launch-success-1",
+      "group": "launch-success",
+      "message": "好啦，已经开始了。最难的那一步过去了。",
+      "animation": "jumping",
+      "synth": "好啦，已经开始了。<#0.4#>最难的那一步过去了。"
+    },
+    {
+      "id": "launch-success-2",
+      "group": "launch-success",
+      "message": "你已经走进学习里啦。接下来，我就安静陪你。",
+      "animation": "jumping",
+      "synth": "你已经走进学习里啦。<#0.4#>接下来，我就安静陪你。"
+    },
+    {
+      "id": "launch-success-3",
+      "group": "launch-success",
+      "message": "我就知道你可以开始。好啦，我不再催你了。",
+      "animation": "jumping",
+      "synth": "我就知道你可以开始。<#0.4#>好啦，我不再催你了。"
+    },
+    {
+      "id": "study-launch-return-1",
+      "group": "study-launch-return",
+      "message": "学习台还在等你。打开一道题或一段教材，我就不再催啦。",
+      "synth": "学习台还在等你。<#0.4#>打开一道题或一段教材，我就不再催啦。",
+      "animation": "waiting"
+    },
+    {
+      "id": "study-launch-return-2",
+      "group": "study-launch-return",
+      "message": "别在门口停太久，我们进去学一点吧。",
+      "synth": "别在门口停太久，我们进去学一点吧。<#0.4#>",
+      "animation": "waiting"
+    },
+    {
+      "id": "study-launch-return-3",
+      "group": "study-launch-return",
+      "message": "再拉你一下。先进入具体内容，开始以后我就安静。",
+      "synth": "再拉你一下。<#0.4#>先进入具体内容，开始以后我就安静。",
+      "animation": "waiting"
+    },
+    {
+      "id": "study-launch-return-4",
+      "group": "study-launch-return",
+      "message": "不用先做好准备。把内容打开，我们就已经赢过拖延一点了。",
+      "synth": "不用先做好准备。<#0.4#>把内容打开，我们就已经赢过拖延一点了。",
+      "animation": "waving"
+    },
+    {
+      "id": "patrol-start-playful-1",
+      "group": "patrol-start-playful",
+      "message": "你还没有开始，我可要在这里巡逻啦。",
+      "animation": "waiting",
+      "synth": "你还没有开始，我可要在这里巡逻啦。<#0.4#>"
+    },
+    {
+      "id": "patrol-start-playful-2",
+      "group": "patrol-start-playful",
+      "message": "我先跑一圈。等我回来，你会不会已经开始了？",
+      "animation": "waiting",
+      "synth": "我先跑一圈。<#0.4#>等我回来，你会不会已经开始了？"
+    },
+    {
+      "id": "patrol-start-playful-3",
+      "group": "patrol-start-playful",
+      "message": "先做一点点也算开始呀。我就在这里等你。",
+      "animation": "waiting",
+      "synth": "先做一点点也算开始呀。<#0.4#>我就在这里等你。"
+    },
+    {
+      "id": "patrol-start-playful-4",
+      "group": "patrol-start-playful",
+      "message": "你不叫我停，我就继续跑喽。",
+      "animation": "waiting",
+      "synth": "你不叫我停，我就继续跑喽。<#0.4#>"
+    },
+    {
+      "id": "patrol-start-playful-5",
+      "group": "patrol-start-playful",
+      "message": "我又路过一次。学习内容还是没有打开吗？",
+      "animation": "waiting",
+      "synth": "我又路过一次。<#0.4#>学习内容还是没有打开吗？"
+    },
+    {
+      "id": "patrol-start-playful-6",
+      "group": "patrol-start-playful",
+      "message": "我都跑到这里啦。你也该往前走一步了。",
+      "animation": "waiting",
+      "synth": "我都跑到这里啦。<#0.4#>你也该往前走一步了。"
+    },
+    {
+      "id": "patrol-start-playful-7",
+      "group": "patrol-start-playful",
+      "message": "不用想今天要学多久。现在先开始三分钟。",
+      "animation": "waiting",
+      "synth": "不用想今天要学多久。<#0.4#>现在先开始三分钟。"
+    },
+    {
+      "id": "patrol-start-playful-8",
+      "group": "patrol-start-playful",
+      "message": "我去那边看看。回来时，希望能看见你已经开始。",
+      "animation": "waiting",
+      "synth": "我去那边看看。<#0.4#>回来时，希望能看见你已经开始。"
+    },
+    {
+      "id": "patrol-start-firm-1",
+      "group": "patrol-start-firm",
+      "message": "我已经回来好几次啦。我们先把第一步走出去吧。",
+      "animation": "waiting",
+      "synth": "我已经回来好几次啦。<#0.4#>我们先把第一步走出去吧。"
+    },
+    {
+      "id": "patrol-start-firm-2",
+      "group": "patrol-start-firm",
+      "message": "不用等状态变好。开始以后，状态会慢慢跟上的。",
+      "animation": "waiting",
+      "synth": "不用等状态变好。<#0.4#>开始以后，状态会慢慢跟上的。"
+    },
+    {
+      "id": "patrol-start-firm-3",
+      "group": "patrol-start-firm",
+      "message": "先打开学习内容。剩下的事情，我们开始以后再想。",
+      "animation": "waiting",
+      "synth": "先打开学习内容。<#0.4#>剩下的事情，我们开始以后再想。"
+    },
+    {
+      "id": "patrol-start-firm-4",
+      "group": "patrol-start-firm",
+      "message": "我知道你不是不想学。只是还没有迈出去。",
+      "animation": "waiting",
+      "synth": "我知道你不是不想学。<#0.4#>只是还没有迈出去。"
+    },
+    {
+      "id": "patrol-start-firm-5",
+      "group": "patrol-start-firm",
+      "message": "这段时间是我们约好的。我还没有等到你开始。",
+      "animation": "waiting",
+      "synth": "这段时间是我们约好的。<#0.4#>我还没有等到你开始。"
+    },
+    {
+      "id": "patrol-start-firm-6",
+      "group": "patrol-start-firm",
+      "message": "已经拖得够久啦。现在，先翻开一页。",
+      "animation": "waiting",
+      "synth": "已经拖得够久啦。<#0.4#>现在，先翻开一页。"
+    },
+    {
+      "id": "patrol-start-angry-1",
+      "group": "patrol-start-angry",
+      "message": "我真的要生气了。我们约好的学习时间，不是拿来一直拖延的。",
+      "animation": "failed",
+      "synth": "我真的要生气了。<#0.4#>我们约好的学习时间，不是拿来一直拖延的。"
+    },
+    {
+      "id": "patrol-start-angry-2",
+      "group": "patrol-start-angry",
+      "message": "已经提醒你好几次了。现在，把别的事情放下，打开学习内容。",
+      "animation": "failed",
+      "synth": "(哼)已经提醒你好几次了。<#0.4#>现在，把别的事情放下，打开学习内容。"
+    },
+    {
+      "id": "patrol-start-angry-3",
+      "group": "patrol-start-angry",
+      "message": "你明明知道，开始以后就能学进去。为什么还要一直躲着第一步？",
+      "animation": "failed",
+      "synth": "你明明知道，开始以后就能学进去。<#0.4#>为什么还要一直躲着第一步？"
+    },
+    {
+      "id": "patrol-start-angry-4",
+      "group": "patrol-start-angry",
+      "message": "别再看着我跑啦。把注意力放回学习上。现在就开始。",
+      "animation": "failed",
+      "synth": "别再看着我跑啦。<#0.4#>把注意力放回学习上。现在就开始。"
+    },
+    {
+      "id": "patrol-start-angry-5",
+      "group": "patrol-start-angry",
+      "message": "这段时间是我们约好的。我已经等了很久，可你还是没有开始。",
+      "animation": "failed",
+      "synth": "(哼)这段时间是我们约好的。<#0.4#>我已经等了很久，可你还是没有开始。"
+    },
+    {
+      "id": "patrol-start-angry-6",
+      "group": "patrol-start-angry",
+      "message": "我不是来陪你继续拖延的。先坐好，把学习内容打开。",
+      "animation": "failed",
+      "synth": "我不是来陪你继续拖延的。<#0.4#>先坐好，把学习内容打开。"
+    },
+    {
+      "id": "patrol-start-angry-7",
+      "group": "patrol-start-angry",
+      "message": "不要再告诉自己等一会儿。你已经等过很多个一会儿了。",
+      "animation": "failed",
+      "synth": "不要再告诉自己等一会儿。<#0.4#>你已经等过很多个一会儿了。"
+    },
+    {
+      "id": "patrol-start-angry-8",
+      "group": "patrol-start-angry",
+      "message": "这次我不哄你了。别想今天要学多久，先把这一小段学起来。",
+      "animation": "failed",
+      "synth": "(哼)这次我不哄你了。<#0.4#>别想今天要学多久，先把这一小段学起来。"
+    },
+    {
+      "id": "patrol-start-final-1",
+      "group": "patrol-start-final",
+      "message": "听好。现在打开学习内容，不要再给拖延找理由。",
+      "animation": "waiting",
+      "synth": "听好。<#0.4#>现在打开学习内容，不要再给拖延找理由。"
+    },
+    {
+      "id": "patrol-start-final-2",
+      "group": "patrol-start-final",
+      "message": "已经拖得太久了。你答应过的事情，需要认真对待。",
+      "animation": "waiting",
+      "synth": "已经拖得太久了。<#0.4#>你答应过的事情，需要认真对待。"
+    },
+    {
+      "id": "patrol-start-final-3",
+      "group": "patrol-start-final",
+      "message": "我现在真的很生气。先开始学习，再去做其他事情。",
+      "animation": "waiting",
+      "synth": "(哼)我现在真的很生气。<#0.4#>先开始学习，再去做其他事情。"
+    },
+    {
+      "id": "patrol-start-final-4",
+      "group": "patrol-start-final",
+      "message": "不要继续消耗今天了。现在开始，还来得及把时间拿回来。",
+      "animation": "waiting",
+      "synth": "不要继续消耗今天了。<#0.4#>现在开始，还来得及把时间拿回来。"
+    },
+    {
+      "id": "patrol-start-final-5",
+      "group": "patrol-start-final",
+      "message": "这不是状态好不好的问题。是你现在愿不愿意迈出第一步。",
+      "animation": "waiting",
+      "synth": "这不是状态好不好的问题。<#0.4#>是你现在愿不愿意迈出第一步。"
+    },
+    {
+      "id": "patrol-start-final-6",
+      "group": "patrol-start-final",
+      "message": "我会继续在这里盯着你。直到你真正进入学习。",
+      "animation": "waiting",
+      "synth": "(哼)我会继续在这里盯着你。<#0.4#>直到你真正进入学习。"
+    },
+    {
+      "id": "patrol-return-1",
+      "group": "patrol-return",
+      "message": "休息得差不多啦。我们回来继续吧。",
+      "animation": "review",
+      "synth": "休息得差不多啦。<#0.4#>我们回来继续吧。"
+    },
+    {
+      "id": "patrol-return-2",
+      "group": "patrol-return",
+      "message": "我来接你回去。下一小段，从哪里开始？",
+      "animation": "review",
+      "synth": "我来接你回去。<#0.4#>下一小段，从哪里开始？"
+    },
+    {
+      "id": "patrol-return-3",
+      "group": "patrol-return",
+      "message": "刚才那一段已经收好了。现在接着往下走吧。",
+      "animation": "review",
+      "synth": "刚才那一段已经收好了。<#0.4#>现在接着往下走吧。"
+    },
+    {
+      "id": "patrol-return-4",
+      "group": "patrol-return",
+      "message": "休息有一会儿啦。准备好了，就回来继续吧。",
+      "animation": "review",
+      "synth": "休息有一会儿啦。<#0.4#>准备好了，就回来继续吧。"
+    },
+    {
+      "id": "patrol-return-5",
+      "group": "patrol-return",
+      "message": "你已经开始过一次了。重新回来，也不会很难。",
+      "animation": "review",
+      "synth": "你已经开始过一次了。<#0.4#>重新回来，也不会很难。"
+    },
+    {
+      "id": "patrol-return-6",
+      "group": "patrol-return",
+      "message": "这一程还没有结束。我来带你回去。",
+      "animation": "review",
+      "synth": "这一程还没有结束。<#0.4#>我来带你回去。"
+    },
+    {
+      "id": "patrol-return-7",
+      "group": "patrol-return",
+      "message": "先回来做一点。别让短短的休息，变成长长的拖延。",
+      "animation": "review",
+      "synth": "先回来做一点。<#0.4#>别让短短的休息，变成长长的拖延。"
+    },
+    {
+      "id": "patrol-return-8",
+      "group": "patrol-return",
+      "message": "我又开始巡逻啦。等你重新进入学习，我就停下。",
+      "animation": "review",
+      "synth": "我又开始巡逻啦。<#0.4#>等你重新进入学习，我就停下。"
+    },
+    {
+      "id": "patrol-success-1",
+      "group": "patrol-success",
+      "message": "好啦，这次是真的开始了。我回去陪你。",
+      "animation": "jumping",
+      "synth": "好啦，这次是真的开始了。<#0.4#>我回去陪你。"
+    },
+    {
+      "id": "patrol-success-2",
+      "group": "patrol-success",
+      "message": "已经稳稳开始啦。接下来交给你。",
+      "animation": "jumping",
+      "synth": "已经稳稳开始啦。<#0.4#>接下来交给你。"
+    },
+    {
+      "id": "patrol-success-3",
+      "group": "patrol-success",
+      "message": "你已经回到学习里了。我不再到处跑啦。",
+      "animation": "jumping",
+      "synth": "你已经回到学习里了。<#0.4#>我不再到处跑啦。"
+    },
+    {
+      "id": "night-stroll-1",
+      "group": "night-stroll",
+      "message": "今天这一页已经收好啦。我随便走走。",
+      "animation": "idle",
+      "synth": "今天这一页已经收好啦。<#0.4#>我随便走走。"
+    },
+    {
+      "id": "night-stroll-2",
+      "group": "night-stroll",
+      "message": "你忙你的。我就在这里待一会儿。",
+      "animation": "idle",
+      "synth": "你忙你的。<#0.4#>我就在这里待一会儿。"
+    },
+    {
+      "id": "night-stroll-3",
+      "group": "night-stroll",
+      "message": "今天也留下了一点，值得记住的东西。",
+      "animation": "idle",
+      "synth": "今天也留下了一点，值得记住的东西。<#0.4#>"
+    },
+    {
+      "id": "night-stroll-4",
+      "group": "night-stroll",
+      "message": "已经九点以后啦。接下来慢慢来就好。",
+      "animation": "idle",
+      "synth": "已经九点以后啦。<#0.4#>接下来慢慢来就好。"
+    },
+    {
+      "id": "night-stroll-5",
+      "group": "night-stroll",
+      "message": "我去那边看看。一会儿再回来。",
+      "animation": "idle",
+      "synth": "我去那边看看。<#0.4#>一会儿再回来。"
+    },
+    {
+      "id": "night-stroll-6",
+      "group": "night-stroll",
+      "message": "今天的事情暂时告一段落。桌面借我散散步吧。",
+      "animation": "idle",
+      "synth": "今天的事情暂时告一段落。<#0.4#>桌面借我散散步吧。"
+    },
+    {
+      "id": "night-stroll-7",
+      "group": "night-stroll",
+      "message": "我没有在催你。只是想四处走一走。",
+      "animation": "idle",
+      "synth": "我没有在催你。<#0.4#>只是想四处走一走。"
+    },
+    {
+      "id": "night-stroll-8",
+      "group": "night-stroll",
+      "message": "夜晚安静下来啦。我也慢一点陪着你。",
+      "animation": "idle",
+      "synth": "夜晚安静下来啦。<#0.4#>我也慢一点陪着你。"
+    },
+    {
+      "id": "night-resume-1",
+      "group": "night-resume",
+      "message": "这一段也结束啦。那我继续随便走走。",
+      "animation": "review",
+      "synth": "这一段也结束啦。<#0.4#>那我继续随便走走。"
+    },
+    {
+      "id": "night-resume-2",
+      "group": "night-resume",
+      "message": "你先休息。我去桌面上转一圈。",
+      "animation": "review",
+      "synth": "你先休息。<#0.4#>我去桌面上转一圈。"
+    },
+    {
+      "id": "night-resume-3",
+      "group": "night-resume",
+      "message": "学习的时候我安静陪你。现在我又可以散步啦。",
+      "animation": "review",
+      "synth": "学习的时候我安静陪你。<#0.4#>现在我又可以散步啦。"
+    },
+    {
+      "id": "task-reminder-21-1",
+      "group": "task-reminder-21",
+      "message": "今天的每日事项还有几件没划掉，要一起看一眼吗？",
+      "synth": "今天的每日事项还有几件没划掉，要一起看一眼吗？",
+      "animation": "waiting"
+    },
+    {
+      "id": "task-reminder-21-2",
+      "group": "task-reminder-21",
+      "message": "收尾以前，我们看看今天还留下了什么吧。",
+      "synth": "收尾以前，我们看看今天还留下了什么吧。<#0.4#>",
+      "animation": "review"
+    },
+    {
+      "id": "task-reminder-21-3",
+      "group": "task-reminder-21",
+      "message": "每日事项还有小尾巴哦。现在处理，还是认真留到明天？",
+      "synth": "每日事项还有小尾巴哦。<#0.4#>现在处理，还是认真留到明天？",
+      "animation": "waiting"
+    },
+    {
+      "id": "task-reminder-21-4",
+      "group": "task-reminder-21",
+      "message": "今天的每日事项还没完成。方便的话，我们去看一眼。",
+      "synth": "今天的每日事项还没完成。<#0.4#>方便的话，我们去看一眼。",
+      "animation": "review"
+    },
+    {
+      "id": "task-reminder-22-1",
+      "group": "task-reminder-22",
+      "message": "睡前再看一眼每日事项吧。别让重要的事情悄悄漏掉。",
+      "synth": "睡前再看一眼每日事项吧。<#0.4#>别让重要的事情悄悄漏掉。",
+      "animation": "waiting"
+    },
+    {
+      "id": "task-reminder-22-2",
+      "group": "task-reminder-22",
+      "message": "今天的每日事项还有没划掉的。要不要决定一下怎么安置它们？",
+      "synth": "今天的每日事项还有没划掉的。<#0.4#>要不要决定一下怎么安置它们？",
+      "animation": "review"
+    },
+    {
+      "id": "task-reminder-22-3",
+      "group": "task-reminder-22",
+      "message": "再轻轻提醒一下。今天的每日事项还没有完全收好。",
+      "synth": "再轻轻提醒一下。<#0.4#>今天的每日事项还没有完全收好。",
+      "animation": "waiting"
+    },
+    {
+      "id": "task-reminder-22-4",
+      "group": "task-reminder-22",
+      "message": "没有做完也可以，但别假装没看见。我们去确认一下吧。",
+      "synth": "没有做完也可以，但别假装没看见。<#0.4#>我们去确认一下吧。",
+      "animation": "review"
+    },
+    {
+      "id": "task-completed-3",
+      "group": "task-completed-extra",
+      "message": "又划掉一件。看吧，你一直都在往前走。",
+      "synth": "又划掉一件。<#0.4#>看吧，你一直都在往前走。",
+      "animation": "waving"
+    },
+    {
+      "id": "task-completed-4",
+      "group": "task-completed-extra",
+      "message": "这件也完成啦。我替你高兴一下。",
+      "synth": "这件也完成啦。<#0.4#>我替你高兴一下。",
+      "animation": "jumping"
+    },
+    {
+      "id": "task-completed-5",
+      "group": "task-completed-extra",
+      "message": "认真做完的事情，值得一个小小的对勾。",
+      "synth": "认真做完的事情，值得一个小小的对勾。<#0.4#>",
+      "animation": "waving"
+    },
+    {
+      "id": "yuquiz-set-complete-4",
+      "group": "yuquiz-set-complete-extra",
+      "message": "这一组也收好啦。你又多会了一点点。",
+      "synth": "这一组也收好啦。<#0.4#>你又多会了一点点。",
+      "animation": "waving"
+    },
+    {
+      "id": "yuquiz-set-complete-5",
+      "group": "yuquiz-set-complete-extra",
+      "message": "做完一整组啦。先看看成果，再决定下一步。",
+      "synth": "做完一整组啦。<#0.4#>先看看成果，再决定下一步。",
+      "animation": "jumping"
+    },
+    {
+      "id": "yuquiz-set-complete-6",
+      "group": "yuquiz-set-complete-extra",
+      "message": "不管对了多少，愿意把这一组走完就很棒。",
+      "synth": "不管对了多少，愿意把这一组走完就很棒。<#0.4#>",
+      "animation": "waving"
+    },
+    {
+      "id": "hourly-morning-01",
+      "group": "hourly-morning",
+      "message": "早呀，我刚刚偷偷看了你一眼。今天也要好好照顾自己。",
+      "synth": "(轻笑)早呀，我刚刚偷偷看了你一眼。今天也要好好照顾自己。",
+      "animation": "waving"
+    },
+    {
+      "id": "hourly-morning-02",
+      "group": "hourly-morning",
+      "message": "上午还很长，不用着急。把眼前这一小步走好就可以啦。",
+      "synth": "上午还很长，不用着急。<#0.4#>把眼前这一小步走好就可以啦。",
+      "animation": "idle"
+    },
+    {
+      "id": "hourly-morning-03",
+      "group": "hourly-morning",
+      "message": "你认真起来的时候，真的很让人放心。",
+      "synth": "(轻笑)你认真起来的时候，真的很让人放心。",
+      "animation": "waving"
+    },
+    {
+      "id": "hourly-morning-04",
+      "group": "hourly-morning",
+      "message": "我在这里陪着呢。你不用一个人和今天较劲。",
+      "synth": "我在这里陪着呢。<#0.4#>你不用一个人和今天较劲。",
+      "animation": "idle"
+    },
+    {
+      "id": "hourly-morning-05",
+      "group": "hourly-morning",
+      "message": "喝一口水吧。不是催你，我只是想让你舒服一点。",
+      "synth": "喝一口水吧。<#0.3#>不是催你，我只是想让你舒服一点。",
+      "animation": "review"
+    },
+    {
+      "id": "hourly-morning-06",
+      "group": "hourly-morning",
+      "message": "刚才好像发了一会儿呆。没关系，回来就好。",
+      "synth": "(轻笑)刚才好像发了一会儿呆。没关系，回来就好。",
+      "animation": "waiting"
+    },
+    {
+      "id": "hourly-morning-07",
+      "group": "hourly-morning",
+      "message": "今天的你也在慢慢向前。这个速度就很好。",
+      "synth": "今天的你也在慢慢向前。<#0.3#>这个速度就很好。",
+      "animation": "waving"
+    },
+    {
+      "id": "hourly-morning-08",
+      "group": "hourly-morning",
+      "message": "坐好一点点，肩膀放松。我可不想看你又累得脖子疼。",
+      "synth": "坐好一点点，肩膀放松。<#0.3#>我可不想看你又累得脖子疼。",
+      "animation": "review"
+    },
+    {
+      "id": "hourly-morning-09",
+      "group": "hourly-morning",
+      "message": "我其实很喜欢这种安安静静陪着你的时候。",
+      "synth": "(轻笑)我其实很喜欢这种安安静静陪着你的时候。",
+      "animation": "idle"
+    },
+    {
+      "id": "hourly-morning-10",
+      "group": "hourly-morning",
+      "message": "别小看已经完成的这一点点。很多事情就是这样积累起来的。",
+      "synth": "别小看已经完成的这一点点。<#0.4#>很多事情就是这样积累起来的。",
+      "animation": "waving"
+    },
+    {
+      "id": "hourly-morning-11",
+      "group": "hourly-morning",
+      "message": "要是觉得难，就先挑最容易的一小块。我陪你从那里开始。",
+      "synth": "要是觉得难，就先挑最容易的一小块。<#0.3#>我陪你从那里开始。",
+      "animation": "waiting"
+    },
+    {
+      "id": "hourly-morning-12",
+      "group": "hourly-morning",
+      "message": "嗯，我没有什么大事。就是想提醒你，我还在。",
+      "synth": "(哼)嗯，我没有什么大事。<#0.4#>就是想提醒你，我还在。",
+      "animation": "idle"
+    },
+    {
+      "id": "hourly-afternoon-01",
+      "group": "hourly-afternoon",
+      "message": "下午也一起慢慢走吧。累了可以喘口气，但别把自己弄丢啦。",
+      "synth": "下午也一起慢慢走吧。<#0.4#>累了可以喘口气，但别把自己弄丢啦。",
+      "animation": "waving"
+    },
+    {
+      "id": "hourly-afternoon-02",
+      "group": "hourly-afternoon",
+      "message": "我刚刚在想，你今天已经比早上多走了好多步。",
+      "synth": "(轻笑)我刚刚在想，你今天已经比早上多走了好多步。",
+      "animation": "idle"
+    },
+    {
+      "id": "hourly-afternoon-03",
+      "group": "hourly-afternoon",
+      "message": "困的话就站起来伸个懒腰。我替你看着桌面。",
+      "synth": "困的话就站起来伸个懒腰。<#0.3#>我替你看着桌面。",
+      "animation": "review"
+    },
+    {
+      "id": "hourly-afternoon-04",
+      "group": "hourly-afternoon",
+      "message": "别皱眉啦。不会的东西，只是还没轮到你弄懂。",
+      "synth": "别皱眉啦。<#0.3#>不会的东西，只是还没轮到你弄懂。",
+      "animation": "waiting"
+    },
+    {
+      "id": "hourly-afternoon-05",
+      "group": "hourly-afternoon",
+      "message": "看见你还坐在这里，我就觉得今天挺有希望的。",
+      "synth": "(轻笑)看见你还坐在这里，我就觉得今天挺有希望的。",
+      "animation": "waving"
+    },
+    {
+      "id": "hourly-afternoon-06",
+      "group": "hourly-afternoon",
+      "message": "我宣布，现在可以奖励自己一口喜欢的饮料。",
+      "synth": "(轻笑)我宣布，现在可以奖励自己一口喜欢的饮料。",
+      "animation": "jumping"
+    },
+    {
+      "id": "hourly-afternoon-07",
+      "group": "hourly-afternoon",
+      "message": "如果脑子有点乱，就把下一件事写下来。别让它们一起挤你。",
+      "synth": "如果脑子有点乱，就把下一件事写下来。<#0.4#>别让它们一起挤你。",
+      "animation": "review"
+    },
+    {
+      "id": "hourly-afternoon-08",
+      "group": "hourly-afternoon",
+      "message": "今天不需要完美。认真过，就已经很值得喜欢啦。",
+      "synth": "今天不需要完美。<#0.3#>(轻笑)认真过，就已经很值得喜欢啦。",
+      "animation": "waving"
+    },
+    {
+      "id": "hourly-afternoon-09",
+      "group": "hourly-afternoon",
+      "message": "我偷偷给你加一点好运。虽然不一定有用，但心意是真的。",
+      "synth": "(轻笑)我偷偷给你加一点好运。<#0.3#>虽然不一定有用，但心意是真的。",
+      "animation": "jumping"
+    },
+    {
+      "id": "hourly-afternoon-10",
+      "group": "hourly-afternoon",
+      "message": "眼睛离屏幕远一点。你要是累坏了，我会心疼的。",
+      "synth": "眼睛离屏幕远一点。<#0.3#>你要是累坏了，我会心疼的。",
+      "animation": "review"
+    },
+    {
+      "id": "hourly-afternoon-11",
+      "group": "hourly-afternoon",
+      "message": "下午的时间容易悄悄溜走。我们抓住接下来这一小段就好。",
+      "synth": "下午的时间容易悄悄溜走。<#0.4#>我们抓住接下来这一小段就好。",
+      "animation": "waiting"
+    },
+    {
+      "id": "hourly-afternoon-12",
+      "group": "hourly-afternoon",
+      "message": "你不用一直很厉害。在我这里，愿意继续就很好。",
+      "synth": "你不用一直很厉害。<#0.4#>在我这里，愿意继续就很好。",
+      "animation": "waving"
+    },
+    {
+      "id": "hourly-afternoon-13",
+      "group": "hourly-afternoon",
+      "message": "我刚才什么也没做，只是在这里陪你待了一会儿。",
+      "synth": "(轻笑)我刚才什么也没做，只是在这里陪你待了一会儿。",
+      "animation": "idle"
+    },
+    {
+      "id": "hourly-afternoon-14",
+      "group": "hourly-afternoon",
+      "message": "累了就休息一下，不过记得回来。我会等你的。",
+      "synth": "累了就休息一下。<#0.3#>不过记得回来，我会等你的。",
+      "animation": "idle"
+    },
+    {
+      "id": "hourly-afternoon-15",
+      "group": "hourly-afternoon",
+      "message": "这一小时也没有白过。你留下的东西，我都替你看见了。",
+      "synth": "这一小时也没有白过。<#0.3#>你留下的东西，我都替你看见了。",
+      "animation": "waving"
+    },
+    {
+      "id": "hourly-afternoon-16",
+      "group": "hourly-afternoon",
+      "message": "好啦，别对自己那么凶。我们继续做能做的事。",
+      "synth": "好啦，别对自己那么凶。<#0.3#>我们继续做能做的事。",
+      "animation": "review"
+    },
+    {
+      "id": "hourly-evening-01",
+      "group": "hourly-evening",
+      "message": "天已经慢慢黑啦。今天剩下的时间，也别太为难自己。",
+      "synth": "天已经慢慢黑啦。<#0.4#>今天剩下的时间，也别太为难自己。",
+      "animation": "idle"
+    },
+    {
+      "id": "hourly-evening-02",
+      "group": "hourly-evening",
+      "message": "晚上好呀。我还在原来的位置陪你。",
+      "synth": "(轻笑)晚上好呀。<#0.3#>我还在原来的位置陪你。",
+      "animation": "waving"
+    },
+    {
+      "id": "hourly-evening-03",
+      "group": "hourly-evening",
+      "message": "今天辛苦到这里，已经很不容易了。剩下的慢慢收尾吧。",
+      "synth": "今天辛苦到这里，已经很不容易了。<#0.4#>剩下的慢慢收尾吧。",
+      "animation": "review"
+    },
+    {
+      "id": "hourly-evening-04",
+      "group": "hourly-evening",
+      "message": "别忘了吃东西。认真生活和认真学习一样重要。",
+      "synth": "别忘了吃东西。<#0.3#>认真生活和认真学习一样重要。",
+      "animation": "waiting"
+    },
+    {
+      "id": "hourly-evening-05",
+      "group": "hourly-evening",
+      "message": "我有一点喜欢今天的你。嗯，比刚才又多一点。",
+      "synth": "(轻笑)我有一点喜欢今天的你。<#0.4#>嗯，比刚才又多一点。",
+      "animation": "waving"
+    },
+    {
+      "id": "hourly-evening-06",
+      "group": "hourly-evening",
+      "message": "如果今天还有遗憾，就留一点给明天。你不用今晚全都解决。",
+      "synth": "如果今天还有遗憾，就留一点给明天。<#0.4#>你不用今晚全都解决。",
+      "animation": "idle"
+    },
+    {
+      "id": "hourly-evening-07",
+      "group": "hourly-evening",
+      "message": "我刚刚绕着桌面看了一圈。还是待在你旁边最好。",
+      "synth": "(轻笑)我刚刚绕着桌面看了一圈。<#0.3#>还是待在你旁边最好。",
+      "animation": "waving"
+    },
+    {
+      "id": "hourly-evening-08",
+      "group": "hourly-evening",
+      "message": "夜里安静一点以后，很多事情好像也没有那么难了。",
+      "synth": "夜里安静一点以后，很多事情好像也没有那么难了。",
+      "animation": "idle"
+    },
+    {
+      "id": "hourly-evening-09",
+      "group": "hourly-evening",
+      "message": "要不要把最后一件小事做完？做完我们就安心一点。",
+      "synth": "要不要把最后一件小事做完？<#0.3#>做完我们就安心一点。",
+      "animation": "waiting"
+    },
+    {
+      "id": "hourly-evening-10",
+      "group": "hourly-evening",
+      "message": "你今天已经努力过啦。就算没人看见，我也看见了。",
+      "synth": "你今天已经努力过啦。<#0.3#>(轻笑)就算没人看见，我也看见了。",
+      "animation": "waving"
+    },
+    {
+      "id": "hourly-evening-11",
+      "group": "hourly-evening",
+      "message": "坐了很久的话，起来走两步吧。我不许你把自己坐僵。",
+      "synth": "坐了很久的话，起来走两步吧。<#0.3#>我不许你把自己坐僵。",
+      "animation": "review"
+    },
+    {
+      "id": "hourly-evening-12",
+      "group": "hourly-evening",
+      "message": "今天发生的好事和坏事，都先放在这里吧。我陪你一起收着。",
+      "synth": "今天发生的好事和坏事，都先放在这里吧。<#0.4#>我陪你一起收着。",
+      "animation": "idle"
+    },
+    {
+      "id": "hourly-evening-13",
+      "group": "hourly-evening",
+      "message": "我没有催你睡觉哦。我只是觉得，你值得好好休息。",
+      "synth": "(轻笑)我没有催你睡觉哦。<#0.3#>我只是觉得，你值得好好休息。",
+      "animation": "waving"
+    },
+    {
+      "id": "hourly-evening-14",
+      "group": "hourly-evening",
+      "message": "再坚持一小会儿也可以，现在停下来也可以。你自己选。",
+      "synth": "再坚持一小会儿也可以。<#0.3#>现在停下来也可以。你自己选。",
+      "animation": "review"
+    },
+    {
+      "id": "hourly-evening-15",
+      "group": "hourly-evening",
+      "message": "我今天陪了你很久诶。这样想想，还挺开心的。",
+      "synth": "(轻笑)我今天陪了你很久诶。<#0.3#>这样想想，还挺开心的。",
+      "animation": "jumping"
+    },
+    {
+      "id": "hourly-evening-16",
+      "group": "hourly-evening",
+      "message": "晚一点没关系，但别熬得太过分。我会担心。",
+      "synth": "晚一点没关系。<#0.3#>但别熬得太过分，我会担心。",
+      "animation": "waiting"
+    },
+    {
+      "id": "hourly-midnight-01",
+      "group": "hourly-midnight",
+      "message": "十二点啦。今天到这里就很好，剩下的交给明天吧。",
+      "synth": "十二点啦。<#0.4#>今天到这里就很好，剩下的交给明天吧。",
+      "animation": "waving"
+    },
+    {
+      "id": "hourly-midnight-02",
+      "group": "hourly-midnight",
+      "message": "新的一天悄悄开始啦。不过现在最重要的，是好好睡觉。",
+      "synth": "(轻笑)新的一天悄悄开始啦。<#0.4#>不过现在最重要的，是好好睡觉。",
+      "animation": "idle"
+    },
+    {
+      "id": "hourly-midnight-03",
+      "group": "hourly-midnight",
+      "message": "我陪你走到今天的最后一格啦。晚安，明天再见。",
+      "synth": "我陪你走到今天的最后一格啦。<#0.4#>晚安，明天再见。",
+      "animation": "waving"
+    },
+    {
+      "id": "hourly-midnight-04",
+      "group": "hourly-midnight",
+      "message": "零点报时。今天辛苦了，现在可以放心休息啦。",
+      "synth": "零点报时。<#0.3#>今天辛苦了，现在可以放心休息啦。",
+      "animation": "review"
+    },
+    {
+      "id": "hourly-midnight-05",
+      "group": "hourly-midnight",
+      "message": "再舍不得今天，也该和它说晚安啦。我明天还会在。",
+      "synth": "再舍不得今天，也该和它说晚安啦。<#0.4#>(轻笑)我明天还会在。",
+      "animation": "idle"
+    },
+    {
+      "id": "hourly-midnight-06",
+      "group": "hourly-midnight",
+      "message": "已经十二点了哦。把电脑也放下吧，我陪你一起收工。",
+      "synth": "已经十二点了哦。<#0.4#>把电脑也放下吧，我陪你一起收工。",
+      "animation": "waving"
+    },
+    {
+      "id": "hourly-midnight-07",
+      "group": "hourly-midnight",
+      "message": "今天无论完成了多少，都已经结束啦。别带着责备去睡觉。",
+      "synth": "今天无论完成了多少，都已经结束啦。<#0.4#>别带着责备去睡觉。",
+      "animation": "review"
+    },
+    {
+      "id": "hourly-midnight-08",
+      "group": "hourly-midnight",
+      "message": "晚安。希望你睡醒以后，又有一点喜欢新的生活。",
+      "synth": "(轻笑)晚安。<#0.5#>希望你睡醒以后，又有一点喜欢新的生活。",
+      "animation": "waving"
+    }
+  ]
+}

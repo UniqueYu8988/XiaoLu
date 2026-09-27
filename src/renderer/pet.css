@@ -26,6 +26,10 @@ button { font: inherit; }
   filter: drop-shadow(0 9px 9px rgba(29, 15, 43, 0.2));
 }
 .pet-card:active { cursor: grabbing; }
+.pet-card.show-study-art { width: 144px; height: 156px; }
+.stage:has(.show-study-art) .message { bottom: 164px; }
+.study-art { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; pointer-events: none; }
+.study-art[hidden] { display: none; }
 .pet-card:focus-visible { filter: drop-shadow(0 0 7px rgba(196, 150, 255, 0.85)); }
 .sprite {
   width: var(--frame-width);

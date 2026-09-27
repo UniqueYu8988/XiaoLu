@@ -1,0 +1,61 @@
+{
+  "version": "retake-slow-2026-09",
+  "entries": [
+    {
+      "id": "hourly-midnight-01",
+      "group": "hourly-midnight",
+      "message": "十二点啦。今天到这里就很好，剩下的交给明天吧。",
+      "synth": "十二点啦。<#0.4#>今天到这里就很好，剩下的交给明天吧。",
+      "animation": "waving"
+    },
+    {
+      "id": "hourly-midnight-02",
+      "group": "hourly-midnight",
+      "message": "新的一天悄悄开始啦。不过现在最重要的，是好好睡觉。",
+      "synth": "(轻笑)新的一天悄悄开始啦。<#0.4#>不过现在最重要的，是好好睡觉。",
+      "animation": "idle"
+    },
+    {
+      "id": "hourly-midnight-03",
+      "group": "hourly-midnight",
+      "message": "我陪你走到今天的最后一格啦。晚安，明天再见。",
+      "synth": "我陪你走到今天的最后一格啦。<#0.4#>晚安，明天再见。",
+      "animation": "waving"
+    },
+    {
+      "id": "hourly-midnight-04",
+      "group": "hourly-midnight",
+      "message": "零点报时。今天辛苦了，现在可以放心休息啦。",
+      "synth": "零点报时。<#0.3#>今天辛苦了，现在可以放心休息啦。",
+      "animation": "review"
+    },
+    {
+      "id": "hourly-midnight-05",
+      "group": "hourly-midnight",
+      "message": "再舍不得今天，也该和它说晚安啦。我明天还会在。",
+      "synth": "再舍不得今天，也该和它说晚安啦。<#0.4#>(轻笑)我明天还会在。",
+      "animation": "idle"
+    },
+    {
+      "id": "hourly-midnight-06",
+      "group": "hourly-midnight",
+      "message": "已经十二点了哦。把电脑也放下吧，我陪你一起收工。",
+      "synth": "已经十二点了哦。<#0.4#>把电脑也放下吧，我陪你一起收工。",
+      "animation": "waving"
+    },
+    {
+      "id": "hourly-midnight-07",
+      "group": "hourly-midnight",
+      "message": "今天无论完成了多少，都已经结束啦。别带着责备去睡觉。",
+      "synth": "今天无论完成了多少，都已经结束啦。<#0.4#>别带着责备去睡觉。",
+      "animation": "review"
+    },
+    {
+      "id": "hourly-midnight-08",
+      "group": "hourly-midnight",
+      "message": "晚安。希望你睡醒以后，又有一点喜欢新的生活。",
+      "synth": "(轻笑)晚安。<#0.5#>希望你睡醒以后，又有一点喜欢新的生活。",
+      "animation": "waving"
+    }
+  ]
+}

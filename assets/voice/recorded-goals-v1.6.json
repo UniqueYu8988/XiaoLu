@@ -1,0 +1,18 @@
+{
+  "version": "1.6",
+  "batch": "goals",
+  "entries": [
+    { "id": "automatic-study-1", "group": "automatic-study", "message": "刚好，学习时间达标啦。这枚书签是你认真坐下来的证明。", "animation": "jumping" },
+    { "id": "automatic-study-2", "group": "automatic-study", "message": "看吧，只要开始，你就能做得很好。第一枚书签，我替你收好啦。", "animation": "jumping" },
+    { "id": "automatic-study-3", "group": "automatic-study", "message": "今天的时长目标完成。辛苦啦，我就知道你可以。", "animation": "jumping" },
+    { "id": "automatic-questions-1", "group": "automatic-questions", "message": "做题目标达成啦。这一枚，是你一道一道赢回来的。", "animation": "jumping" },
+    { "id": "automatic-questions-2", "group": "automatic-questions", "message": "今天的题量攒够啦。第二枚书签也被你拿下了。", "animation": "jumping" },
+    { "id": "automatic-questions-3", "group": "automatic-questions", "message": "你认真做过的每一道都算数。这枚书签，收好哦。", "animation": "jumping" },
+    { "id": "automatic-together-1", "group": "automatic-together", "message": "两个目标都完成啦。今天的双人书签，要好好收着。", "animation": "jumping" },
+    { "id": "automatic-together-2", "group": "automatic-together", "message": "今天的时长和题量都达标了。你又把想做的事，真的做到了。", "animation": "jumping" },
+    { "id": "automatic-together-3", "group": "automatic-together", "message": "双目标完成。嗯，我现在真的很为你开心。", "animation": "jumping" },
+    { "id": "settlement-summary-1", "group": "settlement-summary", "message": "今天的数据和这句话，我都替你好好收起来啦。", "animation": "review" },
+    { "id": "settlement-summary-2", "group": "settlement-summary", "message": "今天走过的每一步，都在这里。晚安之前，记得夸夸自己。", "animation": "review" },
+    { "id": "settlement-summary-3", "group": "settlement-summary", "message": "这一天已经写进日记了。无论结果怎样，我都陪你走到这里啦。", "animation": "review" }
+  ]
+}

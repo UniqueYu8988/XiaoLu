@@ -1,0 +1,89 @@
+{
+  "version": "retake-slow-2026-09",
+  "entries": [
+    {
+      "id": "hourly-morning-01",
+      "group": "hourly-morning",
+      "message": "早呀，我刚刚偷偷看了你一眼。今天也要好好照顾自己。",
+      "synth": "(轻笑)早呀，我刚刚偷偷看了你一眼。今天也要好好照顾自己。",
+      "animation": "waving"
+    },
+    {
+      "id": "hourly-morning-02",
+      "group": "hourly-morning",
+      "message": "上午还很长，不用着急。把眼前这一小步走好就可以啦。",
+      "synth": "上午还很长，不用着急。<#0.4#>把眼前这一小步走好就可以啦。",
+      "animation": "idle"
+    },
+    {
+      "id": "hourly-morning-03",
+      "group": "hourly-morning",
+      "message": "你认真起来的时候，真的很让人放心。",
+      "synth": "(轻笑)你认真起来的时候，真的很让人放心。",
+      "animation": "waving"
+    },
+    {
+      "id": "hourly-morning-04",
+      "group": "hourly-morning",
+      "message": "我在这里陪着呢。你不用一个人和今天较劲。",
+      "synth": "我在这里陪着呢。<#0.4#>你不用一个人和今天较劲。",
+      "animation": "idle"
+    },
+    {
+      "id": "hourly-morning-05",
+      "group": "hourly-morning",
+      "message": "喝一口水吧。不是催你，我只是想让你舒服一点。",
+      "synth": "喝一口水吧。<#0.3#>不是催你，我只是想让你舒服一点。",
+      "animation": "review"
+    },
+    {
+      "id": "hourly-morning-06",
+      "group": "hourly-morning",
+      "message": "刚才好像发了一会儿呆。没关系，回来就好。",
+      "synth": "(轻笑)刚才好像发了一会儿呆。没关系，回来就好。",
+      "animation": "waiting"
+    },
+    {
+      "id": "hourly-morning-07",
+      "group": "hourly-morning",
+      "message": "今天的你也在慢慢向前。这个速度就很好。",
+      "synth": "今天的你也在慢慢向前。<#0.3#>这个速度就很好。",
+      "animation": "waving"
+    },
+    {
+      "id": "hourly-morning-08",
+      "group": "hourly-morning",
+      "message": "坐好一点点，肩膀放松。我可不想看你又累得脖子疼。",
+      "synth": "坐好一点点，肩膀放松。<#0.3#>我可不想看你又累得脖子疼。",
+      "animation": "review"
+    },
+    {
+      "id": "hourly-morning-09",
+      "group": "hourly-morning",
+      "message": "我其实很喜欢这种安安静静陪着你的时候。",
+      "synth": "(轻笑)我其实很喜欢这种安安静静陪着你的时候。",
+      "animation": "idle"
+    },
+    {
+      "id": "hourly-morning-10",
+      "group": "hourly-morning",
+      "message": "别小看已经完成的这一点点。很多事情就是这样积累起来的。",
+      "synth": "别小看已经完成的这一点点。<#0.4#>很多事情就是这样积累起来的。",
+      "animation": "waving"
+    },
+    {
+      "id": "hourly-morning-11",
+      "group": "hourly-morning",
+      "message": "要是觉得难，就先挑最容易的一小块。我陪你从那里开始。",
+      "synth": "要是觉得难，就先挑最容易的一小块。<#0.3#>我陪你从那里开始。",
+      "animation": "waiting"
+    },
+    {
+      "id": "hourly-morning-12",
+      "group": "hourly-morning",
+      "message": "嗯，我没有什么大事。就是想提醒你，我还在。",
+      "synth": "(哼)嗯，我没有什么大事。<#0.4#>就是想提醒你，我还在。",
+      "animation": "idle"
+    }
+  ]
+}

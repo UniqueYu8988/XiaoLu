@@ -1,4 +1,31 @@
+import { advanceStudyArt } from './study-art.mjs';
 const api = window.xiaoluPet;
+let notifiedArt = null;
+function reportStudyArt(asset) {
+  if (notifiedArt === asset) return;
+  notifiedArt = asset;
+  api.setStudyArt(asset);
+}
+const studyArt = document.getElementById('study-art');
+let learningArtActive = false;
+let achievedArt = null;
+try { achievedArt = JSON.parse(localStorage.getItem('xiaolu-study-art') || 'null'); } catch { /* optional presentation cache */ }
+function updateStudyArt(state) {
+  learningArtActive = state.isStudying === true || state.externalStudying === true;
+  const previous = achievedArt;
+  const next = advanceStudyArt(achievedArt, state.date, state.today?.goals?.overallPercent || 0, state.today?.studyMs || 0);
+  if (JSON.stringify(next) !== JSON.stringify(achievedArt)) {
+    achievedArt = next;
+    try { localStorage.setItem('xiaolu-study-art', JSON.stringify(next)); } catch { /* storage may be disabled */ }
+  }
+  const artPath = `../assets/study-art/widget_${next.kind}_${next.index}.png`;
+  if (studyArt.getAttribute('src') !== artPath) studyArt.src = artPath;
+  const advanced = previous?.date === next.date && (next.progress > previous.progress || next.time > previous.time);
+  if (advanced && learningArtActive && !currentPrompt && !actionLocked && !dragging && !autoRunning) {
+    const cue = state.studyArtCues?.find(item => item.id === `stage-${next.kind}-${next.index}`);
+    if (cue) showTransientMessage(cue.message, 2200, playVoice(cue.voice));
+  }
+}
 const sprite = document.getElementById("sprite");
 const card = document.getElementById("pet-card");
 const message = document.getElementById("message");
@@ -54,6 +81,10 @@ const LOOK_HYSTERESIS_DEGREES = 3.5;
 const LOOK_SMOOTHING_MS = 52;
 
 function applyAnimation(name, persistent = false) {
+  card.classList.remove('show-study-art');
+  reportStudyArt(null);
+  studyArt.hidden = true;
+  sprite.hidden = false;
   const animation = animations[name] || animations.idle;
   lookActive = false;
   displayedLookIndex = null;
@@ -73,6 +104,14 @@ function restorePersistentAnimation() {
   }
   if (autoRunning) {
     applyAnimation(`running-${autoRunDirection}`, true);
+    return;
+  }
+  if (learningArtActive && achievedArt && !currentPrompt) {
+    card.classList.add('show-study-art');
+    reportStudyArt(`widget_${achievedArt.kind}_${achievedArt.index}.png`);
+    sprite.style.animation = 'none';
+    sprite.hidden = true;
+    studyArt.hidden = false;
     return;
   }
   applyAnimation(persistentAnimation, true);
@@ -274,7 +313,7 @@ function setLookFrame(index) {
 function updateLookDirection(now) {
   const elapsed = Math.min(100, Math.max(0, now - lastLookFrameTime));
   lastLookFrameTime = now;
-  if (!actionLocked && !dragging && !autoRunning && persistentAnimation === "idle" && latestCursorPoint) {
+  if (!learningArtActive && !actionLocked && !dragging && !autoRunning && persistentAnimation === "idle" && latestCursorPoint) {
     const distance = Math.hypot(latestCursorPoint.x, latestCursorPoint.y);
     if (!lookActive && distance >= LOOK_ENTER_DISTANCE) {
       lookActive = true;
@@ -407,6 +446,7 @@ api.onAction((action) => {
 });
 api.onVoice(playVoice);
 api.onState((state) => {
+  updateStudyArt(state);
   if (typeof state.statusBubble === "string") statusBubbleMessage = state.statusBubble;
   voiceEnabled = state.settings?.voiceEnabled !== false;
   voiceVolume = Number.isFinite(state.settings?.voiceVolume) ? state.settings.voiceVolume : 0.82;
@@ -423,6 +463,7 @@ api.onState((state) => {
 restorePersistentAnimation();
 requestAnimationFrame(updateLookDirection);
 void api.getState().then((state) => {
+  updateStudyArt(state);
   statusBubbleMessage = typeof state.statusBubble === "string" ? state.statusBubble : "";
   persistentAnimation = state.persistentAnimation || "idle";
   voiceEnabled = state.settings?.voiceEnabled !== false;

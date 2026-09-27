@@ -85,7 +85,8 @@ import { parseYuReaderStatus, YUREADER_BASE_URL } from "./yureader.js";
 import { createMobileSnapshot } from "./mobile-snapshot.js";
 import { createMobileServer, MOBILE_PORT, type MobileTaskChange } from "./mobile-server.js";
 
-const PET_WINDOW = { width: 128, height: 208 } as const;
+const PET_WINDOW = { width: 176, height: 260 } as const;
+let visibleStudyArt: { pixels: Buffer; width: number; height: number } | null = null;
 const execFileAsync = promisify(execFile);
 const MOBILE_TAILSCALE_PORT = 8786;
 const PET_HITBOX = { width: 68, height: 102, bottom: 9 } as const;
@@ -133,6 +134,34 @@ const runtimeDirectory = dirname(fileURLToPath(import.meta.url));
 const runtimeVoiceDirectory = join(runtimeDirectory, "assets", "voice");
 const hourlyChatter = loadVoiceCatalog("hourly-v1.5.json");
 const functionalVoices = loadVoiceCatalog("functional-v1.5.json");
+const recordedGoalVoices = loadVoiceCatalog("recorded-goals-v1.6.json");
+const refreshedVoices = loadVoiceCatalog("companion-refresh.json");
+const slowRetakeVoices = loadVoiceCatalog("retakes-slow.json");
+const verifiedVoiceEntries = new Map([...hourlyChatter, ...functionalVoices, ...recordedGoalVoices, ...slowRetakeVoices, ...refreshedVoices].map(entry => [entry.id, entry]));
+// These recordings describe old reward rules; retain files, but no longer play them.
+const retiredVoicePrefixes = ["automatic-study-", "automatic-together-", "bounty-", "settlement-together-", "settlement-self-", "settlement-friend-", "settlement-none-"];
+function matchedVoice(voice: string | undefined, message?: string): { voice?: string | undefined; message?: string | undefined } {
+  const replacements: Record<string, string> = {
+    "automatic-study-": "refresh-reading-goal-1",
+    "automatic-questions-": "refresh-questions-goal-1",
+    "automatic-together-": "refresh-overall-goal-1",
+    "oral-review-complete-": "refresh-oral-review-1",
+    "mistake-review-complete-": "refresh-mistake-review-1",
+    "settlement-summary-1": "refresh-settlement-1",
+    "task-completed-1": "refresh-todo-done-1",
+    "launch-prompt-1": "refresh-start-gentle-1",
+    "patrol-start-firm-1": "refresh-start-firm-1",
+    "study-launch-return-1": "refresh-study-return-1",
+    "study-stopped-1": "refresh-start-rest-1",
+  };
+  const replacement = Object.entries(replacements).find(([prefix]) => voice?.startsWith(prefix))?.[1];
+  if (replacement && existsSync(join(runtimeVoiceDirectory, `${replacement}.mp3`))) voice = replacement;
+  if (!voice || retiredVoicePrefixes.some(prefix => voice.startsWith(prefix))) return { message };
+  const recorded = verifiedVoiceEntries.get(voice);
+  // A clip without a trustworthy transcript stays text-only until audited.
+  if (!recorded || !existsSync(join(runtimeVoiceDirectory, `${voice}.mp3`))) return { message };
+  return { voice, message: recorded.message };
+}
 
 function loadVoiceCatalog(fileName: string): readonly CatalogVoice[] {
   try {
@@ -887,6 +916,20 @@ function installIpc(): void {
     bubbleHitbox = normalizeWindowBounds(value);
     syncPetMousePassthrough();
   });
+  ipcMain.on("xiaolu:study-art", (event, asset: unknown) => {
+    if (!petWindow || event.sender !== petWindow.webContents) return;
+    visibleStudyArt = null;
+    if (typeof asset === "string" && /^widget_(progress|time)_[0-4]\.png$/.test(asset)) {
+      const image = nativeImage.createFromPath(join(runtimeDirectory, "assets", "study-art", asset));
+      if (!image.isEmpty()) {
+        const size = image.getSize();
+        visibleStudyArt = { pixels: image.toBitmap(), width: size.width, height: size.height };
+        const bounds = petWindow.getContentBounds();
+        movePetWindow(bounds.x, bounds.y);
+      }
+    }
+    syncPetMousePassthrough();
+  });
   ipcMain.on("xiaolu:hide-panel", (event) => { assertTrustedSender(event); hidePanel(); });
   ipcMain.on("xiaolu:drag-start", (event, point: unknown) => {
     if (!petWindow || event.sender !== petWindow.webContents || !isPoint(point)) return;
@@ -1255,6 +1298,10 @@ async function syncYuQuiz(announce: boolean): Promise<void> {
     }
     await syncYuQuizEvents(shouldTrack);
     yuQuizRuntime = { connected: true, statusAvailable: Boolean(status), snapshot };
+    if (shouldTrack && previous?.date === snapshot.date && snapshot.vocabularyCount > previous.vocabularyCount && !activePromptType) {
+      const cue = verifiedVoiceEntries.get("refresh-vocabulary-1");
+      if (cue) emitAction(cue.animation, cue.message, "✓", 1_850, cue.id);
+    }
     handleYuQuizDocking(snapshot);
     if (isExternalStudy) await completeOrganicStudyLaunch(now);
     updateYuQuizStatusBubble(snapshot, now);
@@ -2148,6 +2195,8 @@ function publicState(message?: string): Record<string, unknown> {
     now: now.toISOString(),
     date,
     isStudying,
+    externalStudying: Boolean(studyState.settings.yuReaderIntegration && yuQuizRuntime.connected && yuReaderSnapshot?.date === date && (yuReaderSnapshot.studyState === "learning" || yuReaderSnapshot.studyState === "consulting")),
+    studyArtCues: refreshedVoices.filter(entry => entry.group === "study-stage").map(entry => ({ id: entry.id, message: entry.message, voice: existsSync(join(runtimeVoiceDirectory, `${entry.id}.mp3`)) ? entry.id : null })),
     activeSessionStartedAt: studyState.activeSessionStartedAt ?? null,
     persistentAnimation: pending ? "waiting" : isStudying ? "running" : "idle",
     pendingCheckIn: pending ?? null,
@@ -2214,6 +2263,9 @@ function flushAutomaticGoalAwards(): void {
 }
 
 function emitAction(animation: string, message?: string, effect?: string, lockMs = 1_700, voice?: string): void {
+  const matched = matchedVoice(voice, message);
+  voice = matched.voice;
+  message = matched.message;
   const payload = {
     animation,
     lockMs,
@@ -2226,7 +2278,8 @@ function emitAction(animation: string, message?: string, effect?: string, lockMs
 }
 
 function emitVoice(voice: string): void {
-  if (voice) petWindow?.webContents.send("xiaolu:play-voice", voice);
+  const matched = matchedVoice(voice);
+  if (matched.voice) petWindow?.webContents.send("xiaolu:play-voice", matched.voice);
 }
 
 function emitVoiceVariant(poolKey: string, pool: readonly VoiceVariant[], effect?: string): void {
@@ -2257,17 +2310,22 @@ function choosePaired(poolKey: string, messages: readonly string[], voices: read
   const candidates = variants.filter((item) => item.voice !== previous);
   const selected = candidates[Math.floor(Math.random() * candidates.length)] ?? variants[0] ?? { message: "", voice: "" };
   lastVariantByPool.set(poolKey, selected.voice);
-  return selected;
+  const matched = matchedVoice(selected.voice, selected.message);
+  return { message: matched.message ?? selected.message, voice: matched.voice ?? "" };
 }
 
 function chooseVariant(poolKey: string, pool: readonly VoiceVariant[]): VoiceVariant {
   const fallback = pool[0] ?? { message: "", voice: "", animation: "idle" };
-  if (pool.length <= 1) return fallback;
+  if (pool.length <= 1) {
+    const matched = matchedVoice(fallback.voice, fallback.message);
+    return { ...fallback, message: matched.message ?? fallback.message, voice: matched.voice ?? "" };
+  }
   const previous = lastVariantByPool.get(poolKey);
   const candidates = pool.filter((item) => item.voice !== previous);
   const selected = candidates[Math.floor(Math.random() * candidates.length)] ?? fallback;
   lastVariantByPool.set(poolKey, selected.voice);
-  return selected;
+  const matched = matchedVoice(selected.voice, selected.message);
+  return { ...selected, message: matched.message ?? selected.message, voice: matched.voice ?? "" };
 }
 
 function chooseVoice(poolKey: string, pool: readonly string[]): string {
@@ -2535,10 +2593,20 @@ function syncPetMousePassthrough(cursor = screen.getCursorScreenPoint()): void {
   const bounds = petWindow.getBounds();
   const petLeft = bounds.x + (bounds.width - PET_HITBOX.width) / 2;
   const petTop = bounds.y + bounds.height - PET_HITBOX.bottom - PET_HITBOX.height;
-  const overPet = cursor.x >= petLeft
+  let overPet = cursor.x >= petLeft
     && cursor.x < petLeft + PET_HITBOX.width
     && cursor.y >= petTop
     && cursor.y < petTop + PET_HITBOX.height;
+  if (visibleStudyArt && !dragging && !petTravel) {
+    // Match object-fit: contain, including alpha: transparent decoration must not block clicks.
+    const scale = Math.min(144 / visibleStudyArt.width, 156 / visibleStudyArt.height);
+    const width = visibleStudyArt.width * scale, height = visibleStudyArt.height * scale;
+    const left = bounds.x + (bounds.width - width) / 2;
+    const top = bounds.y + bounds.height - 8 - 156 + (156 - height) / 2;
+    const x = Math.floor((cursor.x - left) / scale), y = Math.floor((cursor.y - top) / scale);
+    overPet = x >= 0 && y >= 0 && x < visibleStudyArt.width && y < visibleStudyArt.height
+      && (visibleStudyArt.pixels[(y * visibleStudyArt.width + x) * 4 + 3] ?? 0) > 32;
+  }
   const overBubble = bubblePromptActive && bubbleHitbox
     && cursor.x >= bounds.x + bubbleHitbox.left
     && cursor.x < bounds.x + bubbleHitbox.left + bubbleHitbox.width
@@ -2560,10 +2628,11 @@ function movePetWindow(x: number, y: number): void {
 
 function clampPetPosition(x: number, y: number): { x: number; y: number } {
   const work = screen.getPrimaryDisplay().workArea;
-  const hitboxLeft = (PET_WINDOW.width - PET_HITBOX.width) / 2;
-  const hitboxTop = PET_WINDOW.height - PET_HITBOX.bottom - PET_HITBOX.height;
-  const hitboxRight = hitboxLeft + PET_HITBOX.width;
-  const hitboxBottom = hitboxTop + PET_HITBOX.height;
+  const hitbox = visibleStudyArt && !dragging && !petTravel ? { width: 144, height: 156, bottom: 8 } : PET_HITBOX;
+  const hitboxLeft = (PET_WINDOW.width - hitbox.width) / 2;
+  const hitboxTop = PET_WINDOW.height - hitbox.bottom - hitbox.height;
+  const hitboxRight = hitboxLeft + hitbox.width;
+  const hitboxBottom = hitboxTop + hitbox.height;
   const minX = work.x - hitboxLeft;
   const maxX = work.x + work.width - hitboxRight;
   const minY = work.y - hitboxTop;

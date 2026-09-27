@@ -1,0 +1,278 @@
+{
+  "version": "retake-slow-2026-09",
+  "entries": [
+    {
+      "id": "patrol-start-playful-1",
+      "group": "patrol-start-playful",
+      "message": "你还没有开始，我可要在这里巡逻啦。",
+      "animation": "waiting",
+      "synth": "你还没有开始，我可要在这里巡逻啦。<#0.4#>"
+    },
+    {
+      "id": "patrol-start-playful-2",
+      "group": "patrol-start-playful",
+      "message": "我先跑一圈。等我回来，你会不会已经开始了？",
+      "animation": "waiting",
+      "synth": "我先跑一圈。<#0.4#>等我回来，你会不会已经开始了？"
+    },
+    {
+      "id": "patrol-start-playful-3",
+      "group": "patrol-start-playful",
+      "message": "先做一点点也算开始呀。我就在这里等你。",
+      "animation": "waiting",
+      "synth": "先做一点点也算开始呀。<#0.4#>我就在这里等你。"
+    },
+    {
+      "id": "patrol-start-playful-4",
+      "group": "patrol-start-playful",
+      "message": "你不叫我停，我就继续跑喽。",
+      "animation": "waiting",
+      "synth": "你不叫我停，我就继续跑喽。<#0.4#>"
+    },
+    {
+      "id": "patrol-start-playful-5",
+      "group": "patrol-start-playful",
+      "message": "我又路过一次。学习内容还是没有打开吗？",
+      "animation": "waiting",
+      "synth": "我又路过一次。<#0.4#>学习内容还是没有打开吗？"
+    },
+    {
+      "id": "patrol-start-playful-6",
+      "group": "patrol-start-playful",
+      "message": "我都跑到这里啦。你也该往前走一步了。",
+      "animation": "waiting",
+      "synth": "我都跑到这里啦。<#0.4#>你也该往前走一步了。"
+    },
+    {
+      "id": "patrol-start-playful-7",
+      "group": "patrol-start-playful",
+      "message": "不用想今天要学多久。现在先开始三分钟。",
+      "animation": "waiting",
+      "synth": "不用想今天要学多久。<#0.4#>现在先开始三分钟。"
+    },
+    {
+      "id": "patrol-start-playful-8",
+      "group": "patrol-start-playful",
+      "message": "我去那边看看。回来时，希望能看见你已经开始。",
+      "animation": "waiting",
+      "synth": "我去那边看看。<#0.4#>回来时，希望能看见你已经开始。"
+    },
+    {
+      "id": "patrol-start-firm-1",
+      "group": "patrol-start-firm",
+      "message": "我已经回来好几次啦。我们先把第一步走出去吧。",
+      "animation": "waiting",
+      "synth": "我已经回来好几次啦。<#0.4#>我们先把第一步走出去吧。"
+    },
+    {
+      "id": "patrol-start-firm-2",
+      "group": "patrol-start-firm",
+      "message": "不用等状态变好。开始以后，状态会慢慢跟上的。",
+      "animation": "waiting",
+      "synth": "不用等状态变好。<#0.4#>开始以后，状态会慢慢跟上的。"
+    },
+    {
+      "id": "patrol-start-firm-3",
+      "group": "patrol-start-firm",
+      "message": "先打开学习内容。剩下的事情，我们开始以后再想。",
+      "animation": "waiting",
+      "synth": "先打开学习内容。<#0.4#>剩下的事情，我们开始以后再想。"
+    },
+    {
+      "id": "patrol-start-firm-4",
+      "group": "patrol-start-firm",
+      "message": "我知道你不是不想学。只是还没有迈出去。",
+      "animation": "waiting",
+      "synth": "我知道你不是不想学。<#0.4#>只是还没有迈出去。"
+    },
+    {
+      "id": "patrol-start-firm-5",
+      "group": "patrol-start-firm",
+      "message": "这段时间是我们约好的。我还没有等到你开始。",
+      "animation": "waiting",
+      "synth": "这段时间是我们约好的。<#0.4#>我还没有等到你开始。"
+    },
+    {
+      "id": "patrol-start-firm-6",
+      "group": "patrol-start-firm",
+      "message": "已经拖得够久啦。现在，先翻开一页。",
+      "animation": "waiting",
+      "synth": "已经拖得够久啦。<#0.4#>现在，先翻开一页。"
+    },
+    {
+      "id": "patrol-start-angry-1",
+      "group": "patrol-start-angry",
+      "message": "我真的要生气了。我们约好的学习时间，不是拿来一直拖延的。",
+      "animation": "failed",
+      "synth": "我真的要生气了。<#0.4#>我们约好的学习时间，不是拿来一直拖延的。"
+    },
+    {
+      "id": "patrol-start-angry-2",
+      "group": "patrol-start-angry",
+      "message": "已经提醒你好几次了。现在，把别的事情放下，打开学习内容。",
+      "animation": "failed",
+      "synth": "(哼)已经提醒你好几次了。<#0.4#>现在，把别的事情放下，打开学习内容。"
+    },
+    {
+      "id": "patrol-start-angry-3",
+      "group": "patrol-start-angry",
+      "message": "你明明知道，开始以后就能学进去。为什么还要一直躲着第一步？",
+      "animation": "failed",
+      "synth": "你明明知道，开始以后就能学进去。<#0.4#>为什么还要一直躲着第一步？"
+    },
+    {
+      "id": "patrol-start-angry-4",
+      "group": "patrol-start-angry",
+      "message": "别再看着我跑啦。把注意力放回学习上。现在就开始。",
+      "animation": "failed",
+      "synth": "别再看着我跑啦。<#0.4#>把注意力放回学习上。现在就开始。"
+    },
+    {
+      "id": "patrol-start-angry-5",
+      "group": "patrol-start-angry",
+      "message": "这段时间是我们约好的。我已经等了很久，可你还是没有开始。",
+      "animation": "failed",
+      "synth": "(哼)这段时间是我们约好的。<#0.4#>我已经等了很久，可你还是没有开始。"
+    },
+    {
+      "id": "patrol-start-angry-6",
+      "group": "patrol-start-angry",
+      "message": "我不是来陪你继续拖延的。先坐好，把学习内容打开。",
+      "animation": "failed",
+      "synth": "我不是来陪你继续拖延的。<#0.4#>先坐好，把学习内容打开。"
+    },
+    {
+      "id": "patrol-start-angry-7",
+      "group": "patrol-start-angry",
+      "message": "不要再告诉自己等一会儿。你已经等过很多个一会儿了。",
+      "animation": "failed",
+      "synth": "不要再告诉自己等一会儿。<#0.4#>你已经等过很多个一会儿了。"
+    },
+    {
+      "id": "patrol-start-angry-8",
+      "group": "patrol-start-angry",
+      "message": "这次我不哄你了。别想今天要学多久，先把这一小段学起来。",
+      "animation": "failed",
+      "synth": "(哼)这次我不哄你了。<#0.4#>别想今天要学多久，先把这一小段学起来。"
+    },
+    {
+      "id": "patrol-start-final-1",
+      "group": "patrol-start-final",
+      "message": "听好。现在打开学习内容，不要再给拖延找理由。",
+      "animation": "waiting",
+      "synth": "听好。<#0.4#>现在打开学习内容，不要再给拖延找理由。"
+    },
+    {
+      "id": "patrol-start-final-2",
+      "group": "patrol-start-final",
+      "message": "已经拖得太久了。你答应过的事情，需要认真对待。",
+      "animation": "waiting",
+      "synth": "已经拖得太久了。<#0.4#>你答应过的事情，需要认真对待。"
+    },
+    {
+      "id": "patrol-start-final-3",
+      "group": "patrol-start-final",
+      "message": "我现在真的很生气。先开始学习，再去做其他事情。",
+      "animation": "waiting",
+      "synth": "(哼)我现在真的很生气。<#0.4#>先开始学习，再去做其他事情。"
+    },
+    {
+      "id": "patrol-start-final-4",
+      "group": "patrol-start-final",
+      "message": "不要继续消耗今天了。现在开始，还来得及把时间拿回来。",
+      "animation": "waiting",
+      "synth": "不要继续消耗今天了。<#0.4#>现在开始，还来得及把时间拿回来。"
+    },
+    {
+      "id": "patrol-start-final-5",
+      "group": "patrol-start-final",
+      "message": "这不是状态好不好的问题。是你现在愿不愿意迈出第一步。",
+      "animation": "waiting",
+      "synth": "这不是状态好不好的问题。<#0.4#>是你现在愿不愿意迈出第一步。"
+    },
+    {
+      "id": "patrol-start-final-6",
+      "group": "patrol-start-final",
+      "message": "我会继续在这里盯着你。直到你真正进入学习。",
+      "animation": "waiting",
+      "synth": "(哼)我会继续在这里盯着你。<#0.4#>直到你真正进入学习。"
+    },
+    {
+      "id": "patrol-return-1",
+      "group": "patrol-return",
+      "message": "休息得差不多啦。我们回来继续吧。",
+      "animation": "review",
+      "synth": "休息得差不多啦。<#0.4#>我们回来继续吧。"
+    },
+    {
+      "id": "patrol-return-2",
+      "group": "patrol-return",
+      "message": "我来接你回去。下一小段，从哪里开始？",
+      "animation": "review",
+      "synth": "我来接你回去。<#0.4#>下一小段，从哪里开始？"
+    },
+    {
+      "id": "patrol-return-3",
+      "group": "patrol-return",
+      "message": "刚才那一段已经收好了。现在接着往下走吧。",
+      "animation": "review",
+      "synth": "刚才那一段已经收好了。<#0.4#>现在接着往下走吧。"
+    },
+    {
+      "id": "patrol-return-4",
+      "group": "patrol-return",
+      "message": "休息有一会儿啦。准备好了，就回来继续吧。",
+      "animation": "review",
+      "synth": "休息有一会儿啦。<#0.4#>准备好了，就回来继续吧。"
+    },
+    {
+      "id": "patrol-return-5",
+      "group": "patrol-return",
+      "message": "你已经开始过一次了。重新回来，也不会很难。",
+      "animation": "review",
+      "synth": "你已经开始过一次了。<#0.4#>重新回来，也不会很难。"
+    },
+    {
+      "id": "patrol-return-6",
+      "group": "patrol-return",
+      "message": "这一程还没有结束。我来带你回去。",
+      "animation": "review",
+      "synth": "这一程还没有结束。<#0.4#>我来带你回去。"
+    },
+    {
+      "id": "patrol-return-7",
+      "group": "patrol-return",
+      "message": "先回来做一点。别让短短的休息，变成长长的拖延。",
+      "animation": "review",
+      "synth": "先回来做一点。<#0.4#>别让短短的休息，变成长长的拖延。"
+    },
+    {
+      "id": "patrol-return-8",
+      "group": "patrol-return",
+      "message": "我又开始巡逻啦。等你重新进入学习，我就停下。",
+      "animation": "review",
+      "synth": "我又开始巡逻啦。<#0.4#>等你重新进入学习，我就停下。"
+    },
+    {
+      "id": "patrol-success-1",
+      "group": "patrol-success",
+      "message": "好啦，这次是真的开始了。我回去陪你。",
+      "animation": "jumping",
+      "synth": "好啦，这次是真的开始了。<#0.4#>我回去陪你。"
+    },
+    {
+      "id": "patrol-success-2",
+      "group": "patrol-success",
+      "message": "已经稳稳开始啦。接下来交给你。",
+      "animation": "jumping",
+      "synth": "已经稳稳开始啦。<#0.4#>接下来交给你。"
+    },
+    {
+      "id": "patrol-success-3",
+      "group": "patrol-success",
+      "message": "你已经回到学习里了。我不再到处跑啦。",
+      "animation": "jumping",
+      "synth": "你已经回到学习里了。<#0.4#>我不再到处跑啦。"
+    }
+  ]
+}

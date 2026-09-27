@@ -1,7 +1,7 @@
 {
   "name": "xiaolu-desktop-pet",
   "productName": "共学日记",
-  "version": "2.0.4",
+  "version": "2.0.5",
   "author": "Xiaolu",
   "license": "MIT",
   "private": true,
@@ -14,7 +14,7 @@
     "start:built": "electron .",
     "typecheck": "tsc --noEmit",
     "test": "pnpm build && node tests/game.test.mjs && node tests/yureader.test.mjs && node tests/wakeup.test.mjs && node tests/external-diary.test.mjs && node tests/study-enforcement.test.mjs && node tests/windows-browser.test.mjs && node tests/mobile-snapshot.test.mjs && node tests/mobile-server.test.mjs",
-    "check": "pnpm typecheck && pnpm test",
+    "check": "pnpm typecheck && pnpm test && node tests/study-art.test.mjs && node tests/voice-catalog.test.mjs",
     "package:msi": "pnpm build && electron-builder --win msi --x64"
   },
   "devDependencies": {

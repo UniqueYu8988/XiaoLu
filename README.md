@@ -3,7 +3,7 @@
   <h1>共学日记</h1>
   <p>把朋友的陪伴，留在桌面，也带在身边。</p>
   <p>
-    <img alt="Windows" src="https://img.shields.io/badge/Windows-2.0.4-76558f" />
+    <img alt="Windows" src="https://img.shields.io/badge/Windows-2.0.5-76558f" />
     <img alt="Android" src="https://img.shields.io/badge/Android-1.0.0-76558f" />
     <img alt="Data" src="https://img.shields.io/badge/data-local--first-a9c99e" />
     <img alt="License" src="https://img.shields.io/badge/license-MIT-f4d57b" />

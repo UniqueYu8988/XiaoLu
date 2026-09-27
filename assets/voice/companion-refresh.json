@@ -1,0 +1,159 @@
+{
+  "version": "pending",
+  "entries": [
+    {
+      "id": "stage-progress-0",
+      "group": "study-stage",
+      "message": "我在这儿，陪你慢慢把今天打开。",
+      "synth": "我在这儿，陪你慢慢把今天打开。<#0.4#>",
+      "animation": "review"
+    },
+    {
+      "id": "stage-progress-1",
+      "group": "study-stage",
+      "message": "看，今天已经走起来了。你认真一点，我就再靠近一点。",
+      "synth": "看，今天已经走起来了。<#0.4#>你认真一点，我就再靠近一点。",
+      "animation": "review"
+    },
+    {
+      "id": "stage-progress-2",
+      "group": "study-stage",
+      "message": "我们已经走过一大段啦。别急，我陪你稳稳地来。",
+      "synth": "我们已经走过一大段啦。<#0.4#>别急，我陪你稳稳地来。",
+      "animation": "review"
+    },
+    {
+      "id": "stage-progress-3",
+      "group": "study-stage",
+      "message": "快把今天点亮了。差的那一点，我们一起拿下。",
+      "synth": "快把今天点亮了。<#0.4#>差的那一点，我们一起拿下。",
+      "animation": "review"
+    },
+    {
+      "id": "stage-progress-4",
+      "group": "study-stage",
+      "message": "今天的约定完成啦！这颗星星，当然要给你。",
+      "synth": "(轻笑)今天的约定完成啦！这颗星星，当然要给你。<#0.4#>",
+      "animation": "jumping"
+    },
+    {
+      "id": "stage-time-0",
+      "group": "study-stage",
+      "message": "书翻开啦，我也坐好啦。今天继续陪你。",
+      "synth": "书翻开啦，我也坐好啦。<#0.4#>今天继续陪你。",
+      "animation": "review"
+    },
+    {
+      "id": "stage-time-1",
+      "group": "study-stage",
+      "message": "两小时了，已经有点小小的学者气质啦。也记得喝口水。",
+      "synth": "两小时了，已经有点小小的学者气质啦。<#0.4#>也记得喝口水。",
+      "animation": "review"
+    },
+    {
+      "id": "stage-time-2",
+      "group": "study-stage",
+      "message": "四小时了！知识都开始围着你转啦。让我偷偷夸你一下。",
+      "synth": "四小时了！知识都开始围着你转啦。<#0.4#>让我偷偷夸你一下。",
+      "animation": "review"
+    },
+    {
+      "id": "stage-time-3",
+      "group": "study-stage",
+      "message": "六小时了，我们学进小宇宙啦。眼睛和肩膀，也要歇一歇哦。",
+      "synth": "六小时了，我们学进小宇宙啦。<#0.4#>眼睛和肩膀，也要歇一歇哦。",
+      "animation": "review"
+    },
+    {
+      "id": "stage-time-4",
+      "group": "study-stage",
+      "message": "八小时了，好认真呀。先抱一下，休息和睡觉也很重要。",
+      "synth": "(轻笑)八小时了，好认真呀。<#0.4#>先抱一下，休息和睡觉也很重要。",
+      "animation": "jumping"
+    },
+    {
+      "id": "refresh-reading-goal-1",
+      "group": "reading-goal",
+      "message": "阅读书签点亮啦。一页一页的认真，我都看见了。",
+      "synth": "阅读书签点亮啦。<#0.4#>一页一页的认真，我都看见了。",
+      "animation": "waving"
+    },
+    {
+      "id": "refresh-questions-goal-1",
+      "group": "questions-goal",
+      "message": "做题书签到手啦。今天又把不会的，变成了会的。",
+      "synth": "做题书签到手啦。<#0.4#>今天又把不会的，变成了会的。",
+      "animation": "waving"
+    },
+    {
+      "id": "refresh-overall-goal-1",
+      "group": "overall-goal",
+      "message": "综合进度到一百啦！今天的双人书签，我替你收好。",
+      "synth": "综合进度到一百啦！今天的双人书签，我替你收好。<#0.4#>",
+      "animation": "waving"
+    },
+    {
+      "id": "refresh-vocabulary-1",
+      "group": "vocabulary",
+      "message": "今天的单词收好啦。你在手机上认真，我在这里替你记着。",
+      "synth": "今天的单词收好啦。<#0.4#>你在手机上认真，我在这里替你记着。",
+      "animation": "waving"
+    },
+    {
+      "id": "refresh-oral-review-1",
+      "group": "oral-review",
+      "message": "每日复习完成啦。温故知新，今天又扎实了一点。",
+      "synth": "每日复习完成啦。<#0.4#>温故知新，今天又扎实了一点。",
+      "animation": "waving"
+    },
+    {
+      "id": "refresh-mistake-review-1",
+      "group": "mistake-review",
+      "message": "错题攻坚完成啦。卡住的地方，被你一点点解开了。",
+      "synth": "错题攻坚完成啦。<#0.4#>卡住的地方，被你一点点解开了。",
+      "animation": "waving"
+    },
+    {
+      "id": "refresh-settlement-1",
+      "group": "settlement",
+      "message": "今天的努力收好啦。不用每一天都完美，我喜欢认真生活的你。",
+      "synth": "今天的努力收好啦。<#0.4#>不用每一天都完美，我喜欢认真生活的你。",
+      "animation": "waving"
+    },
+    {
+      "id": "refresh-study-return-1",
+      "group": "study-return",
+      "message": "回来啦？刚才的认真没有白费，我们接着往下走。",
+      "synth": "回来啦？刚才的认真没有白费，我们接着往下走。<#0.4#>",
+      "animation": "waving"
+    },
+    {
+      "id": "refresh-todo-done-1",
+      "group": "todo-done",
+      "message": "又划掉了一件。慢慢来，想做的事总会有它的位置。",
+      "synth": "又划掉了一件。<#0.4#>慢慢来，想做的事总会有它的位置。",
+      "animation": "waving"
+    },
+    {
+      "id": "refresh-start-gentle-1",
+      "group": "start-gentle",
+      "message": "先翻开一页就好。你负责开始，我负责陪着你。",
+      "synth": "先翻开一页就好。<#0.4#>你负责开始，我负责陪着你。",
+      "animation": "waving"
+    },
+    {
+      "id": "refresh-start-firm-1",
+      "group": "start-firm",
+      "message": "我再拉你一下。先把学习台打开，我们认真十分钟。",
+      "synth": "我再拉你一下。<#0.4#>先把学习台打开，我们认真十分钟。",
+      "animation": "waving"
+    },
+    {
+      "id": "refresh-start-rest-1",
+      "group": "start-rest",
+      "message": "现在先休息吧。学习和好好照顾自己，我们都要。",
+      "synth": "现在先休息吧。<#0.4#>学习和好好照顾自己，我们都要。",
+      "animation": "waving"
+    }
+  ]
+}

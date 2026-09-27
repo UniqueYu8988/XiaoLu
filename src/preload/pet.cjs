@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld("xiaoluPet", {
   dragStart: (point) => ipcRenderer.send("xiaolu:drag-start", point),
   dragEnd: () => ipcRenderer.send("xiaolu:drag-end"),
   setBubbleBounds: (bounds) => ipcRenderer.send("xiaolu:bubble-bounds", bounds),
+  setStudyArt: (asset) => ipcRenderer.send("xiaolu:study-art", asset),
   onCursor: (callback) => ipcRenderer.on("xiaolu:cursor", (_event, point) => callback(point)),
   onAction: (callback) => ipcRenderer.on("xiaolu:play-action", (_event, action) => callback(action)),
   onVoice: (callback) => ipcRenderer.on("xiaolu:play-voice", (_event, voice) => callback(voice)),
