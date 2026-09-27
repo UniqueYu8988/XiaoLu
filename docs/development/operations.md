@@ -36,7 +36,7 @@
 
 `scripts/create_manual_preview.mjs` 提供虚构界面数据；它用于布局和截图，不能替代 Electron 窗口或真实联动验收。检查当前窗口尺寸及 Windows 缩放下的一屏显示、长文字、分页、粒子和气泡裁切。桌面透明区的点击穿透、边缘拖动、释放鼠标及菜单关闭后的跑步状态单独检查。
 
-语音修改核对台词映射、文件存在和实际播放。说明书生成入口为 `scripts/create_companion_manual.py`，长图拼接为 `scripts/stitch_manual_pages.py`；生成 PDF 后逐页渲染检查，再更新 `docs/xiaolu-study-guide.pdf` 和 README 折叠预览。截图使用虚构数据，不包含个人日记或真实任务。
+语音修改核对台词映射、文件存在和实际播放。当前精简 PDF 说明书生成入口为 `scripts/create_compact_manual.py`（旧 DOCX 版生成器 `scripts/create_companion_manual.py` 仅作历史保留），长图拼接为 `scripts/stitch_manual_pages.py`；生成 PDF 后逐页渲染检查，再更新 `docs/xiaolu-study-guide.pdf` 和 README 折叠预览。说明书只用可公开素材和虚构数据，不包含个人日记或真实任务。
 
 ## 构建、安装与发布
 

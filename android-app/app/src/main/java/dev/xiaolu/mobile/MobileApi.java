@@ -16,11 +16,15 @@ final class MobileApi {
     private MobileApi() {}
 
     static JSONObject request(String base, String path, String method, String token, String revision, JSONObject payload) throws Exception {
+        return request(base, path, method, token, revision, payload, 6000);
+    }
+
+    static JSONObject request(String base, String path, String method, String token, String revision, JSONObject payload, int timeout) throws Exception {
         if (!base.matches("https://[A-Za-z0-9.-]+(?::[0-9]{1,5})?")) throw new Exception("请输入 Tailscale 提供的 HTTPS 地址");
         HttpURLConnection connection = (HttpURLConnection) new URL(base + path).openConnection();
         connection.setRequestMethod(method);
-        connection.setConnectTimeout(6000);
-        connection.setReadTimeout(6000);
+        connection.setConnectTimeout(timeout);
+        connection.setReadTimeout(timeout);
         connection.setRequestProperty("Accept", "application/json");
         if (token != null && !token.isEmpty()) connection.setRequestProperty("Authorization", "Bearer " + token);
         if (revision != null && !revision.isEmpty()) connection.setRequestProperty("If-Match", revision);

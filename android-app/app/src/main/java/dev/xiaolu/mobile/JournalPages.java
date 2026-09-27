@@ -36,7 +36,7 @@ final class JournalPages {
     private static final int GREEN = Color.rgb(232, 241, 229);
     private static final int RED = Color.rgb(252, 231, 232);
     private final Context context;
-    private final MobileSnapshot snapshot;
+    private MobileSnapshot snapshot;
     private final String page;
     private final String notice;
     private final boolean connected;
@@ -44,7 +44,8 @@ final class JournalPages {
     private final Actions actions;
     private final Typeface pixel;
     private static Typeface cachedPixel;
-    private final LinearLayout root;
+    private LinearLayout root;
+    private final java.util.Map<TextView, java.util.function.Function<MobileSnapshot, String>> bindings = new java.util.HashMap<>();
 
     interface Actions {
         void navigate(String page);
@@ -62,6 +63,8 @@ final class JournalPages {
         void deleteTodo(MobileSnapshot.Todo todo);
         void editVocabulary(MobileSnapshot snapshot);
         void openReader(String route);
+        void reminderSettings();
+        String reminderLabel();
     }
 
     JournalPages(Context context, MobileSnapshot snapshot, String page, String notice,
@@ -110,6 +113,9 @@ final class JournalPages {
             return root;
         }
         tabs();
+        LinearLayout full = root;
+        root = column();
+        full.addView(root, new LinearLayout.LayoutParams(-1, -2));
         switch (page) {
             case TASKS: tasks(); break;
             case TODOS: todos(); break;
@@ -119,8 +125,34 @@ final class JournalPages {
             case RULES: rules(); break;
             default: today(); break;
         }
-        return root;
+        return full;
     }
+
+    View contentView() { return root; }
+
+    boolean updateProgress(MobileSnapshot next, String nextNotice) {
+        if (snapshot == null || !snapshot.studyDay.equals(next.studyDay)
+                || !notice.equals(nextNotice) || snapshot.isStudying != next.isStudying
+                || !snapshot.studyState.equals(next.studyState) || snapshot.settled != next.settled) return false;
+        if (!page.equals(TODAY) && !page.equals(STATS) && !page.equals(TASKS)) return false;
+        if (page.equals(TODAY)) {
+            if (snapshot.checkIns.size() != next.checkIns.size()) return false;
+            for (int i = 0; i < next.checkIns.size(); i++) if (!snapshot.checkIns.get(i).status.equals(next.checkIns.get(i).status)) return false;
+        }
+        if (page.equals(TASKS) && (snapshot.readingPercent != next.readingPercent || snapshot.questionsPercent != next.questionsPercent || snapshot.overallPercent != next.overallPercent)) return false;
+        if (page.equals(STATS) && (snapshot.settings.launchAtLogin != next.settings.launchAtLogin || snapshot.settings.yuReaderEnabled != next.settings.yuReaderEnabled
+                || snapshot.settings.patrolEnabled != next.settings.patrolEnabled || snapshot.settings.voiceEnabled != next.settings.voiceEnabled)) return false;
+        snapshot = next;
+        for (java.util.Map.Entry<TextView, java.util.function.Function<MobileSnapshot, String>> entry : bindings.entrySet()) {
+            String value = entry.getValue().apply(next);
+            if (!entry.getKey().getText().toString().equals(value)) entry.getKey().setText(value);
+            if (value.equals("✓")) entry.getKey().setTextColor(Color.rgb(63, 125, 75));
+            if (value.equals("×")) entry.getKey().setTextColor(Color.rgb(181, 72, 88));
+        }
+        return true;
+    }
+
+    private void bind(TextView view, java.util.function.Function<MobileSnapshot, String> value) { bindings.put(view, value); }
 
     private void header() {
         LinearLayout line = row();
@@ -156,6 +188,7 @@ final class JournalPages {
         card.addView(details, new LinearLayout.LayoutParams(0, -2, 1));
         details.addView(text(snapshot.studyDay.replace('-', '.'), 11, PURPLE, true, true));
         TextView timer = text(clock(snapshot.studySeconds), 23, INK, true, true);
+        bind(timer, s -> clock(s.studySeconds));
         details.addView(timer);
         String status = "learning".equals(snapshot.studyState)
                 ? "YuReader 正在记录，我会安静陪着你。"
@@ -228,7 +261,9 @@ final class JournalPages {
         ImageView icon = image(R.drawable.stat_daily_summary, 26, 26);
         vocabulary.addView(icon, box(28, 28, 9));
         vocabulary.addView(text("今日背诵单词", 12, INK, true, true), new LinearLayout.LayoutParams(0, -2, 1));
-        vocabulary.addView(text(snapshot.vocabularyCount + " / " + snapshot.vocabularyTarget, 15, PURPLE, true, true));
+        TextView words = text(snapshot.vocabularyCount + " / " + snapshot.vocabularyTarget, 15, PURPLE, true, true);
+        bind(words, s -> s.vocabularyCount + " / " + s.vocabularyTarget);
+        vocabulary.addView(words);
         vocabulary.setContentDescription("填写今日背诵单词总数");
         if (connected) vocabulary.setOnClickListener(view -> actions.editVocabulary(snapshot));
         TextView edit = text("›", 22, PURPLE, true, false);
@@ -327,12 +362,17 @@ final class JournalPages {
         setting("小鹿学习", "连接 YuReader，同步阅读与做题进度", snapshot.settings.yuReaderEnabled, R.drawable.stat_questions);
         setting("小鹿巡逻", "约定时段没开始，就在桌面找你", snapshot.settings.patrolEnabled, R.drawable.stat_accuracy);
         setting("小鹿语音", "只在重要时刻开口", snapshot.settings.voiceEnabled, R.drawable.stat_daily_summary);
+        Button reminders = button("手机提醒 · " + actions.reminderLabel() + "  ›", false);
+        add(root, reminders, 7, 0);
+        reminders.setOnClickListener(view -> actions.reminderSettings());
         section("LINK", "手机连接", null);
         LinearLayout connectionLine = row();
         connectionLine.setGravity(Gravity.CENTER_VERTICAL);
         add(root, connectionLine, 0, 6);
         connectionLine.addView(text(connected ? "已配对" : "未配对", 13, INK, true, true), new LinearLayout.LayoutParams(0, -2, 1));
-        connectionLine.addView(text(updatedTime(), 10, MUTED, false, false));
+        TextView updated = text(updatedTime(), 10, MUTED, false, false);
+        bind(updated, s -> updatedTime());
+        connectionLine.addView(updated);
         Button connection = button(connected ? "断开此手机" : "与电脑配对", false);
         LinearLayout controls = row();
         add(root, controls, 4, 0);
@@ -453,6 +493,15 @@ final class JournalPages {
         tile.addView(main, new LinearLayout.LayoutParams(-1, -2));
         main.addView(image(icon, 27, 27), box(27, 27, 5));
         TextView amount = text(value, 15, INK, true, true);
+        switch (label) {
+            case "学习时间": bind(amount, s -> duration(s.studySeconds)); break;
+            case "综合完成": bind(amount, s -> percent(s.overallPercent)); break;
+            case "错题攻坚": bind(amount, s -> s.mistakeReviewCompleted ? "✓" : "×"); break;
+            case "每日复习": bind(amount, s -> s.oralReviewCompleted ? "✓" : "×"); break;
+            case "口腔": bind(amount, s -> percent(s.medicinePercent)); break;
+            case "英语": bind(amount, s -> percent(s.englishPercent)); break;
+            case "政治": bind(amount, s -> percent(s.politicsPercent)); break;
+        }
         amount.setGravity(Gravity.CENTER);
         amount.setSingleLine(true);
         amount.setAutoSizeTextTypeUniformWithConfiguration(11, 15, 1, android.util.TypedValue.COMPLEX_UNIT_SP);
@@ -476,6 +525,12 @@ final class JournalPages {
         tile.setMinimumHeight(dp(60));
         tile.setBackground(frame(CREAM));
         TextView amount = text(value, 16, INK, true, true);
+        switch (label) {
+            case "累计学习": bind(amount, s -> duration(s.stats.totalStudySeconds)); break;
+            case "按时打卡": bind(amount, s -> s.stats.checkedCount + " 次"); break;
+            case "双人书签": bind(amount, s -> s.stats.togetherBookmarks + " 枚"); break;
+            case "累计背词": bind(amount, s -> s.stats.totalVocabulary + " 个"); break;
+        }
         amount.setSingleLine(true);
         amount.setAutoSizeTextTypeUniformWithConfiguration(12, 16, 1, android.util.TypedValue.COMPLEX_UNIT_SP);
         tile.addView(amount, new LinearLayout.LayoutParams(-1, dp(23)));

@@ -1,0 +1,11 @@
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut android:shortcutId="todo" android:shortcutShortLabel="@string/shortcut_todo" android:icon="@drawable/xiaolu_icon">
+        <intent android:action="dev.xiaolu.TODO" android:targetPackage="dev.xiaolu.mobile" android:targetClass="dev.xiaolu.mobile.MainActivity" />
+    </shortcut>
+    <shortcut android:shortcutId="words" android:shortcutShortLabel="@string/shortcut_words" android:icon="@drawable/stat_daily_summary">
+        <intent android:action="dev.xiaolu.WORDS" android:targetPackage="dev.xiaolu.mobile" android:targetClass="dev.xiaolu.mobile.MainActivity" />
+    </shortcut>
+    <shortcut android:shortcutId="learn" android:shortcutShortLabel="@string/shortcut_learn" android:icon="@drawable/stat_subject_oral">
+        <intent android:action="dev.xiaolu.LEARN" android:targetPackage="dev.xiaolu.mobile" android:targetClass="dev.xiaolu.mobile.MainActivity" />
+    </shortcut>
+</shortcuts>

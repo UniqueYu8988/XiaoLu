@@ -9,8 +9,9 @@ val localSettingsFile = rootProject.file("local.properties")
 if (localSettingsFile.exists()) {
     localSettingsFile.inputStream().use { localSettings.load(it) }
 }
-val defaultBaseUrl = localSettings.getProperty("xiaolu.baseUrl", "")
-val programmingUrl = localSettings.getProperty("xiaolu.programmingUrl", "")
+val publicBuild = providers.gradleProperty("xiaolu.publicBuild").orNull == "true"
+val defaultBaseUrl = if (publicBuild) "" else localSettings.getProperty("xiaolu.baseUrl", "")
+val programmingUrl = if (publicBuild) "" else localSettings.getProperty("xiaolu.programmingUrl", "")
 require(programmingUrl.isEmpty() || programmingUrl.matches(Regex("https://antigravity\\.google\\.com/r/[A-Za-z0-9-]+"))) {
     "xiaolu.programmingUrl must be an Antigravity HTTPS remote page"
 }
@@ -26,8 +27,8 @@ android {
         applicationId = "dev.xiaolu.mobile"
         minSdk = 26
         targetSdk = 36
-        versionCode = 3
-        versionName = "0.2.0"
+        versionCode = 100
+        versionName = "1.0.0"
         buildConfigField("String", "DEFAULT_BASE_URL", "\"$defaultBaseUrl\"")
         buildConfigField("String", "PROGRAMMING_URL", "\"$programmingUrl\"")
     }

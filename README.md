@@ -4,7 +4,8 @@
   <p>不是桌面宠物，而是住在桌面上的学习搭子。</p>
   <p>
     <img alt="Version" src="https://img.shields.io/badge/version-2.0.4-76558f" />
-    <img alt="Platform" src="https://img.shields.io/badge/platform-Windows-4b315e" />
+    <img alt="Android" src="https://img.shields.io/badge/Android-1.0.0-76558f" />
+    <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%20%2B%20Android-4b315e" />
     <img alt="Data" src="https://img.shields.io/badge/data-local--first-a9c99e" />
     <img alt="License" src="https://img.shields.io/badge/license-MIT-f4d57b" />
   </p>
@@ -17,9 +18,9 @@
 
 ## 图文说明书
 
-当前源码包含 Android 伴侣端：通过同一 Wi-Fi 或 Tailscale 配对，查看今日进度、书签和历史记录，在线编辑待办、提交今日背词总数，并从手机浏览器进入学习网页。编译和连接方法见 [Android 使用说明](android-app/README.md)。电脑需运行共学日记；离线时手机展示上次同步结果。个人地址与配对信息不包含在源码中。下方 PDF 仍为 2.0.0 桌面版说明；最新手机功能以上述文档为准，本轮未另发 Release。
+Android 1.0.0 已发布：查看今日、任务、书签与历史，在线编辑待办、提交今日背词，使用两款随进度变化的 2×2 像素插画组件、快捷入口和分级提醒。电脑负责保存；手机经 Tailscale 配对，离线显示上次摘要。公开 APK 不含个人地址或配对信息，首次使用需填写电脑托盘提供的 HTTPS 地址。[下载手机版](https://github.com/UniqueYu8988/XiaoLu/releases/tag/android-v1.0.0) · [连接与编译说明](android-app/README.md)。
 
-说明书已按 2.0.0 重新制作，介绍 YuReader 目标同步、三枚动态书签、三学科结算、待办、学习中打卡、自动启动学习台、巡逻、离线语音和位置机制。可以直接[下载 PDF](docs/xiaolu-study-guide.pdf)，也可以在下方展开阅读。
+新版说明书精简为五页，以角色、书签和十张组件插画介绍 Windows 2.0.4 与 Android 1.0.0，移除整页界面截图展示。可以直接[下载 PDF](docs/xiaolu-study-guide.pdf)，也可以在下方展开阅读。
 
 <details>
   <summary><strong>展开完整图文说明书</strong></summary>

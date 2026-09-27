@@ -1,0 +1,5 @@
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/widget_root"
+    android:layout_width="match_parent" android:layout_height="match_parent">
+    <ImageView android:id="@+id/widget_card" android:layout_width="match_parent" android:layout_height="match_parent"
+        android:scaleType="fitCenter" android:contentDescription="今日学习摘要，点击打开共学日记" />
+</FrameLayout>

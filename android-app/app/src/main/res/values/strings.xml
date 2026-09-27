@@ -1,0 +1,7 @@
+<resources>
+    <string name="widget_description">2×2 今日完成度，随进度变化的像素小鹿</string>
+    <string name="compact_widget_description">2×2 今日学习时长，每两小时变化的像素小鹿</string>
+    <string name="shortcut_todo">记待办</string>
+    <string name="shortcut_words">填单词</string>
+    <string name="shortcut_learn">去学习</string>
+</resources>

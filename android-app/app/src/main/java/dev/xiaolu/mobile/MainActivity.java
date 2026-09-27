@@ -53,6 +53,11 @@ public final class MainActivity extends Activity {
     private String notice = "";
     private boolean networkBusy = false;
     private boolean editingTodo = false;
+    private JournalPages renderedPages;
+    private String renderedPage = "";
+    private String pendingAction = "";
+    private final java.util.Map<String, Integer> pageScroll = new java.util.HashMap<>();
+    private int navigationDirection = 0;
     private final Handler refreshHandler = new Handler(Looper.getMainLooper());
     private final Runnable periodicRefresh = new Runnable() {
         @Override public void run() {
@@ -83,7 +88,13 @@ public final class MainActivity extends Activity {
         }
         scroll.addView(body);
         setContentView(scroll);
+        revision = MobileStore.preferences(this).getString("revision", "");
+        vocabularyRevision = MobileStore.preferences(this).getString("vocabularyRevision", "");
+        handleEntry(getIntent());
         render();
+        runEntry();
+        SnapshotJob.schedule(this, false);
+        StudyReminder.schedule(this);
     }
 
     @Override protected void onResume() {
@@ -98,20 +109,18 @@ public final class MainActivity extends Activity {
     }
 
     private void render() {
-        int previousY = resetScrollNext ? 0 : scroll.getScrollY();
+        boolean reset = resetScrollNext;
+        int previousY = reset ? 0 : scroll.getScrollY();
         resetScrollNext = false;
+        MobileSnapshot snapshot = MobileStore.read(this);
+        if (!reset && snapshot != null && renderedPages != null && renderedPage.equals(selectedPage)
+                && renderedPages.updateProgress(snapshot, notice)) return;
         body.removeAllViews();
-        MobileSnapshot snapshot = null;
-        try (InputStream input = openFileInput(SNAPSHOT_FILE)) {
-            snapshot = MobileSnapshot.parse(new String(readLimited(input), StandardCharsets.UTF_8));
-        } catch (FileNotFoundException ignored) {
-            // The first launch intentionally has no personal data.
-        } catch (IOException | JSONException error) {
-            notice = "已有摘要无法读取，请重新同步。";
-        }
         JournalPages pages = new JournalPages(this, snapshot, selectedPage, notice,
                 !savedToken().isEmpty(), historyPage, new JournalPages.Actions() {
             @Override public void navigate(String page) {
+                pageScroll.put(selectedPage, scroll.getScrollY());
+                navigationDirection = tabIndex(page) >= tabIndex(selectedPage) ? 1 : -1;
                 selectedPage = page;
                 resetScrollNext = true;
                 render();
@@ -159,9 +168,21 @@ public final class MainActivity extends Activity {
             }
             @Override public void editVocabulary(MobileSnapshot snapshot) { vocabularyDialog(snapshot); }
             @Override public void openReader(String route) { MainActivity.this.openReader(route); }
+            @Override public void reminderSettings() { reminderDialog(); }
+            @Override public String reminderLabel() { return StudyReminder.label(MainActivity.this); }
         });
         body.addView(pages.build());
-        scroll.post(() -> scroll.scrollTo(0, previousY));
+        renderedPages = pages;
+        renderedPage = selectedPage;
+        int targetY = navigationDirection == 0 ? previousY : pageScroll.getOrDefault(selectedPage, 0);
+        scroll.post(() -> scroll.scrollTo(0, targetY));
+        if (navigationDirection != 0 && android.animation.ValueAnimator.areAnimatorsEnabled()) {
+            View content = pages.contentView();
+            content.setTranslationX(dp(12) * navigationDirection);
+            content.setAlpha(0f);
+            content.animate().translationX(0f).alpha(1f).setDuration(200).start();
+        }
+        navigationDirection = 0;
     }
 
     private String savedBase() { return getPreferences(MODE_PRIVATE).getString("base", BuildConfig.DEFAULT_BASE_URL); }
@@ -264,15 +285,12 @@ public final class MainActivity extends Activity {
 
     private void saveSnapshot(JSONObject response) {
         try {
-            String json = response.getJSONObject("snapshot").toString();
-            MobileSnapshot.parse(json);
-            try (java.io.FileOutputStream output = openFileOutput(SNAPSHOT_FILE, MODE_PRIVATE)) {
-                output.write(json.getBytes(StandardCharsets.UTF_8));
-            }
-            revision = response.getString("revision");
-            vocabularyRevision = response.optString("vocabularyRevision", "");
+            MobileStore.save(this, response);
+            revision = MobileStore.preferences(this).getString("revision", "");
+            vocabularyRevision = MobileStore.preferences(this).getString("vocabularyRevision", "");
             notice = "已与电脑同步";
             render();
+            runEntry();
         } catch (Exception error) {
             toast("同步数据无法读取");
         }
@@ -449,6 +467,7 @@ public final class MainActivity extends Activity {
             return;
         }
         if (!route.equals("home")) return;
+        StudyReminder.cancelRepeat(this);
         try {
             android.net.Uri base = android.net.Uri.parse(savedBase());
             if (!"https".equals(base.getScheme()) || base.getHost() == null) throw new Exception();
@@ -457,6 +476,52 @@ public final class MainActivity extends Activity {
                     .appendQueryParameter("companion_device", "mobile").build();
             startActivity(new Intent(Intent.ACTION_VIEW, target));
         } catch (Exception error) { toast("请先设置电脑地址，并确认手机上有浏览器"); }
+    }
+
+    private static int tabIndex(String page) { return java.util.Arrays.asList("today", "tasks", "todos", "stats").indexOf(page); }
+
+    @Override protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent); setIntent(intent); handleEntry(intent); renderedPages = null; render(); runEntry();
+    }
+
+    private void handleEntry(Intent intent) {
+        if (intent == null) return;
+        String action = intent.getAction();
+        if (Intent.ACTION_SEND.equals(action) && "text/plain".equals(intent.getType())) {
+            String text = intent.getStringExtra(Intent.EXTRA_TEXT);
+            if (text != null && !text.trim().isEmpty()) {
+                String shared = text.trim();
+                if (shared.length() > 60) { shared = shared.substring(0, 60); toast("先收下前60字，提交前可以修改"); }
+                if (todoDraft().isEmpty()) getPreferences(MODE_PRIVATE).edit().putString("todoDraft", shared).apply();
+                else toast("已有待办草稿还没提交，先保留原来的内容");
+                selectedPage = JournalPages.TODOS;
+            }
+        } else if ("dev.xiaolu.TODO".equals(action)) selectedPage = JournalPages.TODOS;
+        else if ("dev.xiaolu.WORDS".equals(action)) { selectedPage = JournalPages.TODAY; pendingAction = "words"; }
+        else if ("dev.xiaolu.LEARN".equals(action)) pendingAction = "learn";
+        else if ("dev.xiaolu.TODAY".equals(action)) selectedPage = JournalPages.TODAY;
+    }
+
+    private void runEntry() {
+        if (pendingAction.equals("learn")) { pendingAction = ""; openReader("home"); }
+        else if (pendingAction.equals("words") && !vocabularyRevision.isEmpty()) {
+            MobileSnapshot snapshot = MobileStore.read(this);
+            if (snapshot != null && !savedToken().isEmpty()) { pendingAction = ""; vocabularyDialog(snapshot); }
+        }
+    }
+
+    private void reminderDialog() {
+        new AlertDialog.Builder(this).setTitle("学习提醒 · 9/15/21点")
+                .setSingleChoiceItems(new String[] {"关闭", "轻提醒", "声音与振动", "约定提醒（最多三次）"}, StudyReminder.mode(this), (dialog, which) -> {
+                    MobileStore.preferences(this).edit().putInt("reminderMode", which).apply();
+                    StudyReminder.cancelRepeat(this); StudyReminder.schedule(this);
+                    dialog.dismiss(); renderedPages = null; render();
+                    if (which > 0) toast("系统省电可能延后提醒；不会强行打开页面");
+                    if (which > 0 && Build.VERSION.SDK_INT >= 33 && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                        requestPermissions(new String[] { android.Manifest.permission.POST_NOTIFICATIONS }, 2001);
+                    }
+                })
+                .setNegativeButton("返回", null).show();
     }
 
     private void showSnapshot(MobileSnapshot snapshot) {
