@@ -20,7 +20,7 @@
 
 Android 1.0.0 已发布：查看今日、任务、书签与历史，在线编辑待办、提交今日背词，使用两款随进度变化的 2×2 像素插画组件、快捷入口和分级提醒。电脑负责保存；手机经 Tailscale 配对，离线显示上次摘要。公开 APK 不含个人地址或配对信息，首次使用需填写电脑托盘提供的 HTTPS 地址。[下载手机版](https://github.com/UniqueYu8988/XiaoLu/releases/tag/android-v1.0.0) · [连接与编译说明](android-app/README.md)。
 
-新版说明书精简为五页，以角色、书签和十张组件插画介绍 Windows 2.0.4 与 Android 1.0.0，移除整页界面截图展示。可以直接[下载 PDF](docs/xiaolu-study-guide.pdf)，也可以在下方展开阅读。
+新版说明书共十页，保留原封面与桌面核心功能，只合并重复说明和边缘细节；加入手机使用与两款组件的十张插画，移除整页界面截图展示。可以直接[下载 PDF](docs/xiaolu-study-guide.pdf)，也可以在下方展开阅读。
 
 <details>
   <summary><strong>展开完整图文说明书</strong></summary>
